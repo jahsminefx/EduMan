@@ -37,3 +37,7 @@ backend/uploads/
 *.sln
 *.sw?
 .gemini/
+
+# Project Info
+README.md
+frontend/README.md

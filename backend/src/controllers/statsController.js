@@ -6,10 +6,8 @@ exports.getDashboardStats = async (req, res) => {
         const { role, school_id, id: user_id } = req.user;
 
         if (role === 'SuperAdmin') {
-            // Global Oversight for Super Admin
             const schoolsCount = await db.get("SELECT COUNT(*) as count FROM schools");
             const usersCount = await db.get("SELECT COUNT(*) as count FROM users");
-            // Placeholder for subscription logic if not in schema yet
             const activeSubs = await db.get("SELECT COUNT(*) as count FROM schools WHERE is_active = 1");
 
             return res.json({
@@ -30,16 +28,16 @@ exports.getDashboardStats = async (req, res) => {
         }
 
         if (role === 'SchoolAdmin') {
-            const studentsCount = await db.get("SELECT COUNT(*) as count FROM students WHERE school_id = ?", [school_id]);
-            const teachersCount = await db.get("SELECT COUNT(*) as count FROM teachers WHERE school_id = ?", [school_id]);
-            const classesCount = await db.get("SELECT COUNT(*) as count FROM classes WHERE school_id = ?", [school_id]);
-            const subjectsCount = await db.get("SELECT COUNT(*) as count FROM subjects WHERE school_id = ?", [school_id]);
+            const studentsCount = await db.get("SELECT COUNT(*) as count FROM students WHERE school_id = $1", [school_id]);
+            const teachersCount = await db.get("SELECT COUNT(*) as count FROM teachers WHERE school_id = $1", [school_id]);
+            const classesCount = await db.get("SELECT COUNT(*) as count FROM classes WHERE school_id = $1", [school_id]);
+            const subjectsCount = await db.get("SELECT COUNT(*) as count FROM subjects WHERE school_id = $1", [school_id]);
 
             const attendanceData = await db.get(`
                 SELECT COUNT(*) as total, SUM(CASE WHEN status = 'Present' THEN 1 ELSE 0 END) as present
                 FROM attendance_records ar
                 JOIN students s ON ar.student_id = s.id
-                WHERE s.school_id = ? AND ar.date = date('now')
+                WHERE s.school_id = $1 AND ar.date = CURRENT_DATE
             `, [school_id]);
 
             let attendancePercentage = 0;
@@ -57,30 +55,30 @@ exports.getDashboardStats = async (req, res) => {
         }
 
         if (role === 'Teacher') {
-            const teacher = await db.get("SELECT id FROM teachers WHERE user_id = ?", [user_id]);
+            const teacher = await db.get("SELECT id FROM teachers WHERE user_id = $1", [user_id]);
             if (!teacher) return res.status(404).json({ error: 'Not Found', message: 'Teacher record not found' });
 
             const studentsCount = await db.get(`
                 SELECT COUNT(DISTINCT s.id) as count 
                 FROM students s
                 JOIN teacher_classes tc ON s.class_id = tc.class_id
-                WHERE tc.teacher_id = ?
+                WHERE tc.teacher_id = $1
             `, [teacher.id]);
 
-            const classesCount = await db.get("SELECT COUNT(*) as count FROM teacher_classes WHERE teacher_id = ?", [teacher.id]);
+            const classesCount = await db.get("SELECT COUNT(*) as count FROM teacher_classes WHERE teacher_id = $1", [teacher.id]);
             
             const pendingHomework = await db.get(`
                 SELECT COUNT(*) as count 
                 FROM homework_submissions hs
                 JOIN homework h ON hs.homework_id = h.id
-                WHERE h.teacher_id = ? AND hs.status = 'pending'
+                WHERE h.teacher_id = $1 AND hs.status = 'pending'
             `, [teacher.id]);
 
             const attendanceData = await db.get(`
                 SELECT COUNT(*) as total, SUM(CASE WHEN status = 'Present' THEN 1 ELSE 0 END) as present
                 FROM attendance_records ar
                 JOIN teacher_classes tc ON ar.class_id = tc.class_id
-                WHERE tc.teacher_id = ? AND ar.date = date('now')
+                WHERE tc.teacher_id = $1 AND ar.date = CURRENT_DATE
             `, [teacher.id]);
 
             let attendancePercentage = 0;
@@ -97,19 +95,19 @@ exports.getDashboardStats = async (req, res) => {
         }
 
         if (role === 'Student') {
-            const student = await db.get("SELECT id, class_id FROM students WHERE user_id = ?", [user_id]);
+            const student = await db.get("SELECT id, class_id FROM students WHERE user_id = $1", [user_id]);
             if (!student) return res.status(404).json({ error: 'Not Found', message: 'Student record not found' });
 
-            const subjectsCount = await db.get("SELECT COUNT(*) as count FROM class_subjects WHERE class_id = ?", [student.class_id]);
-            const completedAssignments = await db.get("SELECT COUNT(*) as count FROM homework_submissions WHERE student_id = ? AND status != 'pending'", [student.id]);
+            const subjectsCount = await db.get("SELECT COUNT(*) as count FROM class_subjects WHERE class_id = $1", [student.class_id]);
+            const completedAssignments = await db.get("SELECT COUNT(*) as count FROM homework_submissions WHERE student_id = $1 AND status != 'pending'", [student.id]);
             
             const attendanceData = await db.get(`
                 SELECT COUNT(*) as total, SUM(CASE WHEN status = 'Present' THEN 1 ELSE 0 END) as present
                 FROM attendance_records
-                WHERE student_id = ?
+                WHERE student_id = $1
             `, [student.id]);
 
-            const averageScore = await db.get("SELECT AVG(score) as avg FROM assessments WHERE student_id = ?", [student.id]);
+            const averageScore = await db.get("SELECT AVG(score) as avg FROM assessments WHERE student_id = $1", [student.id]);
 
             let attendancePercentage = 0;
             if (attendanceData && attendanceData.total > 0) {
@@ -141,17 +139,16 @@ exports.getPerformanceSnapshot = async (req, res) => {
                 SELECT c.name, AVG(a.score) as avg_score
                 FROM assessments a
                 JOIN classes c ON a.class_id = c.id
-                WHERE c.school_id = ?
-                GROUP BY c.id
+                WHERE c.school_id = $1
+                GROUP BY c.id, c.name
                 ORDER BY avg_score DESC LIMIT 1
             `, [school_id]);
 
-            // Trend: last 7 days attendance
             const attendanceTrend = await db.all(`
                 SELECT date, ROUND(SUM(CASE WHEN status = 'Present' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) as percentage
                 FROM attendance_records ar
                 JOIN students s ON ar.student_id = s.id
-                WHERE s.school_id = ?
+                WHERE s.school_id = $1
                 GROUP BY date
                 ORDER BY date DESC LIMIT 7
             `, [school_id]);
@@ -163,15 +160,16 @@ exports.getPerformanceSnapshot = async (req, res) => {
         }
 
         if (role === 'Teacher') {
-            const teacher = await db.get("SELECT id FROM teachers WHERE user_id = ?", [user_id]);
+            const teacher = await db.get("SELECT id FROM teachers WHERE user_id = $1", [user_id]);
+            if (!teacher) return res.status(404).json({ error: 'Not Found', message: 'Teacher record not found' });
             
             const classAverages = await db.all(`
                 SELECT c.name, AVG(a.score) as avg_score
                 FROM assessments a
                 JOIN classes c ON a.class_id = c.id
                 JOIN teacher_classes tc ON c.id = tc.class_id
-                WHERE tc.teacher_id = ?
-                GROUP BY c.id
+                WHERE tc.teacher_id = $1
+                GROUP BY c.id, c.name
             `, [teacher.id]);
 
             const topStudent = await db.get(`
@@ -179,8 +177,8 @@ exports.getPerformanceSnapshot = async (req, res) => {
                 FROM assessments a
                 JOIN students s ON a.student_id = s.id
                 JOIN teacher_classes tc ON s.class_id = tc.class_id
-                WHERE tc.teacher_id = ?
-                GROUP BY s.id
+                WHERE tc.teacher_id = $1
+                GROUP BY s.id, s.first_name, s.last_name
                 ORDER BY avg_score DESC LIMIT 1
             `, [teacher.id]);
 
@@ -189,8 +187,8 @@ exports.getPerformanceSnapshot = async (req, res) => {
                 FROM assessments a
                 JOIN subjects sub ON a.subject_id = sub.id
                 JOIN teacher_subject_assignments tsa ON sub.id = tsa.subject_id AND a.class_id = tsa.class_id
-                WHERE tsa.teacher_id = ?
-                GROUP BY sub.id
+                WHERE tsa.teacher_id = $1
+                GROUP BY sub.id, sub.name
                 ORDER BY avg_score ASC LIMIT 3
             `, [teacher.id]);
 
@@ -202,20 +200,21 @@ exports.getPerformanceSnapshot = async (req, res) => {
         }
 
         if (role === 'Student') {
-            const student = await db.get("SELECT id FROM students WHERE user_id = ?", [user_id]);
+            const student = await db.get("SELECT id FROM students WHERE user_id = $1", [user_id]);
+            if (!student) return res.status(404).json({ error: 'Not Found', message: 'Student record not found' });
             
             const performance = await db.get(`
                 SELECT AVG(score) as avg_score
                 FROM assessments
-                WHERE student_id = ?
+                WHERE student_id = $1
             `, [student.id]);
 
             const bestSubject = await db.get(`
                 SELECT s.name, AVG(a.score) as avg_score
                 FROM assessments a
                 JOIN subjects s ON a.subject_id = s.id
-                WHERE a.student_id = ?
-                GROUP BY s.id
+                WHERE a.student_id = $1
+                GROUP BY s.id, s.name
                 ORDER BY avg_score DESC LIMIT 1
             `, [student.id]);
 
@@ -223,8 +222,8 @@ exports.getPerformanceSnapshot = async (req, res) => {
                 SELECT s.name, AVG(a.score) as avg_score
                 FROM assessments a
                 JOIN subjects s ON a.subject_id = s.id
-                WHERE a.student_id = ?
-                GROUP BY s.id
+                WHERE a.student_id = $1
+                GROUP BY s.id, s.name
                 ORDER BY avg_score ASC LIMIT 1
             `, [student.id]);
 
@@ -248,18 +247,19 @@ exports.getPendingTasks = async (req, res) => {
         const { role, id: user_id } = req.user;
 
         if (role === 'Teacher') {
-            const teacher = await db.get("SELECT id FROM teachers WHERE user_id = ?", [user_id]);
+            const teacher = await db.get("SELECT id FROM teachers WHERE user_id = $1", [user_id]);
+            if (!teacher) return res.status(404).json({ error: 'Not Found', message: 'Teacher record not found' });
             
             const pendingHomework = await db.get(`
                 SELECT COUNT(*) as count FROM homework_submissions hs
                 JOIN homework h ON hs.homework_id = h.id
-                WHERE h.teacher_id = ? AND hs.status = 'pending'
+                WHERE h.teacher_id = $1 AND hs.status = 'pending'
             `, [teacher.id]);
 
             const attendanceDue = await db.get(`
                 SELECT COUNT(*) as count FROM teacher_classes tc
-                LEFT JOIN attendance_records ar ON tc.class_id = ar.class_id AND ar.date = date('now')
-                WHERE tc.teacher_id = ? AND ar.id IS NULL
+                LEFT JOIN attendance_records ar ON tc.class_id = ar.class_id AND ar.date = CURRENT_DATE
+                WHERE tc.teacher_id = $1 AND ar.id IS NULL
             `, [teacher.id]);
 
             return res.json([
@@ -269,7 +269,6 @@ exports.getPendingTasks = async (req, res) => {
         }
 
         if (role === 'SchoolAdmin') {
-            // Placeholder: Admins could see school-wide gaps
             return res.json([
                 { label: 'Unassigned Subjects', count: 0, action: '/subjects' },
                 { label: 'Teachers without Classes', count: 0, action: '/teachers' }

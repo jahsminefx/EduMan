@@ -12,11 +12,11 @@ exports.createQuiz = async (req, res) => {
         const db = getDB();
         const school_id = req.user.school_id;
 
-        const teacher = await db.get('SELECT id FROM teachers WHERE user_id = ? AND school_id = ?', [req.user.id, school_id]);
+        const teacher = await db.get('SELECT id FROM teachers WHERE user_id = $1 AND school_id = $2', [req.user.id, school_id]);
         if (!teacher) return res.status(403).json({ error: 'Forbidden', message: 'Teacher profile not found.' });
 
         const assignment = await db.get(
-            'SELECT id FROM teacher_subject_assignments WHERE teacher_id = ? AND class_id = ? AND subject_id = ?',
+            'SELECT id FROM teacher_subject_assignments WHERE teacher_id = $1 AND class_id = $2 AND subject_id = $3',
             [teacher.id, class_id, subject_id]
         );
         if (!assignment) return res.status(403).json({ error: 'Forbidden', message: 'You are not assigned to this class/subject.' });
@@ -24,14 +24,14 @@ exports.createQuiz = async (req, res) => {
         await db.run('BEGIN TRANSACTION');
 
         const quizResult = await db.run(
-            'INSERT INTO quizzes (school_id, class_id, subject_id, teacher_id, title, duration_minutes) VALUES (?, ?, ?, ?, ?, ?)',
+            'INSERT INTO quizzes (school_id, class_id, subject_id, teacher_id, title, duration_minutes) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
             [school_id, class_id, subject_id, teacher.id, title, duration_minutes || 30]
         );
-        const quizId = quizResult.lastID;
+        const quizId = quizResult.lastID || quizResult.rows?.[0]?.id;
 
         for (const q of questions) {
             await db.run(
-                'INSERT INTO quiz_questions (quiz_id, question_text, options, correct_option_index) VALUES (?, ?, ?, ?)',
+                'INSERT INTO quiz_questions (quiz_id, question_text, options, correct_option_index) VALUES ($1, $2, $3, $4)',
                 [quizId, q.question_text, JSON.stringify(q.options), q.correct_option_index]
             );
         }
@@ -60,7 +60,7 @@ exports.getQuizzes = async (req, res) => {
             WHERE q.school_id = ?
         `;
         const params = [school_id];
-        if (class_id) { query += ' AND q.class_id = ?'; params.push(class_id); }
+        if (class_id) { query += ' AND q.class_id = $2'; params.push(class_id); }
 
         query += ' ORDER BY q.id DESC';
         const quizzes = await db.all(query, params);
@@ -77,10 +77,10 @@ exports.getQuizDetails = async (req, res) => {
         const db = getDB();
         const school_id = req.user.school_id;
 
-        const quiz = await db.get('SELECT * FROM quizzes WHERE id = ? AND school_id = ?', [id, school_id]);
+        const quiz = await db.get('SELECT * FROM quizzes WHERE id = $1 AND school_id = $2', [id, school_id]);
         if (!quiz) return res.status(404).json({ error: 'Not Found' });
 
-        const questions = await db.all('SELECT id, question_text, options FROM quiz_questions WHERE quiz_id = ?', [id]);
+        const questions = await db.all('SELECT id, question_text, options FROM quiz_questions WHERE quiz_id = $1', [id]);
         // Parse options JSON and strip correct answer for students
         const parsed = questions.map(q => ({
             ...q,
@@ -101,19 +101,19 @@ exports.submitQuiz = async (req, res) => {
         const db = getDB();
         const school_id = req.user.school_id;
 
-        const quiz = await db.get('SELECT * FROM quizzes WHERE id = ? AND school_id = ?', [quiz_id, school_id]);
+        const quiz = await db.get('SELECT * FROM quizzes WHERE id = $1 AND school_id = $2', [quiz_id, school_id]);
         if (!quiz) return res.status(404).json({ error: 'Not Found' });
 
-        const student = await db.get('SELECT id FROM students WHERE user_id = ? AND school_id = ? AND class_id = ?',
+        const student = await db.get('SELECT id FROM students WHERE user_id = $1 AND school_id = $2 AND class_id = $3',
             [req.user.id, school_id, quiz.class_id]);
         if (!student) return res.status(403).json({ error: 'Forbidden', message: 'You are not enrolled in this class.' });
 
         // Check for existing attempt
-        const existing = await db.get('SELECT id FROM quiz_attempts WHERE quiz_id = ? AND student_id = ?', [quiz_id, student.id]);
+        const existing = await db.get('SELECT id FROM quiz_attempts WHERE quiz_id = $1 AND student_id = $2', [quiz_id, student.id]);
         if (existing) return res.status(400).json({ error: 'Already Submitted', message: 'You have already attempted this quiz.' });
 
         // Score the quiz
-        const questions = await db.all('SELECT id, correct_option_index FROM quiz_questions WHERE quiz_id = ?', [quiz_id]);
+        const questions = await db.all('SELECT id, correct_option_index FROM quiz_questions WHERE quiz_id = $1', [quiz_id]);
         let correct = 0;
         for (const q of questions) {
             if (answers[q.id] === q.correct_option_index) correct++;
@@ -121,11 +121,11 @@ exports.submitQuiz = async (req, res) => {
         const score = questions.length > 0 ? (correct / questions.length) * 100 : 0;
 
         const result = await db.run(
-            'INSERT INTO quiz_attempts (quiz_id, student_id, score, completed_at) VALUES (?, ?, ?, CURRENT_TIMESTAMP)',
+            'INSERT INTO quiz_attempts (quiz_id, student_id, score, completed_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP) RETURNING id',
             [quiz_id, student.id, score]
         );
 
-        res.json({ message: 'Quiz submitted', score, total: questions.length, correct, attemptId: result.lastID });
+        res.json({ message: 'Quiz submitted', score, total: questions.length, correct, attemptId: result.lastID || result.rows?.[0]?.id });
     } catch (err) {
         res.status(500).json({ error: 'Server Error', message: err.message });
     }
@@ -137,7 +137,7 @@ exports.deleteQuiz = async (req, res) => {
     try {
         const db = getDB();
         const school_id = req.user.school_id;
-        const result = await db.run('DELETE FROM quizzes WHERE id = ? AND school_id = ?', [id, school_id]);
+        const result = await db.run('DELETE FROM quizzes WHERE id = $1 AND school_id = $2', [id, school_id]);
         if (result.changes === 0) return res.status(404).json({ error: 'Not Found' });
         res.json({ message: 'Quiz deleted successfully' });
     } catch (err) {

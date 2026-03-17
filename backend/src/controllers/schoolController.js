@@ -24,31 +24,31 @@ exports.createSchool = async (req, res) => {
         const db = getDB();
         
         // 1. Check if admin email exists
-        const existingUser = await db.get('SELECT id FROM users WHERE email = ?', [admin_email]);
+        const existingUser = await db.get('SELECT id FROM users WHERE email = $1', [admin_email]);
         if (existingUser) return res.status(400).json({ error: 'Duplicate', message: 'Admin email is already registered.' });
 
         await db.run('BEGIN TRANSACTION');
 
         // 2. Create School
         const schoolResult = await db.run(
-            'INSERT INTO schools (name, address, phone, email) VALUES (?, ?, ?, ?)',
+            'INSERT INTO schools (name, address, phone, email) VALUES ($1, $2, $3, $4) RETURNING id',
             [name, address, phone, email]
         );
-        const schoolId = schoolResult.lastID;
+        const schoolId = schoolResult.lastID || schoolResult.rows?.[0]?.id;
 
         // 3. Hash password & Create User account (Role: SchoolAdmin)
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(admin_password, salt);
 
         const userResult = await db.run(
-            'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)',
+            'INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id',
             [admin_name, admin_email, passwordHash, 'SchoolAdmin']
         );
-        const userId = userResult.lastID;
+        const userId = userResult.lastID || userResult.rows?.[0]?.id;
 
         // 4. Assign Admin to School
         await db.run(
-            'INSERT INTO school_admin_assignments (user_id, school_id) VALUES (?, ?)',
+            'INSERT INTO school_admin_assignments (user_id, school_id) VALUES ($1, $2)',
             [userId, schoolId]
         );
 
@@ -70,7 +70,7 @@ exports.getMySchool = async (req, res) => {
 
         if (!school_id) return res.status(400).json({ error: 'Bad Request', message: 'User has no associated school' });
 
-        const profile = await db.get("SELECT * FROM schools WHERE id = ?", [school_id]);
+        const profile = await db.get("SELECT * FROM schools WHERE id = $1", [school_id]);
         if (!profile) return res.status(404).json({ error: 'Not Found', message: 'School not found' });
         
         res.json({ profile });
@@ -87,7 +87,7 @@ exports.updateMySchool = async (req, res) => {
         const school_id = req.user.school_id;
         
         await db.run(
-            'UPDATE schools SET name=?, address=?, phone=?, email=?, current_session_id=?, current_term_id=? WHERE id=?',
+            'UPDATE schools SET name=$1, address=$2, phone=$3, email=$4, current_session_id=$5, current_term_id=$6 WHERE id=$7',
             [name, address, phone, email, current_session_id, current_term_id, school_id]
         );
         
@@ -102,7 +102,7 @@ exports.getSessions = async (req, res) => {
     try {
         const db = getDB();
         const school_id = req.user.school_id;
-        const sessions = await db.all("SELECT * FROM academic_sessions WHERE school_id = ? ORDER BY id DESC", [school_id]);
+        const sessions = await db.all("SELECT * FROM academic_sessions WHERE school_id = $1 ORDER BY id DESC", [school_id]);
         res.json({ sessions });
     } catch (err) {
         res.status(500).json({ error: 'Server Error', message: err.message });
@@ -114,8 +114,8 @@ exports.createSession = async (req, res) => {
     try {
         const db = getDB();
         const school_id = req.user.school_id;
-        const result = await db.run('INSERT INTO academic_sessions (school_id, name, start_date, end_date) VALUES (?, ?, ?, ?)', [school_id, name, start_date, end_date]);
-        res.json({ message: 'Session created', id: result.lastID });
+        const result = await db.run('INSERT INTO academic_sessions (school_id, name, start_date, end_date) VALUES ($1, $2, $3, $4) RETURNING id', [school_id, name, start_date, end_date]);
+        res.json({ message: 'Session created', id: result.lastID || result.rows?.[0]?.id });
     } catch (err) {
         res.status(500).json({ error: 'Server Error', message: err.message });
     }

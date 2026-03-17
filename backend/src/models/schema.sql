@@ -1,6 +1,6 @@
 -- Users table
 CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
@@ -10,7 +10,7 @@ CREATE TABLE IF NOT EXISTS users (
 
 -- Schools (Multi-Tenant Identifier)
 CREATE TABLE IF NOT EXISTS schools (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
     address TEXT,
     phone TEXT,
@@ -23,7 +23,7 @@ CREATE TABLE IF NOT EXISTS schools (
 
 -- School Admin Assignments
 CREATE TABLE IF NOT EXISTS school_admin_assignments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL,
     school_id INTEGER NOT NULL,
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -32,7 +32,7 @@ CREATE TABLE IF NOT EXISTS school_admin_assignments (
 
 -- Academic Sessions
 CREATE TABLE IF NOT EXISTS academic_sessions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     school_id INTEGER NOT NULL,
     name TEXT NOT NULL,
     start_date DATE,
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS academic_sessions (
 
 -- Academic Terms
 CREATE TABLE IF NOT EXISTS academic_terms (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     school_id INTEGER NOT NULL,
     session_id INTEGER NOT NULL,
     name TEXT NOT NULL,
@@ -54,7 +54,7 @@ CREATE TABLE IF NOT EXISTS academic_terms (
 
 -- Classes
 CREATE TABLE IF NOT EXISTS classes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     school_id INTEGER NOT NULL,
     name TEXT NOT NULL,
     level INTEGER,
@@ -64,7 +64,7 @@ CREATE TABLE IF NOT EXISTS classes (
 
 -- Subjects
 CREATE TABLE IF NOT EXISTS subjects (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     school_id INTEGER NOT NULL,
     name TEXT NOT NULL,
     code TEXT,
@@ -73,7 +73,7 @@ CREATE TABLE IF NOT EXISTS subjects (
 
 -- Teachers
 CREATE TABLE IF NOT EXISTS teachers (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     user_id INTEGER NOT NULL,
     school_id INTEGER NOT NULL,
     first_name TEXT NOT NULL,
@@ -85,7 +85,7 @@ CREATE TABLE IF NOT EXISTS teachers (
 
 -- Students
 CREATE TABLE IF NOT EXISTS students (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     user_id INTEGER, -- Optional if students log in
     school_id INTEGER NOT NULL,
     admission_number TEXT NOT NULL,
@@ -103,7 +103,7 @@ CREATE TABLE IF NOT EXISTS students (
 
 -- Parent-Student Links
 CREATE TABLE IF NOT EXISTS parent_student_links (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     parent_user_id INTEGER NOT NULL,
     student_id INTEGER NOT NULL,
     FOREIGN KEY(parent_user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS parent_student_links (
 
 -- Teacher-Subject Assignments (who teaches what in which class)
 CREATE TABLE IF NOT EXISTS teacher_subject_assignments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     teacher_id INTEGER NOT NULL,
     class_id INTEGER NOT NULL,
     subject_id INTEGER NOT NULL,
@@ -123,7 +123,7 @@ CREATE TABLE IF NOT EXISTS teacher_subject_assignments (
 
 -- Class-Subject Mappings (which subjects are taught in which class)
 CREATE TABLE IF NOT EXISTS class_subjects (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     subject_id INTEGER NOT NULL,
     class_id INTEGER NOT NULL,
     school_id INTEGER NOT NULL,
@@ -134,7 +134,7 @@ CREATE TABLE IF NOT EXISTS class_subjects (
 
 -- Teacher-Class Assignments (which classes a teacher is responsible for)
 CREATE TABLE IF NOT EXISTS teacher_classes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     teacher_id INTEGER NOT NULL,
     class_id INTEGER NOT NULL,
     school_id INTEGER NOT NULL,
@@ -145,7 +145,7 @@ CREATE TABLE IF NOT EXISTS teacher_classes (
 
 -- Attendance Records
 CREATE TABLE IF NOT EXISTS attendance_records (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     student_id INTEGER NOT NULL,
     class_id INTEGER NOT NULL,
     date DATE NOT NULL,
@@ -158,7 +158,7 @@ CREATE TABLE IF NOT EXISTS attendance_records (
 
 -- Assessments (Grades)
 CREATE TABLE IF NOT EXISTS assessments (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     student_id INTEGER NOT NULL,
     class_id INTEGER NOT NULL,
     subject_id INTEGER NOT NULL,
@@ -176,7 +176,7 @@ CREATE TABLE IF NOT EXISTS assessments (
 
 -- Homework
 CREATE TABLE IF NOT EXISTS homework (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     school_id INTEGER NOT NULL,
     class_id INTEGER NOT NULL,
     subject_id INTEGER NOT NULL,
@@ -193,7 +193,7 @@ CREATE TABLE IF NOT EXISTS homework (
 
 -- Homework Submissions
 CREATE TABLE IF NOT EXISTS homework_submissions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     homework_id INTEGER NOT NULL,
     student_id INTEGER NOT NULL,
     text_answer TEXT,
@@ -206,7 +206,7 @@ CREATE TABLE IF NOT EXISTS homework_submissions (
 
 -- Learning Contents (Library)
 CREATE TABLE IF NOT EXISTS learning_contents (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     school_id INTEGER, -- Nullable for global content manager uploads
     class_id INTEGER,  -- Nullable for all-class general
     subject_id INTEGER,
@@ -224,7 +224,7 @@ CREATE TABLE IF NOT EXISTS learning_contents (
 
 -- Quizzes
 CREATE TABLE IF NOT EXISTS quizzes (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     school_id INTEGER NOT NULL,
     class_id INTEGER NOT NULL,
     subject_id INTEGER NOT NULL,
@@ -239,7 +239,7 @@ CREATE TABLE IF NOT EXISTS quizzes (
 
 -- Quiz Questions
 CREATE TABLE IF NOT EXISTS quiz_questions (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     quiz_id INTEGER NOT NULL,
     question_text TEXT NOT NULL,
     options TEXT NOT NULL, -- JSON array of strings
@@ -249,7 +249,7 @@ CREATE TABLE IF NOT EXISTS quiz_questions (
 
 -- Quiz Attempts
 CREATE TABLE IF NOT EXISTS quiz_attempts (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    id SERIAL PRIMARY KEY,
     quiz_id INTEGER NOT NULL,
     student_id INTEGER NOT NULL,
     score REAL,

@@ -14,12 +14,12 @@ exports.createHomework = async (req, res) => {
         const school_id = req.user.school_id;
 
         // Get teacher profile
-        const teacher = await db.get('SELECT id FROM teachers WHERE user_id = ? AND school_id = ?', [req.user.id, school_id]);
+        const teacher = await db.get('SELECT id FROM teachers WHERE user_id = $1 AND school_id = $2', [req.user.id, school_id]);
         if (!teacher) return res.status(403).json({ error: 'Forbidden', message: 'Teacher profile not found.' });
 
         // Validate assignment
         const assignment = await db.get(
-            'SELECT id FROM teacher_subject_assignments WHERE teacher_id = ? AND class_id = ? AND subject_id = ?',
+            'SELECT id FROM teacher_subject_assignments WHERE teacher_id = $1 AND class_id = $2 AND subject_id = $3',
             [teacher.id, class_id, subject_id]
         );
         if (!assignment) return res.status(403).json({ error: 'Forbidden', message: 'You are not assigned to this class/subject.' });
@@ -27,11 +27,11 @@ exports.createHomework = async (req, res) => {
         const file_path = req.file ? `/uploads/${req.file.filename}` : null;
 
         const result = await db.run(
-            'INSERT INTO homework (school_id, class_id, subject_id, teacher_id, title, description, due_date, file_path) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO homework (school_id, class_id, subject_id, teacher_id, title, description, due_date, file_path) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
             [school_id, class_id, subject_id, teacher.id, title, description, due_date, file_path]
         );
 
-        res.json({ message: 'Homework created successfully', id: result.lastID });
+        res.json({ message: 'Homework created successfully', id: result.lastID || result.rows?.[0]?.id });
     } catch (err) {
         res.status(500).json({ error: 'Server Error', message: err.message });
     }
@@ -51,12 +51,12 @@ exports.getHomework = async (req, res) => {
             JOIN subjects s ON h.subject_id = s.id
             JOIN classes c ON h.class_id = c.id
             JOIN teachers t ON h.teacher_id = t.id
-            WHERE h.school_id = ?
+            WHERE h.school_id = $1
         `;
         const params = [school_id];
 
         if (class_id) {
-            query += ' AND h.class_id = ?';
+            query += ' AND h.class_id = $2';
             params.push(class_id);
         }
 
@@ -76,7 +76,7 @@ exports.deleteHomework = async (req, res) => {
         const db = getDB();
         const school_id = req.user.school_id;
 
-        const result = await db.run('DELETE FROM homework WHERE id = ? AND school_id = ?', [id, school_id]);
+        const result = await db.run('DELETE FROM homework WHERE id = $1 AND school_id = $2', [id, school_id]);
         if (result.changes === 0) return res.status(404).json({ error: 'Not Found' });
 
         res.json({ message: 'Homework deleted successfully' });
@@ -93,21 +93,21 @@ exports.submitHomework = async (req, res) => {
         const db = getDB();
 
         // Verify homework exists and student is in the right class
-        const hw = await db.get('SELECT class_id, school_id FROM homework WHERE id = ?', [homework_id]);
+        const hw = await db.get('SELECT class_id, school_id FROM homework WHERE id = $1', [homework_id]);
         if (!hw) return res.status(404).json({ error: 'Not Found', message: 'Homework not found.' });
 
-        const student = await db.get('SELECT id FROM students WHERE user_id = ? AND school_id = ? AND class_id = ?',
+        const student = await db.get('SELECT id FROM students WHERE user_id = $1 AND school_id = $2 AND class_id = $3',
             [req.user.id, hw.school_id, hw.class_id]);
         if (!student) return res.status(403).json({ error: 'Forbidden', message: 'You are not enrolled in this class.' });
 
         const file_path = req.file ? `/uploads/${req.file.filename}` : null;
 
         const result = await db.run(
-            'INSERT INTO homework_submissions (homework_id, student_id, text_answer, file_path) VALUES (?, ?, ?, ?)',
+            'INSERT INTO homework_submissions (homework_id, student_id, text_answer, file_path) VALUES ($1, $2, $3, $4) RETURNING id',
             [homework_id, student.id, text_answer, file_path]
         );
 
-        res.json({ message: 'Submission received', id: result.lastID });
+        res.json({ message: 'Submission received', id: result.lastID || result.rows?.[0]?.id });
     } catch (err) {
         res.status(500).json({ error: 'Server Error', message: err.message });
     }
@@ -121,14 +121,14 @@ exports.getSubmissions = async (req, res) => {
         const db = getDB();
         const school_id = req.user.school_id;
 
-        const hw = await db.get('SELECT id FROM homework WHERE id = ? AND school_id = ?', [homeworkId, school_id]);
+        const hw = await db.get('SELECT id FROM homework WHERE id = $1 AND school_id = $2', [homeworkId, school_id]);
         if (!hw) return res.status(404).json({ error: 'Not Found' });
 
         const submissions = await db.all(`
             SELECT hs.*, s.first_name, s.last_name, s.admission_number
             FROM homework_submissions hs
             JOIN students s ON hs.student_id = s.id
-            WHERE hs.homework_id = ?
+            WHERE hs.homework_id = $1
             ORDER BY s.last_name ASC
         `, [homeworkId]);
 

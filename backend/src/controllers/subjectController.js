@@ -6,7 +6,7 @@ exports.getSubjects = async (req, res) => {
         const school_id = req.user.school_id;
         
         // Get all subjects
-        const subjects = await db.all("SELECT * FROM subjects WHERE school_id = ? ORDER BY name ASC", [school_id]);
+        const subjects = await db.all("SELECT * FROM subjects WHERE school_id = $1 ORDER BY name ASC", [school_id]);
         
         // For each subject, get assigned classes and teachers
         for (let subject of subjects) {
@@ -14,7 +14,7 @@ exports.getSubjects = async (req, res) => {
                 SELECT c.id, c.name, c.level
                 FROM classes c
                 JOIN class_subjects cs ON c.id = cs.class_id
-                WHERE cs.subject_id = ? AND cs.school_id = ?
+                WHERE cs.subject_id = $1 AND cs.school_id = $2
             `, [subject.id, school_id]);
             subject.classes = assignedClasses;
 
@@ -23,7 +23,7 @@ exports.getSubjects = async (req, res) => {
                 FROM teachers t
                 JOIN teacher_subject_assignments tsa ON t.id = tsa.teacher_id
                 LEFT JOIN teacher_classes tc ON t.id = tc.teacher_id AND tsa.class_id = tc.class_id
-                WHERE tsa.subject_id = ? AND t.school_id = ?
+                WHERE tsa.subject_id = $1 AND t.school_id = $2
             `, [subject.id, school_id]);
             subject.teachers = assignedTeachers;
         }
@@ -48,8 +48,8 @@ exports.assignTeacher = async (req, res) => {
         const school_id = req.user.school_id;
 
         // Verify teacher and subject belong to the same school
-        const teacher = await db.get("SELECT id FROM teachers WHERE id = ? AND school_id = ?", [teacher_id, school_id]);
-        const subject = await db.get("SELECT id FROM subjects WHERE id = ? AND school_id = ?", [subject_id, school_id]);
+        const teacher = await db.get("SELECT id FROM teachers WHERE id = $1 AND school_id = $2", [teacher_id, school_id]);
+        const subject = await db.get("SELECT id FROM subjects WHERE id = $1 AND school_id = $2", [subject_id, school_id]);
 
         if (!teacher || !subject) {
             return res.status(404).json({ error: 'Not Found', message: 'Teacher or Subject not found in your school' });
@@ -59,14 +59,16 @@ exports.assignTeacher = async (req, res) => {
 
         // 1. Assign teacher to subject in this class
         await db.run(`
-            INSERT OR IGNORE INTO teacher_subject_assignments (teacher_id, class_id, subject_id)
-            VALUES (?, ?, ?)
+            INSERT INTO teacher_subject_assignments (teacher_id, class_id, subject_id)
+            VALUES ($1, $2, $3)
+            ON CONFLICT DO NOTHING
         `, [teacher_id, class_id, subject_id]);
 
         // 2. Ensure teacher is assigned to this class generally if not already
         await db.run(`
-            INSERT OR IGNORE INTO teacher_classes (teacher_id, class_id, school_id)
-            VALUES (?, ?, ?)
+            INSERT INTO teacher_classes (teacher_id, class_id, school_id)
+            VALUES ($1, $2, $3)
+            ON CONFLICT DO NOTHING
         `, [teacher_id, class_id, school_id]);
 
         await db.run('COMMIT');
@@ -89,12 +91,12 @@ exports.createSubject = async (req, res) => {
         
         await db.run('BEGIN TRANSACTION');
         
-        const result = await db.run('INSERT INTO subjects (school_id, name, code) VALUES (?, ?, ?)', [school_id, name, code]);
-        const subject_id = result.lastID;
+        const result = await db.run('INSERT INTO subjects (school_id, name, code) VALUES ($1, $2, $3) RETURNING id', [school_id, name, code]);
+        const subject_id = result.lastID || result.rows?.[0]?.id;
         
         if (class_ids && Array.isArray(class_ids)) {
             for (let class_id of class_ids) {
-                await db.run('INSERT INTO class_subjects (subject_id, class_id, school_id) VALUES (?, ?, ?)', [subject_id, class_id, school_id]);
+                await db.run('INSERT INTO class_subjects (subject_id, class_id, school_id) VALUES ($1, $2, $3)', [subject_id, class_id, school_id]);
             }
         }
         
@@ -117,14 +119,14 @@ exports.updateSubject = async (req, res) => {
         
         await db.run('BEGIN TRANSACTION');
         
-        await db.run('UPDATE subjects SET name = ?, code = ? WHERE id = ? AND school_id = ?', [name, code, id, school_id]);
+        await db.run('UPDATE subjects SET name = $1, code = $2 WHERE id = $3 AND school_id = $4', [name, code, id, school_id]);
         
         // Sync class assignments
         await db.run('DELETE FROM class_subjects WHERE subject_id = ? AND school_id = ?', [id, school_id]);
         
         if (class_ids && Array.isArray(class_ids)) {
             for (let class_id of class_ids) {
-                await db.run('INSERT INTO class_subjects (subject_id, class_id, school_id) VALUES (?, ?, ?)', [id, class_id, school_id]);
+                await db.run('INSERT INTO class_subjects (subject_id, class_id, school_id) VALUES ($1, $2, $3)', [id, class_id, school_id]);
             }
         }
         
@@ -141,9 +143,9 @@ exports.deleteSubject = async (req, res) => {
     try {
         const db = getDB();
         const school_id = req.user.school_id;
-        await db.run('DELETE FROM subjects WHERE id = ? AND school_id = ?', [id, school_id]);
+        await db.run('DELETE FROM subjects WHERE id = $1 AND school_id = $2', [id, school_id]);
         // class_subjects will be deleted via ON DELETE CASCADE if configured, but let's be safe
-        await db.run('DELETE FROM class_subjects WHERE subject_id = ? AND school_id = ?', [id, school_id]);
+        await db.run('DELETE FROM class_subjects WHERE subject_id = $1 AND school_id = $2', [id, school_id]);
         res.json({ message: 'Subject deleted' });
     } catch (err) {
         res.status(500).json({ error: 'Server Error', message: err.message });

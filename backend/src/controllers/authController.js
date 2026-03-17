@@ -11,7 +11,7 @@ exports.login = async (req, res) => {
 
     try {
         const db = getDB();
-        const user = await db.get("SELECT * FROM users WHERE email = ?", [email]);
+        const user = await db.get("SELECT * FROM users WHERE email = $1", [email]);
 
         if (!user) {
             return res.status(401).json({ error: 'Unauthorized', message: 'Invalid email or password' });
@@ -90,7 +90,7 @@ exports.register = async (req, res) => {
 
     const db = getDB();
     try {
-        const existing = await db.get("SELECT id FROM users WHERE email = ?", [email]);
+        const existing = await db.get("SELECT id FROM users WHERE email = $1", [email]);
         if (existing) {
             return res.status(409).json({ error: 'Conflict', message: 'An account with this email already exists' });
         }
@@ -99,10 +99,10 @@ exports.register = async (req, res) => {
 
         // 1. Create School
         const schoolResult = await db.run(
-            "INSERT INTO schools (name) VALUES (?)",
+            "INSERT INTO schools (name) VALUES ($1) RETURNING id",
             [name]
         );
-        const school_id = schoolResult.lastID;
+        const school_id = schoolResult.lastID || schoolResult.rows?.[0]?.id;
 
         // 2. Create User
         const salt = await bcrypt.genSalt(10);
@@ -110,14 +110,14 @@ exports.register = async (req, res) => {
         const role = 'SchoolAdmin';
 
         const userResult = await db.run(
-            "INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)",
+            "INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id",
             ['Admin User', email, password_hash, role] // Defaulting admin name to 'Admin User' for now
         );
-        const user_id = userResult.lastID;
+        const user_id = userResult.lastID || userResult.rows?.[0]?.id;
 
         // 3. Assign Admin to School
         await db.run(
-            "INSERT INTO school_admin_assignments (user_id, school_id) VALUES (?, ?)",
+            "INSERT INTO school_admin_assignments (user_id, school_id) VALUES ($1, $2)",
             [user_id, school_id]
         );
 
@@ -142,7 +142,7 @@ exports.register = async (req, res) => {
 exports.getMe = async (req, res) => {
     try {
         const db = getDB();
-        const user = await db.get("SELECT id, name, email, role, created_at FROM users WHERE id = ?", [req.user.id]);
+        const user = await db.get("SELECT id, name, email, role, created_at FROM users WHERE id = $1", [req.user.id]);
         
         if (!user) {
             return res.status(404).json({ error: 'Not Found', message: 'User not found' });
@@ -155,7 +155,7 @@ exports.getMe = async (req, res) => {
                 SELECT a.school_id, s.name as school_name 
                 FROM school_admin_assignments a
                 JOIN schools s ON a.school_id = s.id
-                WHERE a.user_id = ?
+                WHERE a.user_id = $1
             `, [user.id]);
             if (assignment) {
                 school_id = assignment.school_id;
@@ -166,7 +166,7 @@ exports.getMe = async (req, res) => {
                 SELECT t.school_id, s.name as school_name 
                 FROM teachers t
                 JOIN schools s ON t.school_id = s.id
-                WHERE t.user_id = ?
+                WHERE t.user_id = $1
             `, [user.id]);
             if (teacher) {
                 school_id = teacher.school_id;
@@ -177,7 +177,7 @@ exports.getMe = async (req, res) => {
                 SELECT st.school_id, s.name as school_name 
                 FROM students st
                 JOIN schools s ON st.school_id = s.id
-                WHERE st.user_id = ?
+                WHERE st.user_id = $1
             `, [user.id]);
             if (student) {
                 school_id = student.school_id;

@@ -13,20 +13,20 @@ exports.saveGrades = async (req, res) => {
         const school_id = req.user.school_id;
 
         // Verify class and subject belong to user's school
-        const classObj = await db.get('SELECT id FROM classes WHERE id = ? AND school_id = ?', [class_id, school_id]);
-        const subjectObj = await db.get('SELECT id FROM subjects WHERE id = ? AND school_id = ?', [subject_id, school_id]);
+        const classObj = await db.get('SELECT id FROM classes WHERE id = $1 AND school_id = $2', [class_id, school_id]);
+        const subjectObj = await db.get('SELECT id FROM subjects WHERE id = $1 AND school_id = $2', [subject_id, school_id]);
         if (!classObj || !subjectObj) {
             return res.status(403).json({ error: 'Forbidden', message: 'Class or Subject does not belong to your school.' });
         }
 
         // If Teacher, verify they are assigned to this class + subject
         if (req.user.role === 'Teacher') {
-            const teacher = await db.get('SELECT id FROM teachers WHERE user_id = ? AND school_id = ?', [req.user.id, school_id]);
+            const teacher = await db.get('SELECT id FROM teachers WHERE user_id = $1 AND school_id = $2', [req.user.id, school_id]);
             if (!teacher) {
                 return res.status(403).json({ error: 'Forbidden', message: 'Teacher profile not found.' });
             }
             const assignment = await db.get(
-                'SELECT id FROM teacher_subject_assignments WHERE teacher_id = ? AND class_id = ? AND subject_id = ?',
+                'SELECT id FROM teacher_subject_assignments WHERE teacher_id = $1 AND class_id = $2 AND subject_id = $3',
                 [teacher.id, class_id, subject_id]
             );
             if (!assignment) {
@@ -39,19 +39,19 @@ exports.saveGrades = async (req, res) => {
         for (const record of records) {
             const existing = await db.get(
                 `SELECT id FROM assessments 
-                 WHERE term_id = ? AND class_id = ? AND subject_id = ? AND student_id = ? AND type = ?`,
+                 WHERE term_id = $1 AND class_id = $2 AND subject_id = $3 AND student_id = $4 AND type = $5`,
                 [term_id, class_id, subject_id, record.student_id, type]
             );
 
             if (existing) {
                 await db.run(
-                    'UPDATE assessments SET score = ?, max_score = ?, recorded_by = ? WHERE id = ?',
+                    'UPDATE assessments SET score = $1, max_score = $2, recorded_by = $3 WHERE id = $4',
                     [record.score, max_score, req.user.id, existing.id]
                 );
             } else {
                 await db.run(
                     `INSERT INTO assessments (student_id, class_id, subject_id, term_id, type, score, max_score, recorded_by) 
-                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
                     [record.student_id, class_id, subject_id, term_id, type, record.score, max_score, req.user.id]
                 );
             }
@@ -87,8 +87,8 @@ exports.getGrades = async (req, res) => {
             SELECT s.id as student_id, s.first_name, s.last_name, s.admission_number, a.score, a.max_score
             FROM students s
             LEFT JOIN assessments a ON s.id = a.student_id 
-                AND a.term_id = ? AND a.class_id = ? AND a.subject_id = ? AND a.type = ?
-            WHERE s.class_id = ? AND s.school_id = ?
+                AND a.term_id = $1 AND a.class_id = $2 AND a.subject_id = $3 AND a.type = $4
+            WHERE s.class_id = $5 AND s.school_id = $6
             ORDER BY s.last_name ASC
         `, [term_id, class_id, subject_id, type, class_id, school_id]);
 
@@ -108,14 +108,14 @@ exports.getStudentReport = async (req, res) => {
         // Verify student belongs to user's school (or if Parent, linked via parent_student_links)
         if (req.user.role === 'Parent') {
             const link = await db.get(
-                'SELECT id FROM parent_student_links WHERE parent_user_id = ? AND student_id = ?',
+                'SELECT id FROM parent_student_links WHERE parent_user_id = $1 AND student_id = $2',
                 [req.user.id, studentId]
             );
             if (!link) {
                 return res.status(403).json({ error: 'Forbidden', message: 'This student is not linked to your account.' });
             }
         } else {
-            const student = await db.get('SELECT id FROM students WHERE id = ? AND school_id = ?', [studentId, school_id]);
+            const student = await db.get('SELECT id FROM students WHERE id = $1 AND school_id = $2', [studentId, school_id]);
             if (!student) {
                 return res.status(403).json({ error: 'Forbidden', message: 'Student not found in your school.' });
             }
@@ -125,7 +125,7 @@ exports.getStudentReport = async (req, res) => {
             SELECT a.type, a.score, a.max_score, sub.name as subject_name
             FROM assessments a
             JOIN subjects sub ON a.subject_id = sub.id
-            WHERE a.student_id = ? AND a.term_id = ?
+            WHERE a.student_id = $1 AND a.term_id = $2
             ORDER BY sub.name ASC
         `, [studentId, termId]);
 

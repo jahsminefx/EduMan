@@ -14,11 +14,11 @@ exports.uploadContent = async (req, res) => {
         const file_path = `/uploads/${req.file.filename}`;
 
         const result = await db.run(
-            'INSERT INTO learning_contents (school_id, class_id, subject_id, title, description, type, file_path, uploaded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+            'INSERT INTO learning_contents (school_id, class_id, subject_id, title, description, type, file_path, uploaded_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
             [school_id, class_id || null, subject_id || null, title, description, type, file_path, req.user.id]
         );
 
-        res.json({ message: 'Content uploaded successfully', id: result.lastID });
+        res.json({ message: 'Content uploaded successfully', id: result.lastID || result.rows?.[0]?.id });
     } catch (err) {
         res.status(500).json({ error: 'Server Error', message: err.message });
     }
@@ -37,13 +37,13 @@ exports.getContents = async (req, res) => {
 
         // Show global content (school_id IS NULL) + school-specific content
         if (school_id) {
-            query += ' AND (lc.school_id IS NULL OR lc.school_id = ?)';
+            query += ' AND (lc.school_id IS NULL OR lc.school_id = $1)';
             params.push(school_id);
         }
 
-        if (type) { query += ' AND lc.type = ?'; params.push(type); }
-        if (class_id) { query += ' AND lc.class_id = ?'; params.push(class_id); }
-        if (subject_id) { query += ' AND lc.subject_id = ?'; params.push(subject_id); }
+        if (type) { query += ` AND lc.type = $${params.length + 1}`; params.push(type); }
+        if (class_id) { query += ` AND lc.class_id = $${params.length + 1}`; params.push(class_id); }
+        if (subject_id) { query += ` AND lc.subject_id = $${params.length + 1}`; params.push(subject_id); }
 
         query += ' ORDER BY lc.id DESC';
         const contents = await db.all(query, params);
@@ -59,7 +59,7 @@ exports.deleteContent = async (req, res) => {
     const { id } = req.params;
     try {
         const db = getDB();
-        const result = await db.run('DELETE FROM learning_contents WHERE id = ?', [id]);
+        const result = await db.run('DELETE FROM learning_contents WHERE id = $1', [id]);
         if (result.changes === 0) return res.status(404).json({ error: 'Not Found' });
         res.json({ message: 'Content deleted successfully' });
     } catch (err) {
