@@ -1,12 +1,25 @@
 const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs'); // Using bcryptjs for broader compatibility
 require('dotenv').config();
 
+const connectionString = process.env.DATABASE_URL;
+
+if (!connectionString) {
+    console.error('CRITICAL ERROR: DATABASE_URL environment variable is missing.');
+    console.error('The application cannot start without a valid PostgreSQL connection string.');
+    process.exit(1);
+}
+
 const pool = new Pool({
-    connectionString: process.env.DATABASE_URL,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    connectionString,
+    // Render often requires SSL for database connections
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
+    // Basic pool settings for reliability
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 2000
 });
 
 const schemaPath = path.join(__dirname, '../models/schema.sql');
@@ -17,29 +30,21 @@ const db = {
     
     // Shim for sqlite 'get' (returns first row)
     get: async (text, params) => {
-        // Convert ? to $1, $2 if present (simple regex replacement for transition)
-        let n = 1;
-        const processedText = text.replace(/\?/g, () => `$${n++}`);
-        const res = await pool.query(processedText, params);
+        const res = await pool.query(text, params);
         return res.rows[0];
     },
     
     // Shim for sqlite 'all' (returns all rows)
     all: async (text, params) => {
-        let n = 1;
-        const processedText = text.replace(/\?/g, () => `$${n++}`);
-        const res = await pool.query(processedText, params);
+        const res = await pool.query(text, params);
         return res.rows;
     },
     
     // Shim for sqlite 'run' (returns result with lastID/changes)
     run: async (text, params) => {
-        let n = 1;
-        // Postgres uses RETURNING id to get lastID, but for now we shim the execution
-        const processedText = text.replace(/\?/g, () => `$${n++}`);
-        const res = await pool.query(processedText, params);
+        const res = await pool.query(text, params);
         return {
-            lastID: res.rows[0]?.id || null, // Assumes use of RETURNING id in queries later
+            lastID: res.rows[0]?.id || null, 
             changes: res.rowCount
         };
     },
@@ -52,23 +57,20 @@ const db = {
 
 async function initDB() {
     try {
-        console.log('Connecting to PostgreSQL database...');
+        console.log('Attempting to connect to PostgreSQL...');
         
         // Test connection
-        await pool.query('SELECT NOW()');
-        console.log('Connected to PostgreSQL.');
+        const testRes = await pool.query('SELECT NOW()');
+        console.log(`Successfully connected to PostgreSQL at ${testRes.rows[0].now}`);
 
         // Run schema
-        const schema = fs.readFileSync(schemaPath, 'utf8');
-        // Simple regex to convert SQLite specific parts to Postgres if they were missed in manual update
-        const postgresSchema = schema
-            .replace(/INTEGER PRIMARY KEY AUTOINCREMENT/gi, 'SERIAL PRIMARY KEY')
-            .replace(/TIMESTAMP DEFAULT CURRENT_TIMESTAMP/gi, 'TIMESTAMP DEFAULT CURRENT_TIMESTAMP')
-            .replace(/DATETIME/gi, 'TIMESTAMP')
-            .replace(/DATE/gi, 'DATE');
-
-        await pool.query(postgresSchema);
-        console.log('Schema synchronized.');
+        if (fs.existsSync(schemaPath)) {
+            const schema = fs.readFileSync(schemaPath, 'utf8');
+            await pool.query(schema);
+            console.log('Database schema synchronized successfully.');
+        } else {
+            console.warn('Warning: schema.sql not found at', schemaPath);
+        }
 
         // Seed SuperAdmin if not exists
         const adminRes = await db.get("SELECT id FROM users WHERE role = $1 LIMIT 1", ['SuperAdmin']);
@@ -79,18 +81,20 @@ async function initDB() {
                 'INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4)',
                 ['Default Admin', 'admin@eduman.local', hash, 'SuperAdmin']
             );
-            console.log('Default SuperAdmin created.');
+            console.log('Default SuperAdmin created (admin@eduman.local / password123).');
         }
 
         return db;
     } catch (error) {
-        console.error('Database initialization failed:', error);
-        // Retry logic for cloud environments
+        console.error('DATABASE CONNECTION ERROR:', error.message);
+        
+        // Retry logic for production
         if (process.env.NODE_ENV === 'production') {
-            console.log('Retrying connection in 5 seconds...');
+            console.log('Retrying database connection in 5 seconds...');
             await new Promise(resolve => setTimeout(resolve, 5000));
             return initDB();
         }
+        
         throw error;
     }
 }
