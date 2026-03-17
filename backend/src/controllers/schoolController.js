@@ -1,0 +1,122 @@
+const { getDB } = require('../config/database');
+const bcrypt = require('bcrypt');
+
+// SuperAdmin: Get all schools
+exports.getAllSchools = async (req, res) => {
+    try {
+        const db = getDB();
+        const schools = await db.all("SELECT * FROM schools ORDER BY id DESC");
+        res.json({ schools });
+    } catch (err) {
+        res.status(500).json({ error: 'Server Error', message: err.message });
+    }
+};
+
+// SuperAdmin: Create a new school and assign a default School Admin
+exports.createSchool = async (req, res) => {
+    const { name, address, phone, email, admin_name, admin_email, admin_password } = req.body;
+    
+    if (!name || !admin_name || !admin_email || !admin_password) {
+        return res.status(400).json({ error: 'Validation Error', message: 'Missing required fields' });
+    }
+
+    try {
+        const db = getDB();
+        
+        // 1. Check if admin email exists
+        const existingUser = await db.get('SELECT id FROM users WHERE email = ?', [admin_email]);
+        if (existingUser) return res.status(400).json({ error: 'Duplicate', message: 'Admin email is already registered.' });
+
+        await db.run('BEGIN TRANSACTION');
+
+        // 2. Create School
+        const schoolResult = await db.run(
+            'INSERT INTO schools (name, address, phone, email) VALUES (?, ?, ?, ?)',
+            [name, address, phone, email]
+        );
+        const schoolId = schoolResult.lastID;
+
+        // 3. Hash password & Create User account (Role: SchoolAdmin)
+        const salt = await bcrypt.genSalt(10);
+        const passwordHash = await bcrypt.hash(admin_password, salt);
+
+        const userResult = await db.run(
+            'INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)',
+            [admin_name, admin_email, passwordHash, 'SchoolAdmin']
+        );
+        const userId = userResult.lastID;
+
+        // 4. Assign Admin to School
+        await db.run(
+            'INSERT INTO school_admin_assignments (user_id, school_id) VALUES (?, ?)',
+            [userId, schoolId]
+        );
+
+        await db.run('COMMIT');
+
+        res.json({ message: 'School and Admin created successfully', schoolId, userId });
+    } catch (err) {
+        const db = getDB();
+        await db.run('ROLLBACK');
+        res.status(500).json({ error: 'Server Error', message: err.message });
+    }
+};
+
+// SchoolAdmin/Teacher/Student: Get their specific school profile
+exports.getMySchool = async (req, res) => {
+    try {
+        const db = getDB();
+        const school_id = req.user.school_id;
+
+        if (!school_id) return res.status(400).json({ error: 'Bad Request', message: 'User has no associated school' });
+
+        const profile = await db.get("SELECT * FROM schools WHERE id = ?", [school_id]);
+        if (!profile) return res.status(404).json({ error: 'Not Found', message: 'School not found' });
+        
+        res.json({ profile });
+    } catch (err) {
+        res.status(500).json({ error: 'Server Error', message: err.message });
+    }
+};
+
+// SchoolAdmin: Update their own school profile
+exports.updateMySchool = async (req, res) => {
+    const { name, address, phone, email, current_session_id, current_term_id } = req.body;
+    try {
+        const db = getDB();
+        const school_id = req.user.school_id;
+        
+        await db.run(
+            'UPDATE schools SET name=?, address=?, phone=?, email=?, current_session_id=?, current_term_id=? WHERE id=?',
+            [name, address, phone, email, current_session_id, current_term_id, school_id]
+        );
+        
+        res.json({ message: 'School profile updated successfully' });
+    } catch (err) {
+        res.status(500).json({ error: 'Server Error', message: err.message });
+    }
+};
+
+// Scoped Sessions
+exports.getSessions = async (req, res) => {
+    try {
+        const db = getDB();
+        const school_id = req.user.school_id;
+        const sessions = await db.all("SELECT * FROM academic_sessions WHERE school_id = ? ORDER BY id DESC", [school_id]);
+        res.json({ sessions });
+    } catch (err) {
+        res.status(500).json({ error: 'Server Error', message: err.message });
+    }
+};
+
+exports.createSession = async (req, res) => {
+    const { name, start_date, end_date } = req.body;
+    try {
+        const db = getDB();
+        const school_id = req.user.school_id;
+        const result = await db.run('INSERT INTO academic_sessions (school_id, name, start_date, end_date) VALUES (?, ?, ?, ?)', [school_id, name, start_date, end_date]);
+        res.json({ message: 'Session created', id: result.lastID });
+    } catch (err) {
+        res.status(500).json({ error: 'Server Error', message: err.message });
+    }
+};
