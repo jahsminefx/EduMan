@@ -10,12 +10,15 @@ import {
   LogOut,
   FolderOpen,
   HelpCircle,
-  Library
+  Library,
+  Menu,
+  X
 } from 'lucide-react';
 
 export default function MainLayout() {
   const { user, logout } = useAuth();
   const location = useLocation();
+  const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
   const getLinks = () => {
     const base = [
@@ -97,11 +100,31 @@ export default function MainLayout() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex transition-colors duration-200">
+      {/* Mobile Sidebar Overlay */}
+      {isSidebarOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden backdrop-blur-sm transition-opacity"
+          onClick={() => setIsSidebarOpen(false)}
+        />
+      )}
+
       {/* Sidebar */}
-      <div className="w-64 bg-white border-r border-gray-200 flex flex-col shadow-sm">
-        <div className="flex items-center justify-center h-16 border-b border-gray-200 px-4">
-          <BookOpen className="w-8 h-8 text-blue-600 mr-2" />
-          <span className="text-xl font-bold text-gray-900 tracking-tight">EduMan</span>
+      <div className={`
+        fixed inset-y-0 left-0 z-50 w-64 bg-white border-r border-gray-200 flex flex-col shadow-xl lg:shadow-sm
+        transition-transform duration-300 transform lg:translate-x-0 lg:static lg:inset-0
+        ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
+      `}>
+        <div className="flex items-center justify-between h-16 border-b border-gray-200 px-6">
+          <div className="flex items-center">
+            <BookOpen className="w-8 h-8 text-blue-600 mr-2" />
+            <span className="text-xl font-bold text-gray-900 tracking-tight">EduMan</span>
+          </div>
+          <button 
+            className="p-2 rounded-lg lg:hidden hover:bg-gray-100 text-gray-500"
+            onClick={() => setIsSidebarOpen(false)}
+          >
+            <X className="w-6 h-6" />
+          </button>
         </div>
         
         <div className="flex-1 overflow-y-auto py-4">
@@ -113,6 +136,7 @@ export default function MainLayout() {
                 <Link
                   key={link.name}
                   to={link.path}
+                  onClick={() => setIsSidebarOpen(false)}
                   className={`group flex items-center px-3 py-2.5 text-sm font-medium rounded-lg transition-all ${
                     isActive 
                       ? 'bg-blue-50 text-blue-700' 
@@ -128,31 +152,57 @@ export default function MainLayout() {
         </div>
 
         <div className="flex-shrink-0 border-t border-gray-200 p-4">
-          <div className="flex items-center">
-            <div className="ml-3">
-              <p className="text-sm font-medium text-gray-700">{user.school_name || user.name}</p>
-              <p className="text-xs font-medium text-gray-500">{user.role}</p>
+          <div className="flex items-center px-2">
+            <div className="flex-shrink-0">
+              <div className="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white text-xs font-bold">
+                {user.name?.[0]?.toUpperCase() || 'U'}
+              </div>
+            </div>
+            <div className="ml-3 min-w-0 flex-1">
+              <p className="text-sm font-bold text-gray-900 truncate">{user.name}</p>
+              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider truncate">{user.role}</p>
             </div>
           </div>
           <button
             onClick={logout}
-            className="mt-4 w-full flex items-center justify-center px-4 py-2 border border-gray-300 shadow-sm text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 transition-colors"
+            className="mt-4 w-full flex items-center justify-center px-4 py-2 border border-gray-200 shadow-sm text-sm font-bold rounded-xl text-gray-700 bg-white hover:bg-gray-50 transition-all active:scale-[0.98]"
           >
-            <LogOut className="mr-2 w-4 h-4 text-gray-500" />
+            <LogOut className="mr-2 w-4 h-4 text-gray-400" />
             Logout
           </button>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <header className="bg-white shadow-sm border-b border-gray-200 h-16 flex items-center px-8 z-10">
-          <h1 className="text-xl font-semibold text-gray-800 tracking-tight capitalize">
-            {(location.pathname === '/' || location.pathname === '/dashboard') ? (user.school_name || 'Dashboard') : location.pathname.split('/').slice(-1)[0].replace('-', ' ')}
-          </h1>
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <header className="bg-white shadow-sm border-b border-gray-200 h-16 flex items-center justify-between px-4 lg:px-8 z-30">
+          <div className="flex items-center gap-4">
+            <button 
+              className="p-2 rounded-lg lg:hidden hover:bg-gray-100 text-gray-600"
+              onClick={() => setIsSidebarOpen(true)}
+            >
+              <Menu className="w-6 h-6" />
+            </button>
+            <h1 className="text-lg lg:text-xl font-bold text-gray-900 tracking-tight capitalize truncate">
+              {(location.pathname === '/' || location.pathname === '/dashboard') ? (user.school_name || 'Dashboard') : location.pathname.split('/').slice(-1)[0].replace('-', ' ')}
+            </h1>
+          </div>
+          
+          <div className="flex items-center gap-3">
+             <div className="hidden sm:block text-right">
+                <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest leading-none mb-1">Authenticated As</p>
+                <p className="text-xs font-bold text-gray-900">{user.name}</p>
+             </div>
+             <div className="w-8 h-8 lg:w-9 lg:h-9 rounded-full bg-gradient-to-tr from-blue-600 to-indigo-600 p-0.5 shadow-sm">
+                <div className="w-full h-full rounded-full bg-white flex items-center justify-center text-blue-600 font-bold text-sm">
+                  {user.name?.[0]?.toUpperCase()}
+                </div>
+             </div>
+          </div>
         </header>
-        <main className="flex-1 overflow-y-auto bg-gray-50/50 p-8">
-          <div className="max-w-7xl mx-auto">
+        
+        <main className="flex-1 overflow-y-auto bg-gray-50/50 p-4 lg:p-8">
+          <div className="max-w-7xl mx-auto animate-fade-in">
             <Outlet />
           </div>
         </main>

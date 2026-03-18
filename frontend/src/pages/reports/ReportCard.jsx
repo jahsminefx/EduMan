@@ -126,45 +126,47 @@ export default function ReportCard() {
           {/* Grades Table */}
           {subjects.length > 0 ? (
             <>
-              <table className="min-w-full border border-gray-300 text-sm">
-                <thead>
-                  <tr className="bg-gray-800 text-white">
-                    <th className="border border-gray-300 px-4 py-2 text-left">Subject</th>
-                    <th className="border border-gray-300 px-4 py-2 text-center">CA Score</th>
-                    <th className="border border-gray-300 px-4 py-2 text-center">Exam Score</th>
-                    <th className="border border-gray-300 px-4 py-2 text-center">Total</th>
-                    <th className="border border-gray-300 px-4 py-2 text-center">Grade</th>
-                    <th className="border border-gray-300 px-4 py-2 text-center">Remark</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {subjects.map(([name, data], idx) => {
-                    const caScore = data.test?.score ?? '-';
-                    const examScore = data.exam?.score ?? '-';
-                    const total = (data.test?.score || 0) + (data.exam?.score || 0);
-                    const grade = getGrade(total / 2);
-                    return (
-                      <tr key={name} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                        <td className="border border-gray-300 px-4 py-2 font-medium">{name}</td>
-                        <td className="border border-gray-300 px-4 py-2 text-center">{caScore}</td>
-                        <td className="border border-gray-300 px-4 py-2 text-center">{examScore}</td>
-                        <td className="border border-gray-300 px-4 py-2 text-center font-semibold">{total}</td>
-                        <td className="border border-gray-300 px-4 py-2 text-center font-bold">{grade}</td>
-                        <td className="border border-gray-300 px-4 py-2 text-center text-xs">{getRemark(grade)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-                <tfoot>
-                  <tr className="bg-gray-100 font-semibold">
-                    <td className="border border-gray-300 px-4 py-2">Overall</td>
-                    <td className="border border-gray-300 px-4 py-2 text-center" colSpan="2"></td>
-                    <td className="border border-gray-300 px-4 py-2 text-center">{totalObtained}</td>
-                    <td className="border border-gray-300 px-4 py-2 text-center font-bold">{getGrade(average)}</td>
-                    <td className="border border-gray-300 px-4 py-2 text-center text-xs">Avg: {average}%</td>
-                  </tr>
-                </tfoot>
-              </table>
+              <div className="overflow-x-auto">
+                <table className="min-w-full border border-gray-300 text-sm">
+                  <thead>
+                    <tr className="bg-gray-800 text-white">
+                      <th className="border border-gray-300 px-4 py-2 text-left">Subject</th>
+                      <th className="border border-gray-300 px-4 py-2 text-center">CA Score</th>
+                      <th className="border border-gray-300 px-4 py-2 text-center">Exam Score</th>
+                      <th className="border border-gray-300 px-4 py-2 text-center">Total</th>
+                      <th className="border border-gray-300 px-4 py-2 text-center">Grade</th>
+                      <th className="border border-gray-300 px-4 py-2 text-center">Remark</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {subjects.map(([name, data], idx) => {
+                      const caScore = data.test?.score ?? '-';
+                      const examScore = data.exam?.score ?? '-';
+                      const total = (data.test?.score || 0) + (data.exam?.score || 0);
+                      const grade = getGrade(total / 2);
+                      return (
+                        <tr key={name} className={idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                          <td className="border border-gray-300 px-4 py-2 font-medium">{name}</td>
+                          <td className="border border-gray-300 px-4 py-2 text-center">{caScore}</td>
+                          <td className="border border-gray-300 px-4 py-2 text-center">{examScore}</td>
+                          <td className="border border-gray-300 px-4 py-2 text-center font-semibold">{total}</td>
+                          <td className="border border-gray-300 px-4 py-2 text-center font-bold">{grade}</td>
+                          <td className="border border-gray-300 px-4 py-2 text-center text-xs">{getRemark(grade)}</td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                  <tfoot>
+                    <tr className="bg-gray-100 font-semibold">
+                      <td className="border border-gray-300 px-4 py-2">Overall</td>
+                      <td className="border border-gray-300 px-4 py-2 text-center" colSpan="2"></td>
+                      <td className="border border-gray-300 px-4 py-2 text-center">{totalObtained}</td>
+                      <td className="border border-gray-300 px-4 py-2 text-center font-bold">{getGrade(average)}</td>
+                      <td className="border border-gray-300 px-4 py-2 text-center text-xs">Avg: {average}%</td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
 
               {/* Signature Section */}
               <div className="mt-10 grid grid-cols-2 gap-8 text-sm">
