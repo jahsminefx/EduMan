@@ -57,7 +57,7 @@ exports.getQuizzes = async (req, res) => {
             FROM quizzes q
             JOIN subjects s ON q.subject_id = s.id
             JOIN classes c ON q.class_id = c.id
-            WHERE q.school_id = ?
+            WHERE q.school_id = $1
         `;
         const params = [school_id];
         if (class_id) { query += ' AND q.class_id = $2'; params.push(class_id); }

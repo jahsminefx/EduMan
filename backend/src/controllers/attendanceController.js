@@ -13,7 +13,7 @@ exports.markAttendance = async (req, res) => {
         const school_id = req.user.school_id;
 
         // Verify that the class belongs to this school
-        const classObj = await db.get('SELECT id FROM classes WHERE id = ? AND school_id = ?', [class_id, school_id]);
+        const classObj = await db.get('SELECT id FROM classes WHERE id = $1 AND school_id = $2', [class_id, school_id]);
         if (!classObj) {
             return res.status(403).json({ error: 'Forbidden', message: 'This class does not belong to your school.' });
         }

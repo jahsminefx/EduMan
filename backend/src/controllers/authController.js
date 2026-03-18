@@ -1,5 +1,5 @@
 const { getDB } = require('../config/database');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 const { generateToken } = require('../utils/auth');
 
 exports.login = async (req, res) => {
@@ -30,7 +30,7 @@ exports.login = async (req, res) => {
                 SELECT a.school_id, s.name as school_name 
                 FROM school_admin_assignments a
                 JOIN schools s ON a.school_id = s.id
-                WHERE a.user_id = ?
+                WHERE a.user_id = $1
             `, [user.id]);
             if (assignment) {
                 school_id = assignment.school_id;
@@ -41,7 +41,7 @@ exports.login = async (req, res) => {
                 SELECT t.school_id, s.name as school_name 
                 FROM teachers t
                 JOIN schools s ON t.school_id = s.id
-                WHERE t.user_id = ?
+                WHERE t.user_id = $1
             `, [user.id]);
             if (teacher) {
                 school_id = teacher.school_id;
@@ -52,7 +52,7 @@ exports.login = async (req, res) => {
                 SELECT st.school_id, s.name as school_name 
                 FROM students st
                 JOIN schools s ON st.school_id = s.id
-                WHERE st.user_id = ?
+                WHERE st.user_id = $1
             `, [user.id]);
             if (student) {
                 school_id = student.school_id;

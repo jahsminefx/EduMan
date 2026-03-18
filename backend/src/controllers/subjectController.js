@@ -122,7 +122,7 @@ exports.updateSubject = async (req, res) => {
         await db.run('UPDATE subjects SET name = $1, code = $2 WHERE id = $3 AND school_id = $4', [name, code, id, school_id]);
         
         // Sync class assignments
-        await db.run('DELETE FROM class_subjects WHERE subject_id = ? AND school_id = ?', [id, school_id]);
+        await db.run('DELETE FROM class_subjects WHERE subject_id = $1 AND school_id = $2', [id, school_id]);
         
         if (class_ids && Array.isArray(class_ids)) {
             for (let class_id of class_ids) {
