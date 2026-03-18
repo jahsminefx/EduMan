@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import axios from 'axios';
+import API_URL from '../config/api';
 import { 
   Users, BookOpen, GraduationCap, TrendingUp, 
   CheckCircle, AlertCircle, Calendar, BarChart3,
@@ -20,9 +21,9 @@ export default function Dashboard() {
     const fetchData = async () => {
       try {
         const [statsRes, perfRes, pendingRes] = await Promise.all([
-          axios.get('http://localhost:5000/api/stats/dashboard'),
-          axios.get('http://localhost:5000/api/stats/performance'),
-          axios.get('http://localhost:5000/api/stats/pending')
+          axios.get(`${API_URL}/stats/dashboard`),
+          axios.get(`${API_URL}/stats/performance`),
+          axios.get(`${API_URL}/stats/pending`)
         ]);
         setStats(statsRes.data);
         setPerformance(perfRes.data);

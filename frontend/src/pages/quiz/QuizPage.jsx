@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { HelpCircle, Plus, Clock, CheckCircle, Trash2, Send } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import API_URL from '../../config/api';
 
 export default function QuizPage() {
   const { user } = useAuth();
@@ -24,9 +25,9 @@ export default function QuizPage() {
     setLoading(true);
     try {
       const [qRes, clsRes, subRes] = await Promise.all([
-        axios.get('http://localhost:5000/api/quizzes'),
-        axios.get('http://localhost:5000/api/classes/classes'),
-        axios.get('http://localhost:5000/api/classes/subjects')
+        axios.get(`${API_URL}/quizzes`),
+        axios.get(`${API_URL}/classes/classes`),
+        axios.get(`${API_URL}/classes/subjects`)
       ]);
       setQuizzes(qRes.data.quizzes);
       setClasses(clsRes.data.classes);
@@ -54,7 +55,7 @@ export default function QuizPage() {
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
-      await axios.post('http://localhost:5000/api/quizzes', { ...form, questions });
+      await axios.post(`${API_URL}/quizzes`, { ...form, questions });
       setMessage('Quiz created!');
       setShowCreate(false);
       setForm({ class_id: '', subject_id: '', title: '', duration_minutes: 30 });
@@ -68,7 +69,7 @@ export default function QuizPage() {
 
   const takeQuiz = async (quizId) => {
     try {
-      const res = await axios.get(`http://localhost:5000/api/quizzes/${quizId}`);
+      const res = await axios.get(`${API_URL}/quizzes/${quizId}`);
       setActiveQuiz(res.data);
       setAnswers({});
     } catch (err) {
@@ -78,7 +79,7 @@ export default function QuizPage() {
 
   const submitQuiz = async () => {
     try {
-      const res = await axios.post('http://localhost:5000/api/quizzes/submit', {
+      const res = await axios.post(`${API_URL}/quizzes/submit`, {
         quiz_id: activeQuiz.quiz.id,
         answers
       });
@@ -93,7 +94,7 @@ export default function QuizPage() {
   const handleDelete = async (id) => {
     if (!confirm('Delete this quiz?')) return;
     try {
-      await axios.delete(`http://localhost:5000/api/quizzes/${id}`);
+      await axios.delete(`${API_URL}/quizzes/${id}`);
       fetchData();
     } catch (err) { console.error(err); }
   };

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Upload, File, FileText, Video, ImageIcon, CheckCircle, AlertCircle, Loader2 } from 'lucide-react';
+import API_URL from '../config/api';
 
 export default function AssignmentSubmit({ assignmentId, onComplete }) {
   const [file, setFile] = useState(null);
@@ -36,7 +37,7 @@ export default function AssignmentSubmit({ assignmentId, onComplete }) {
     formData.append('assignment_id', assignmentId);
 
     try {
-      const res = await axios.post('http://localhost:5000/api/submissions/submit', formData, {
+      const res = await axios.post(`${API_URL}/submissions/submit`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' },
         onUploadProgress: (progressEvent) => {
           const percentCompleted = Math.round((progressEvent.loaded * 100) / progressEvent.total);

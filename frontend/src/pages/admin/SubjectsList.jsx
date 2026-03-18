@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Plus, Edit2, Trash2, BookMarked, Check, UserPlus, Users } from 'lucide-react';
+import API_URL from '../../config/api';
 
 export default function SubjectsList() {
   const [subjects, setSubjects] = useState([]);
@@ -30,9 +31,9 @@ export default function SubjectsList() {
   const fetchData = async () => {
     try {
       const [subRes, clsRes, teaRes] = await Promise.all([
-        axios.get('http://localhost:5000/api/subjects'),
-        axios.get('http://localhost:5000/api/classes/classes'),
-        axios.get('http://localhost:5000/api/teachers')
+        axios.get(`${API_URL}/subjects`),
+        axios.get(`${API_URL}/classes/classes`),
+        axios.get(`${API_URL}/teachers`)
       ]);
       setSubjects(subRes.data.subjects);
       setClasses(clsRes.data.classes);
@@ -69,7 +70,7 @@ export default function SubjectsList() {
     e.preventDefault();
     try {
       setError('');
-      await axios.post(`http://localhost:5000/api/subjects/${assignData.subject_id}/assign`, {
+      await axios.post(`${API_URL}/subjects/${assignData.subject_id}/assign`, {
         teacher_id: assignData.teacher_id,
         class_id: assignData.class_id
       });
@@ -89,10 +90,10 @@ export default function SubjectsList() {
     try {
       setError('');
       if (editingId) {
-        await axios.put(`http://localhost:5000/api/subjects/${editingId}`, formData);
+        await axios.put(`${API_URL}/subjects/${editingId}`, formData);
         setSuccess('Subject updated successfully!');
       } else {
-        await axios.post('http://localhost:5000/api/subjects', formData);
+        await axios.post(`${API_URL}/subjects`, formData);
         setSuccess('Subject created successfully!');
       }
       setTimeout(() => {
@@ -108,7 +109,7 @@ export default function SubjectsList() {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this subject?')) {
       try {
-        await axios.delete(`http://localhost:5000/api/subjects/${id}`);
+        await axios.delete(`${API_URL}/subjects/${id}`);
         fetchData();
       } catch (err) {
         alert('Failed to delete subject');

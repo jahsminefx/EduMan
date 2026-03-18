@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Library, Upload, Trash2, FileText, Video, File } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { API_URL, API_BASE_URL } from '../../config/api';
 
 const typeIcons = { pdf: FileText, video: Video, document: File };
 
@@ -25,9 +26,9 @@ export default function ContentLibrary() {
     try {
       const params = filterType ? `?type=${filterType}` : '';
       const [contentRes, clsRes, subRes] = await Promise.all([
-        axios.get(`http://localhost:5000/api/content${params}`),
-        axios.get('http://localhost:5000/api/classes/classes'),
-        axios.get('http://localhost:5000/api/classes/subjects')
+        axios.get(`${API_URL}/content${params}`),
+        axios.get(`${API_URL}/classes/classes`),
+        axios.get(`${API_URL}/classes/subjects`)
       ]);
       setContents(contentRes.data.contents);
       setClasses(clsRes.data.classes);
@@ -44,7 +45,7 @@ export default function ContentLibrary() {
       Object.entries(form).forEach(([key, val]) => { if (val) formData.append(key, val); });
       formData.append('file', file);
 
-      await axios.post('http://localhost:5000/api/content', formData, {
+      await axios.post(`${API_URL}/content`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       setMessage('Content uploaded!');
@@ -61,7 +62,7 @@ export default function ContentLibrary() {
   const handleDelete = async (id) => {
     if (!confirm('Delete this content?')) return;
     try {
-      await axios.delete(`http://localhost:5000/api/content/${id}`);
+      await axios.delete(`${API_URL}/content/${id}`);
       fetchData();
     } catch (err) { console.error(err); }
   };
@@ -151,7 +152,7 @@ export default function ContentLibrary() {
                     {c.type.toUpperCase()}
                   </span>
                 </div>
-                <a href={`http://localhost:5000${c.file_path}`} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline mt-3 inline-block">📥 Download / View</a>
+                <a href={`${API_BASE_URL}${c.file_path}`} target="_blank" rel="noreferrer" className="text-xs text-blue-500 hover:underline mt-3 inline-block">📥 Download / View</a>
                 <p className="text-xs text-gray-400 mt-1">By {c.uploader_name || 'Unknown'}</p>
               </div>
             );

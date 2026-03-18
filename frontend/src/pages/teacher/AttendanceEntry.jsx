@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Calendar, Save, CheckCircle, XCircle } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import API_URL from '../../config/api';
 
 export default function AttendanceEntry() {
   const { user } = useAuth();
@@ -27,8 +28,7 @@ export default function AttendanceEntry() {
 
   const fetchClasses = async () => {
     try {
-      // In a real app, you'd filter by teacher's assigned classes. For MVP, we fetch all.
-      const res = await axios.get('http://localhost:5000/api/classes/classes');
+      const res = await axios.get(`${API_URL}/classes/classes`);
       setClasses(res.data.classes);
       if (res.data.classes.length > 0) {
         setSelectedClass(res.data.classes[0].id);
@@ -42,7 +42,7 @@ export default function AttendanceEntry() {
     setLoading(true);
     setMessage('');
     try {
-      const res = await axios.get(`http://localhost:5000/api/attendance?class_id=${selectedClass}&date=${selectedDate}`);
+      const res = await axios.get(`${API_URL}/attendance?class_id=${selectedClass}&date=${selectedDate}`);
       // Initialize any null status to 'present' by default to save clicks, or leave empty to force choice
       const records = res.data.records.map(r => ({
         ...r,
@@ -76,7 +76,7 @@ export default function AttendanceEntry() {
         date: selectedDate,
         records: students.map(s => ({ student_id: s.student_id, status: s.status }))
       };
-      await axios.post('http://localhost:5000/api/attendance', payload);
+      await axios.post(`${API_URL}/attendance`, payload);
       setMessage('Attendance saved successfully!');
       setTimeout(() => setMessage(''), 3000);
     } catch (err) {

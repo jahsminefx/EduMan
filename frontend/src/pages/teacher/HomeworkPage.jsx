@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { BookOpen, Plus, Trash2, Upload, Calendar, Send, FileCheck, Eye, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import { API_URL, API_BASE_URL } from '../../config/api';
 import AssignmentSubmit from '../../components/AssignmentSubmit';
 
 export default function HomeworkPage() {
@@ -28,9 +29,9 @@ export default function HomeworkPage() {
     setLoading(true);
     try {
       const [hwRes, clsRes, subRes] = await Promise.all([
-        axios.get('http://localhost:5000/api/homework'),
-        axios.get('http://localhost:5000/api/classes/classes'),
-        axios.get('http://localhost:5000/api/classes/subjects')
+        axios.get(`${API_URL}/homework`),
+        axios.get(`${API_URL}/classes/classes`),
+        axios.get(`${API_URL}/classes/subjects`)
       ]);
       setHomework(hwRes.data.homework);
       setClasses(clsRes.data.classes);
@@ -46,7 +47,7 @@ export default function HomeworkPage() {
       Object.entries(form).forEach(([key, val]) => formData.append(key, val));
       if (file) formData.append('file', file);
 
-      await axios.post('http://localhost:5000/api/homework', formData, {
+      await axios.post(`${API_URL}/homework`, formData, {
         headers: { 'Content-Type': 'multipart/form-data' }
       });
       setMessage('Homework created!');
@@ -64,14 +65,14 @@ export default function HomeworkPage() {
   const handleDelete = async (id) => {
     if (!confirm('Delete this homework?')) return;
     try {
-      await axios.delete(`http://localhost:5000/api/homework/${id}`);
+      await axios.delete(`${API_URL}/homework/${id}`);
       fetchData();
     } catch (err) { console.error(err); }
   };
 
   const fetchSubmissions = async (hwId) => {
     try {
-      const res = await axios.get(`http://localhost:5000/api/submissions/assignment/${hwId}`);
+      const res = await axios.get(`${API_URL}/submissions/assignment/${hwId}`);
       setSubmissionsList(res.data.submissions);
       setShowSubmissions(hwId);
     } catch (err) {
@@ -156,7 +157,7 @@ export default function HomeworkPage() {
                 </div>
 
                 {hw.file_path && (
-                  <a href={`http://localhost:5000${hw.file_path}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg text-xs text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-all font-medium">
+                  <a href={`${API_BASE_URL}${hw.file_path}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg text-xs text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-all font-medium">
                     <Plus className="w-3.5 h-3.5 rotate-45" /> View Reference Material
                   </a>
                 )}
@@ -249,7 +250,7 @@ export default function HomeworkPage() {
                           {new Date(sub.submitted_at).toLocaleDateString()} at {new Date(sub.submitted_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                         <a 
-                          href={`http://localhost:5000${sub.file_path}`} 
+                          href={`${API_BASE_URL}${sub.file_path}`} 
                           target="_blank" 
                           rel="noreferrer"
                           className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-bold text-[10px]"

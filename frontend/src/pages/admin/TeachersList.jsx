@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { useAuth } from '../../contexts/AuthContext';
 import { Plus, Trash2, Mail, Phone, Edit2, Check, BookOpen } from 'lucide-react';
+import API_URL from '../../config/api';
 
 export default function TeachersList() {
   const [teachers, setTeachers] = useState([]);
@@ -27,8 +28,8 @@ export default function TeachersList() {
   const fetchData = async () => {
     try {
       const [teachRes, clsRes] = await Promise.all([
-        axios.get('http://localhost:5000/api/teachers'),
-        axios.get('http://localhost:5000/api/classes/classes')
+        axios.get(`${API_URL}/teachers`),
+        axios.get(`${API_URL}/classes/classes`)
       ]);
       setTeachers(teachRes.data.teachers);
       setClasses(clsRes.data.classes);
@@ -71,10 +72,10 @@ export default function TeachersList() {
     try {
       setError('');
       if (editingId) {
-        await axios.put(`http://localhost:5000/api/teachers/${editingId}`, formData);
+        await axios.put(`${API_URL}/teachers/${editingId}`, formData);
         setSuccess('Teacher updated successfully!');
       } else {
-        await axios.post('http://localhost:5000/api/teachers', formData);
+        await axios.post(`${API_URL}/teachers`, formData);
         setSuccess('Teacher account created successfully!');
       }
       setTimeout(() => {
@@ -90,7 +91,7 @@ export default function TeachersList() {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this teacher? Their account will also be removed.')) {
       try {
-        await axios.delete(`http://localhost:5000/api/teachers/${id}`);
+        await axios.delete(`${API_URL}/teachers/${id}`);
         fetchData();
       } catch (err) {
         alert('Failed to delete teacher');

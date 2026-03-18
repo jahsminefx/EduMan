@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Printer, GraduationCap, BookOpen } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import API_URL from '../../config/api';
 
 export default function ReportCard() {
   const { user } = useAuth();
@@ -18,8 +19,8 @@ export default function ReportCard() {
   const fetchOptions = async () => {
     try {
       const [clsRes, stuRes] = await Promise.all([
-        axios.get('http://localhost:5000/api/classes/classes'),
-        axios.get('http://localhost:5000/api/students')
+        axios.get(`${API_URL}/classes/classes`),
+        axios.get(`${API_URL}/api/students`)
       ]);
       setClasses(clsRes.data.classes);
       setStudents(stuRes.data.students || []);
@@ -30,7 +31,7 @@ export default function ReportCard() {
     if (!selectedStudent || !termId) return;
     setLoading(true);
     try {
-      const res = await axios.get(`http://localhost:5000/api/grades/report/${selectedStudent}/${termId}`);
+      const res = await axios.get(`${API_URL}/grades/report/${selectedStudent}/${termId}`);
       setReport(res.data.report);
       const stu = students.find(s => s.id === Number(selectedStudent));
       setStudentInfo(stu);

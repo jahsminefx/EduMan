@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Plus, Edit2, Trash2 } from 'lucide-react';
+import API_URL from '../../config/api';
 
 export default function ClassesList() {
   const [classes, setClasses] = useState([]);
@@ -16,7 +17,7 @@ export default function ClassesList() {
 
   const fetchClasses = async () => {
     try {
-      const res = await axios.get('http://localhost:5000/api/classes/classes');
+      const res = await axios.get(`${API_URL}/classes/classes`);
       setClasses(res.data.classes);
     } catch (err) {
       console.error(err);
@@ -29,7 +30,7 @@ export default function ClassesList() {
     e.preventDefault();
     try {
       setError('');
-      await axios.post('http://localhost:5000/api/classes/classes', formData);
+      await axios.post(`${API_URL}/classes/classes`, formData);
       setSuccess('Class created successfully!');
       setTimeout(() => setSuccess(''), 3000);
       setShowModal(false);

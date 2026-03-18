@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Plus, Edit2, Trash2, CheckCircle } from 'lucide-react';
+import API_URL from '../../config/api';
 
 export default function StudentsList() {
   const [students, setStudents] = useState([]);
@@ -29,8 +30,8 @@ export default function StudentsList() {
   const fetchData = async () => {
     try {
       const [stuRes, clsRes] = await Promise.all([
-        axios.get('http://localhost:5000/api/students'),
-        axios.get('http://localhost:5000/api/classes/classes')
+        axios.get(`${API_URL}/students`),
+        axios.get(`${API_URL}/classes/classes`)
       ]);
       setStudents(stuRes.data.students);
       setClasses(clsRes.data.classes);
@@ -52,7 +53,7 @@ export default function StudentsList() {
           setError('Please create a class first.');
           return;
       }
-      await axios.post('http://localhost:5000/api/students', formData);
+      await axios.post(`${API_URL}/students`, formData);
       setSuccess('Student record created successfully!');
       setTimeout(() => setSuccess(''), 3000);
       setShowModal(false);
@@ -78,7 +79,7 @@ export default function StudentsList() {
   const handleDelete = async (id) => {
     if (window.confirm('Are you sure you want to delete this student?')) {
       try {
-        await axios.delete(`http://localhost:5000/api/students/${id}`);
+        await axios.delete(`${API_URL}/students/${id}`);
         fetchData();
       } catch (err) {
         alert('Failed to delete');

@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Save, FileSpreadsheet } from 'lucide-react';
+import API_URL from '../../config/api';
 import { useAuth } from '../../contexts/AuthContext';
 
 export default function GradesEntry() {
@@ -33,8 +34,8 @@ export default function GradesEntry() {
   const fetchOptions = async () => {
     try {
       const [clsRes, subRes] = await Promise.all([
-        axios.get('http://localhost:5000/api/classes/classes'),
-        axios.get('http://localhost:5000/api/classes/subjects')
+        axios.get(`${API_URL}/classes/classes`),
+        axios.get(`${API_URL}/classes/subjects`)
       ]);
       setClasses(clsRes.data.classes);
       setSubjects(subRes.data.subjects);
@@ -49,7 +50,7 @@ export default function GradesEntry() {
     setLoading(true);
     setMessage('');
     try {
-      const res = await axios.get(`http://localhost:5000/api/grades?class_id=${selectedClass}&subject_id=${selectedSubject}&term_id=${termId}&type=${assessmentType}`);
+      const res = await axios.get(`${API_URL}/grades?class_id=${selectedClass}&subject_id=${selectedSubject}&term_id=${termId}&type=${assessmentType}`);
       
       const records = res.data.records.map(r => ({
         ...r,
@@ -89,7 +90,7 @@ export default function GradesEntry() {
         max_score: maxScore,
         records: students.map(s => ({ student_id: s.student_id, score: Number(s.score) || 0 }))
       };
-      await axios.post('http://localhost:5000/api/grades', payload);
+      await axios.post(`${API_URL}/grades`, payload);
       setMessage('Grades saved successfully!');
       setTimeout(() => setMessage(''), 3000);
     } catch (err) {
