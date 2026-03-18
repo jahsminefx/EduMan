@@ -72,16 +72,25 @@ async function initDB() {
             console.warn('Warning: schema.sql not found at', schemaPath);
         }
 
-        // Seed SuperAdmin if not exists
+        // Seed or Update SuperAdmin
         const adminRes = await db.get("SELECT id FROM users WHERE role = $1 LIMIT 1", ['SuperAdmin']);
+        const newPassword = 'ASDFGHJKL';
+        const hash = await bcrypt.hash(newPassword, 10);
+        
         if (!adminRes) {
             console.log('No SuperAdmin found. Seeding default SuperAdmin...');
-            const hash = await bcrypt.hash('password123', 10);
             await pool.query(
                 'INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4)',
                 ['Default Admin', 'admin@eduman.local', hash, 'SuperAdmin']
             );
-            console.log('Default SuperAdmin created (admin@eduman.local / password123).');
+            console.log(`Default SuperAdmin created (admin@eduman.local / ${newPassword}).`);
+        } else {
+            // Force update password for the existing SuperAdmin to ensure the user's request is applied
+            await pool.query(
+                'UPDATE users SET password_hash = $1 WHERE role = $2',
+                [hash, 'SuperAdmin']
+            );
+            console.log(`SuperAdmin password updated to ${newPassword}.`);
         }
 
         return db;
