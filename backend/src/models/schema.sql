@@ -271,6 +271,21 @@ CREATE TABLE IF NOT EXISTS assignment_submissions (
     FOREIGN KEY(student_id) REFERENCES students(id) ON DELETE CASCADE
 );
 
+-- Clean up any duplicates before applying unique constraints
+DELETE FROM teacher_subject_assignments
+WHERE id NOT IN (
+    SELECT MIN(id)
+    FROM teacher_subject_assignments
+    GROUP BY teacher_id, class_id, subject_id
+);
+
+DELETE FROM teacher_classes
+WHERE id NOT IN (
+    SELECT MIN(id)
+    FROM teacher_classes
+    GROUP BY teacher_id, class_id, school_id
+);
+
 -- Unique constraints (required for ON CONFLICT DO NOTHING in PostgreSQL)
 CREATE UNIQUE INDEX IF NOT EXISTS uq_tsa_teacher_class_subject
     ON teacher_subject_assignments (teacher_id, class_id, subject_id);
