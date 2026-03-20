@@ -79,7 +79,7 @@ exports.login = async (req, res) => {
 };
 
 exports.register = async (req, res) => {
-    const { name, email, password } = req.body; // 'name' represents institution name here
+    const { name, email, password } = req.body;
 
     if (!name || !email || !password) {
         return res.status(400).json({ error: 'Bad Request', message: 'Institution name, email, and password are required' });
@@ -95,45 +95,44 @@ exports.register = async (req, res) => {
             return res.status(409).json({ error: 'Conflict', message: 'An account with this email already exists' });
         }
 
-        await db.run('BEGIN TRANSACTION');
-
-        // 1. Create School
-        const schoolResult = await db.run(
-            "INSERT INTO schools (name) VALUES ($1) RETURNING id",
-            [name]
-        );
-        const school_id = schoolResult.lastID || schoolResult.rows?.[0]?.id;
-
-        // 2. Create User
         const salt = await bcrypt.genSalt(10);
         const password_hash = await bcrypt.hash(password, salt);
         const role = 'SchoolAdmin';
 
-        const userResult = await db.run(
-            "INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id",
-            ['Admin User', email, password_hash, role] // Defaulting admin name to 'Admin User' for now
-        );
-        const user_id = userResult.lastID || userResult.rows?.[0]?.id;
+        const result = await db.transaction(async (client) => {
+            // 1. Create School
+            const schoolResult = await client.run(
+                "INSERT INTO schools (name) VALUES ($1) RETURNING id",
+                [name]
+            );
+            const school_id = schoolResult.lastID;
 
-        // 3. Assign Admin to School
-        await db.run(
-            "INSERT INTO school_admin_assignments (user_id, school_id) VALUES ($1, $2)",
-            [user_id, school_id]
-        );
+            // 2. Create User
+            const userResult = await client.run(
+                "INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id",
+                ['Admin User', email, password_hash, role]
+            );
+            const user_id = userResult.lastID;
 
-        await db.run('COMMIT');
+            // 3. Assign Admin to School
+            await client.run(
+                "INSERT INTO school_admin_assignments (user_id, school_id) VALUES ($1, $2)",
+                [user_id, school_id]
+            );
 
-        const user = { id: user_id, name: 'Admin User', email, role };
-        const token = generateToken(user, school_id);
+            return { school_id, user_id };
+        });
+
+        const user = { id: result.user_id, name: 'Admin User', email, role };
+        const token = generateToken(user, result.school_id);
 
         res.status(201).json({
             message: 'School and Admin account created successfully',
             token,
             user,
-            school_id
+            school_id: result.school_id
         });
     } catch (err) {
-        await db.run('ROLLBACK');
         console.error('Register error:', err);
         res.status(500).json({ error: 'Internal Server Error', message: err.message });
     }

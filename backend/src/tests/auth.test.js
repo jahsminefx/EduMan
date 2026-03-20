@@ -16,11 +16,12 @@ describe('Auth API', () => {
   });
 
   it('should login with default admin credentials', async () => {
+    const defaultPassword = process.env.SUPERADMIN_PASSWORD || 'ASDFGHJKL';
     const res = await request(app)
       .post('/api/auth/login')
       .send({
         email: 'admin@eduman.local',
-        password: 'password123'
+        password: defaultPassword
       });
     
     expect(res.statusCode).toEqual(200);
@@ -40,12 +41,12 @@ describe('Auth API', () => {
   });
 
   it('should get current user info with valid token', async () => {
-    // First login to get token
+    const defaultPassword = process.env.SUPERADMIN_PASSWORD || 'ASDFGHJKL';
     const loginRes = await request(app)
       .post('/api/auth/login')
       .send({
         email: 'admin@eduman.local',
-        password: 'password123'
+        password: defaultPassword
       });
     
     const token = loginRes.body.token;

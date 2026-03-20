@@ -1,10 +1,10 @@
 const { getDB } = require('../config/database');
+const bcrypt = require('bcryptjs');
 
 exports.getStudents = async (req, res) => {
     try {
         const db = getDB();
         const school_id = req.user.school_id;
-        // Join with classes to get class name
         const students = await db.all(`
             SELECT s.*, c.name as class_name, c.level as class_level
             FROM students s
@@ -18,48 +18,46 @@ exports.getStudents = async (req, res) => {
     }
 };
 
-const bcrypt = require('bcryptjs');
-
 exports.createStudent = async (req, res) => {
     const { admission_number, first_name, last_name, gender, dob, class_id, parent_name, parent_phone, email, password } = req.body;
-    let db;
+    
     try {
-        db = getDB();
+        const db = getDB();
         
-        // Basic validation
         if (!admission_number || !first_name || !last_name || !email || !password) {
             return res.status(400).json({ error: 'Validation Error', message: 'Missing required fields (admission_number, name, email, password)' });
         }
 
         const school_id = req.user.school_id;
 
-        await db.run('BEGIN TRANSACTION');
+        const result = await db.transaction(async (client) => {
+            // 1. Create User record for login
+            const password_hash = await bcrypt.hash(password, 10);
+            const userResult = await client.run(
+                `INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id`,
+                [`${first_name} ${last_name}`, email, password_hash, 'Student']
+            );
+            const user_id = userResult.lastID;
 
-        // 1. Create User record for login
-        const password_hash = await bcrypt.hash(password, 10);
-        const userResult = await db.run(
-            `INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id`,
-            [`${first_name} ${last_name}`, email, password_hash, 'Student']
-        );
-        const user_id = userResult.lastID || userResult.rows?.[0]?.id;
+            // 2. Create Student record linked to User
+            const studentResult = await client.run(
+                `INSERT INTO students (user_id, school_id, admission_number, first_name, last_name, gender, dob, class_id, parent_name, parent_phone) 
+                 VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
+                [user_id, school_id, admission_number, first_name, last_name, gender, dob, class_id, parent_name, parent_phone]
+            );
 
-        // 2. Create Student record linked to User
-        const studentResult = await db.run(
-            `INSERT INTO students (user_id, school_id, admission_number, first_name, last_name, gender, dob, class_id, parent_name, parent_phone) 
-             VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10) RETURNING id`,
-            [user_id, school_id, admission_number, first_name, last_name, gender, dob, class_id, parent_name, parent_phone]
-        );
+            return { student_id: studentResult.lastID, user_id };
+        });
 
-        await db.run('COMMIT');
         res.json({ 
             message: 'Student and login account created successfully', 
-            id: studentResult.lastID || studentResult.rows?.[0]?.id,
-            user_id: user_id
+            id: result.student_id,
+            user_id: result.user_id
         });
     } catch (err) {
-        if (db) await db.run('ROLLBACK');
-        if (err.message.includes('UNIQUE constraint failed')) {
-            const field = err.message.includes('users.email') ? 'Email' : 'Admission number';
+        // PostgreSQL unique violation error code
+        if (err.code === '23505') {
+            const field = err.detail && err.detail.includes('email') ? 'Email' : 'Admission number';
             return res.status(400).json({ error: 'Duplicate', message: `${field} already exists.` });
         }
         console.error('Create student error:', err);

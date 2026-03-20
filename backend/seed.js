@@ -1,19 +1,34 @@
 /**
- * EduMan Comprehensive Seed Script
+ * EduMan Comprehensive Seed Script (PostgreSQL)
  * Populates the database with realistic test data for all 8 user roles.
  * Run: node seed.js
  */
-const sqlite3 = require('sqlite3').verbose();
-const { open } = require('sqlite');
+const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
-const path = require('path');
+require('dotenv').config();
 
-const dbPath = path.join(__dirname, 'database', 'eduman_v2.db');
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+    console.error('ERROR: DATABASE_URL not set. Check your .env file.');
+    process.exit(1);
+}
+
+const pool = new Pool({
+    connectionString,
+    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+});
+
+// Helper functions for pg
+const get = async (text, params) => {
+    const res = await pool.query(text, params);
+    return res.rows[0];
+};
+const run = async (text, params) => {
+    const res = await pool.query(text, params);
+    return { lastID: res.rows[0]?.id || null, changes: res.rowCount };
+};
 
 async function seed() {
-    const db = await open({ filename: dbPath, driver: sqlite3.Database });
-    await db.exec('PRAGMA foreign_keys = ON;');
-
     const hash = await bcrypt.hash('password123', 10);
     console.log('🌱 Seeding EduMan database...\n');
 
@@ -26,9 +41,9 @@ async function seed() {
     ];
     const schoolIds = [];
     for (const s of schools) {
-        const existing = await db.get('SELECT id FROM schools WHERE name = ?', [s.name]);
+        const existing = await get('SELECT id FROM schools WHERE name = $1', [s.name]);
         if (existing) { schoolIds.push(existing.id); continue; }
-        const r = await db.run('INSERT INTO schools (name, address, phone, email) VALUES (?, ?, ?, ?)', [s.name, s.address, s.phone, s.email]);
+        const r = await run('INSERT INTO schools (name, address, phone, email) VALUES ($1, $2, $3, $4) RETURNING id', [s.name, s.address, s.phone, s.email]);
         schoolIds.push(r.lastID);
     }
     console.log(`✅ ${schoolIds.length} schools ready`);
@@ -37,13 +52,13 @@ async function seed() {
     // 2. ACADEMIC SESSIONS & TERMS
     // ──────────────────────────────────────
     for (const sid of schoolIds) {
-        const existingSession = await db.get('SELECT id FROM academic_sessions WHERE school_id = ?', [sid]);
+        const existingSession = await get('SELECT id FROM academic_sessions WHERE school_id = $1', [sid]);
         if (existingSession) continue;
-        const sess = await db.run('INSERT INTO academic_sessions (school_id, name, start_date, end_date, is_active) VALUES (?, ?, ?, ?, 1)',
+        const sess = await run('INSERT INTO academic_sessions (school_id, name, start_date, end_date, is_active) VALUES ($1, $2, $3, $4, 1) RETURNING id',
             [sid, '2025/2026', '2025-09-01', '2026-07-15']);
-        await db.run('INSERT INTO academic_terms (school_id, session_id, name, is_active) VALUES (?, ?, ?, 1)', [sid, sess.lastID, 'First Term']);
-        await db.run('INSERT INTO academic_terms (school_id, session_id, name, is_active) VALUES (?, ?, ?, 0)', [sid, sess.lastID, 'Second Term']);
-        await db.run('INSERT INTO academic_terms (school_id, session_id, name, is_active) VALUES (?, ?, ?, 0)', [sid, sess.lastID, 'Third Term']);
+        await run('INSERT INTO academic_terms (school_id, session_id, name, is_active) VALUES ($1, $2, $3, 1) RETURNING id', [sid, sess.lastID, 'First Term']);
+        await run('INSERT INTO academic_terms (school_id, session_id, name, is_active) VALUES ($1, $2, $3, 0) RETURNING id', [sid, sess.lastID, 'Second Term']);
+        await run('INSERT INTO academic_terms (school_id, session_id, name, is_active) VALUES ($1, $2, $3, 0) RETURNING id', [sid, sess.lastID, 'Third Term']);
     }
     console.log('✅ Academic sessions & terms seeded');
 
@@ -74,11 +89,11 @@ async function seed() {
         { name: 'Emeka IT', email: 'emeka@eduman.local', role: 'SupportOfficer' },
     ];
 
-    const userMap = {}; // email -> id
+    const userMap = {};
     for (const u of users) {
-        const existing = await db.get('SELECT id FROM users WHERE email = ?', [u.email]);
+        const existing = await get('SELECT id FROM users WHERE email = $1', [u.email]);
         if (existing) { userMap[u.email] = existing.id; continue; }
-        const r = await db.run('INSERT INTO users (name, email, password_hash, role) VALUES (?, ?, ?, ?)', [u.name, u.email, hash, u.role]);
+        const r = await run('INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id', [u.name, u.email, hash, u.role]);
         userMap[u.email] = r.lastID;
     }
     console.log(`✅ ${Object.keys(userMap).length} users seeded (password: password123)`);
@@ -91,8 +106,8 @@ async function seed() {
         { email: 'okonkwo@sunrise.edu.ng', schoolIdx: 1 },
     ];
     for (const a of adminAssignments) {
-        const exists = await db.get('SELECT id FROM school_admin_assignments WHERE user_id = ?', [userMap[a.email]]);
-        if (!exists) await db.run('INSERT INTO school_admin_assignments (user_id, school_id) VALUES (?, ?)', [userMap[a.email], schoolIds[a.schoolIdx]]);
+        const exists = await get('SELECT id FROM school_admin_assignments WHERE user_id = $1', [userMap[a.email]]);
+        if (!exists) await run('INSERT INTO school_admin_assignments (user_id, school_id) VALUES ($1, $2)', [userMap[a.email], schoolIds[a.schoolIdx]]);
     }
     console.log('✅ School admin assignments set');
 
@@ -108,9 +123,9 @@ async function seed() {
     const classIds = {};
     for (const c of classDefs) {
         const sid = schoolIds[c.schoolIdx];
-        const existing = await db.get('SELECT id FROM classes WHERE school_id = ? AND name = ?', [sid, c.name]);
+        const existing = await get('SELECT id FROM classes WHERE school_id = $1 AND name = $2', [sid, c.name]);
         if (existing) { classIds[`${c.schoolIdx}_${c.name}`] = existing.id; continue; }
-        const r = await db.run('INSERT INTO classes (school_id, name, level) VALUES (?, ?, ?)', [sid, c.name, c.level]);
+        const r = await run('INSERT INTO classes (school_id, name, level) VALUES ($1, $2, $3) RETURNING id', [sid, c.name, c.level]);
         classIds[`${c.schoolIdx}_${c.name}`] = r.lastID;
     }
     console.log(`✅ ${Object.keys(classIds).length} classes seeded`);
@@ -123,9 +138,9 @@ async function seed() {
     for (const sIdx of [0, 1]) {
         const sid = schoolIds[sIdx];
         for (const sn of subjectNames) {
-            const existing = await db.get('SELECT id FROM subjects WHERE school_id = ? AND name = ?', [sid, sn]);
+            const existing = await get('SELECT id FROM subjects WHERE school_id = $1 AND name = $2', [sid, sn]);
             if (existing) { subjectIds[`${sIdx}_${sn}`] = existing.id; continue; }
-            const r = await db.run('INSERT INTO subjects (school_id, name, code) VALUES (?, ?, ?)', [sid, sn, sn.substring(0, 3).toUpperCase()]);
+            const r = await run('INSERT INTO subjects (school_id, name, code) VALUES ($1, $2, $3) RETURNING id', [sid, sn, sn.substring(0, 3).toUpperCase()]);
             subjectIds[`${sIdx}_${sn}`] = r.lastID;
         }
     }
@@ -143,9 +158,9 @@ async function seed() {
     for (const t of teacherProfiles) {
         const uid = userMap[t.email];
         const sid = schoolIds[t.schoolIdx];
-        const existing = await db.get('SELECT id FROM teachers WHERE user_id = ?', [uid]);
+        const existing = await get('SELECT id FROM teachers WHERE user_id = $1', [uid]);
         if (existing) { teacherIds[t.email] = existing.id; continue; }
-        const r = await db.run('INSERT INTO teachers (user_id, school_id, first_name, last_name, phone) VALUES (?, ?, ?, ?, ?)',
+        const r = await run('INSERT INTO teachers (user_id, school_id, first_name, last_name, phone) VALUES ($1, $2, $3, $4, $5) RETURNING id',
             [uid, sid, t.first, t.last, t.phone]);
         teacherIds[t.email] = r.lastID;
     }
@@ -164,8 +179,8 @@ async function seed() {
     ];
     for (const a of assignments) {
         const tid = teacherIds[a.teacher]; const cid = classIds[a.class]; const sid = subjectIds[a.subject];
-        const existing = await db.get('SELECT id FROM teacher_subject_assignments WHERE teacher_id = ? AND class_id = ? AND subject_id = ?', [tid, cid, sid]);
-        if (!existing) await db.run('INSERT INTO teacher_subject_assignments (teacher_id, class_id, subject_id) VALUES (?, ?, ?)', [tid, cid, sid]);
+        const existing = await get('SELECT id FROM teacher_subject_assignments WHERE teacher_id = $1 AND class_id = $2 AND subject_id = $3', [tid, cid, sid]);
+        if (!existing) await run('INSERT INTO teacher_subject_assignments (teacher_id, class_id, subject_id) VALUES ($1, $2, $3)', [tid, cid, sid]);
     }
     console.log('✅ Teacher-subject assignments set');
 
@@ -181,9 +196,9 @@ async function seed() {
     const studentIds = {};
     for (const s of studentDefs) {
         const sid = schoolIds[s.schoolIdx]; const cid = classIds[s.class]; const uid = userMap[s.email];
-        const existing = await db.get('SELECT id FROM students WHERE admission_number = ? AND school_id = ?', [s.adm, sid]);
+        const existing = await get('SELECT id FROM students WHERE admission_number = $1 AND school_id = $2', [s.adm, sid]);
         if (existing) { studentIds[s.email] = existing.id; continue; }
-        const r = await db.run('INSERT INTO students (user_id, school_id, admission_number, first_name, last_name, gender, dob, class_id) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+        const r = await run('INSERT INTO students (user_id, school_id, admission_number, first_name, last_name, gender, dob, class_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
             [uid, sid, s.adm, s.first, s.last, s.gender, s.dob, cid]);
         studentIds[s.email] = r.lastID;
     }
@@ -198,8 +213,8 @@ async function seed() {
     ];
     for (const pl of parentLinks) {
         const pid = userMap[pl.parent]; const sid = studentIds[pl.student];
-        const existing = await db.get('SELECT id FROM parent_student_links WHERE parent_user_id = ? AND student_id = ?', [pid, sid]);
-        if (!existing) await db.run('INSERT INTO parent_student_links (parent_user_id, student_id) VALUES (?, ?)', [pid, sid]);
+        const existing = await get('SELECT id FROM parent_student_links WHERE parent_user_id = $1 AND student_id = $2', [pid, sid]);
+        if (!existing) await run('INSERT INTO parent_student_links (parent_user_id, student_id) VALUES ($1, $2)', [pid, sid]);
     }
     console.log('✅ Parent-student links set');
 
@@ -210,10 +225,10 @@ async function seed() {
     const jss1aId = classIds['0_JSS 1A'];
     for (const email of ['femi@student.greenfield.edu.ng', 'joy@student.greenfield.edu.ng']) {
         const sid = studentIds[email];
-        const existing = await db.get('SELECT id FROM attendance_records WHERE student_id = ? AND date = ?', [sid, today]);
+        const existing = await get('SELECT id FROM attendance_records WHERE student_id = $1 AND date = $2', [sid, today]);
         if (!existing) {
-            await db.run('INSERT INTO attendance_records (student_id, class_id, date, status, recorded_by) VALUES (?, ?, ?, ?, ?)',
-                [sid, jss1aId, today, email.includes('femi') ? 'present' : 'absent', userMap['chidi@greenfield.edu.ng']]);
+            await run('INSERT INTO attendance_records (student_id, class_id, date, status, recorded_by) VALUES ($1, $2, $3, $4, $5)',
+                [sid, jss1aId, today, email.includes('femi') ? 'Present' : 'Absent', userMap['chidi@greenfield.edu.ng']]);
         }
     }
     console.log('✅ Sample attendance records seeded');
@@ -221,7 +236,7 @@ async function seed() {
     // ──────────────────────────────────────
     // 12. SAMPLE ASSESSMENTS (GRADES)
     // ──────────────────────────────────────
-    const term = await db.get('SELECT id FROM academic_terms WHERE school_id = ? AND is_active = 1', [schoolIds[0]]);
+    const term = await get('SELECT id FROM academic_terms WHERE school_id = $1 AND is_active = 1', [schoolIds[0]]);
     if (term) {
         const mathId = subjectIds['0_Mathematics'];
         const engId = subjectIds['0_English Language'];
@@ -237,10 +252,10 @@ async function seed() {
         ];
         for (const g of gradeData) {
             const sid = studentIds[g.student];
-            const existing = await db.get('SELECT id FROM assessments WHERE student_id = ? AND subject_id = ? AND term_id = ? AND type = ?',
+            const existing = await get('SELECT id FROM assessments WHERE student_id = $1 AND subject_id = $2 AND term_id = $3 AND type = $4',
                 [sid, g.subject, term.id, g.type]);
             if (!existing) {
-                await db.run('INSERT INTO assessments (student_id, class_id, subject_id, term_id, type, score, max_score, recorded_by) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
+                await run('INSERT INTO assessments (student_id, class_id, subject_id, term_id, type, score, max_score, recorded_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8)',
                     [sid, jss1aId, g.subject, term.id, g.type, g.score, g.max, userMap['chidi@greenfield.edu.ng']]);
             }
         }
@@ -250,12 +265,12 @@ async function seed() {
     // ──────────────────────────────────────
     // 13. SAMPLE HOMEWORK
     // ──────────────────────────────────────
-    const hwExists = await db.get('SELECT id FROM homework WHERE school_id = ? LIMIT 1', [schoolIds[0]]);
+    const hwExists = await get('SELECT id FROM homework WHERE school_id = $1 LIMIT 1', [schoolIds[0]]);
     if (!hwExists) {
-        await db.run('INSERT INTO homework (school_id, class_id, subject_id, teacher_id, title, description, due_date) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        await run('INSERT INTO homework (school_id, class_id, subject_id, teacher_id, title, description, due_date) VALUES ($1, $2, $3, $4, $5, $6, $7)',
             [schoolIds[0], jss1aId, subjectIds['0_Mathematics'], teacherIds['chidi@greenfield.edu.ng'],
              'Algebra Practice Set 1', 'Solve equations 1-20 from textbook page 45', '2026-04-01']);
-        await db.run('INSERT INTO homework (school_id, class_id, subject_id, teacher_id, title, description, due_date) VALUES (?, ?, ?, ?, ?, ?, ?)',
+        await run('INSERT INTO homework (school_id, class_id, subject_id, teacher_id, title, description, due_date) VALUES ($1, $2, $3, $4, $5, $6, $7)',
             [schoolIds[0], jss1aId, subjectIds['0_English Language'], teacherIds['amina@greenfield.edu.ng'],
              'Essay: My Best Holiday', 'Write a 300-word essay about your best holiday experience.', '2026-03-28']);
     }
@@ -275,7 +290,11 @@ async function seed() {
     console.log('   Accountant:      fashola@greenfield.edu.ng');
     console.log('   Support:         emeka@eduman.local');
 
-    await db.close();
+    await pool.end();
 }
 
-seed().catch(console.error);
+seed().catch(err => {
+    console.error('Seed error:', err);
+    pool.end();
+    process.exit(1);
+});

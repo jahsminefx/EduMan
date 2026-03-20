@@ -1,7 +1,6 @@
 const { getDB } = require('../config/database');
 
 exports.markAttendance = async (req, res) => {
-    // Expected body: { class_id, date, records: [{ student_id, status }] }
     const { class_id, date, records } = req.body;
 
     if (!class_id || !date || !Array.isArray(records)) {
@@ -25,7 +24,7 @@ exports.markAttendance = async (req, res) => {
                 return res.status(403).json({ error: 'Forbidden', message: 'Teacher profile not found.' });
             }
             const assignment = await db.get(
-                'SELECT id FROM teacher_subject_assignments WHERE teacher_id = $1 AND class_id = $2',
+                'SELECT id FROM teacher_classes WHERE teacher_id = $1 AND class_id = $2',
                 [teacher.id, class_id]
             );
             if (!assignment) {
@@ -33,32 +32,29 @@ exports.markAttendance = async (req, res) => {
             }
         }
 
-        await db.run('BEGIN TRANSACTION');
-
-        for (const record of records) {
-            const existing = await db.get(
-                'SELECT id FROM attendance_records WHERE student_id = $1 AND date = $2 AND class_id = $3',
-                [record.student_id, date, class_id]
-            );
-
-            if (existing) {
-                await db.run(
-                    'UPDATE attendance_records SET status = $1, recorded_by = $2 WHERE id = $3',
-                    [record.status, req.user.id, existing.id]
+        await db.transaction(async (client) => {
+            for (const record of records) {
+                const existing = await client.get(
+                    'SELECT id FROM attendance_records WHERE student_id = $1 AND date = $2 AND class_id = $3',
+                    [record.student_id, date, class_id]
                 );
-            } else {
-                await db.run(
-                    'INSERT INTO attendance_records (student_id, class_id, date, status, recorded_by) VALUES ($1, $2, $3, $4, $5)',
-                    [record.student_id, class_id, date, record.status, req.user.id]
-                );
+
+                if (existing) {
+                    await client.run(
+                        'UPDATE attendance_records SET status = $1, recorded_by = $2 WHERE id = $3',
+                        [record.status, req.user.id, existing.id]
+                    );
+                } else {
+                    await client.run(
+                        'INSERT INTO attendance_records (student_id, class_id, date, status, recorded_by) VALUES ($1, $2, $3, $4, $5)',
+                        [record.student_id, class_id, date, record.status, req.user.id]
+                    );
+                }
             }
-        }
+        });
 
-        await db.run('COMMIT');
         res.json({ message: 'Attendance recorded successfully' });
     } catch (err) {
-        const db = getDB();
-        await db.run('ROLLBACK');
         res.status(500).json({ error: 'Server Error', message: err.message });
     }
 };
@@ -74,7 +70,6 @@ exports.getAttendance = async (req, res) => {
         const db = getDB();
         const school_id = req.user.school_id;
 
-        // Verify class belongs to user's school
         const classObj = await db.get('SELECT id FROM classes WHERE id = $1 AND school_id = $2', [class_id, school_id]);
         if (!classObj) {
             return res.status(403).json({ error: 'Forbidden', message: 'This class does not belong to your school.' });
@@ -101,7 +96,6 @@ exports.getStudentAttendanceSummary = async (req, res) => {
         const db = getDB();
         const school_id = req.user.school_id;
 
-        // Verify the student belongs to the user's school
         const student = await db.get('SELECT id FROM students WHERE id = $1 AND school_id = $2', [studentId, school_id]);
         if (!student) {
             return res.status(403).json({ error: 'Forbidden', message: 'Student not found in your school.' });

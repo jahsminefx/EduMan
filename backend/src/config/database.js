@@ -1,7 +1,7 @@
 const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
-const bcrypt = require('bcryptjs'); // Using bcryptjs for broader compatibility
+const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
 const connectionString = process.env.DATABASE_URL;
@@ -14,9 +14,7 @@ if (!connectionString) {
 
 const pool = new Pool({
     connectionString,
-    // Render often requires SSL for database connections
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-    // Basic pool settings for reliability
     max: 20,
     idleTimeoutMillis: 30000,
     connectionTimeoutMillis: 2000
@@ -24,23 +22,23 @@ const pool = new Pool({
 
 const schemaPath = path.join(__dirname, '../models/schema.sql');
 
-// Singleton wrapper to mimic some sqlite-like behavior for easier migration
+// Database helper wrapping pg Pool for convenience
 const db = {
     query: (text, params) => pool.query(text, params),
     
-    // Shim for sqlite 'get' (returns first row)
+    // Returns first row
     get: async (text, params) => {
         const res = await pool.query(text, params);
         return res.rows[0];
     },
     
-    // Shim for sqlite 'all' (returns all rows)
+    // Returns all rows
     all: async (text, params) => {
         const res = await pool.query(text, params);
         return res.rows;
     },
     
-    // Shim for sqlite 'run' (returns result with lastID/changes)
+    // Returns { lastID, changes }
     run: async (text, params) => {
         const res = await pool.query(text, params);
         return {
@@ -49,13 +47,56 @@ const db = {
         };
     },
     
-    // Shim for exec
+    // Execute raw SQL
     exec: async (text) => {
         return pool.query(text);
+    },
+
+    /**
+     * Run a function inside a proper PostgreSQL transaction using a dedicated client.
+     * Usage:
+     *   await db.transaction(async (client) => {
+     *       await client.query('INSERT INTO ...', [...]);
+     *       await client.query('UPDATE ...', [...]);
+     *   });
+     */
+    transaction: async (fn) => {
+        const client = await pool.connect();
+        try {
+            await client.query('BEGIN');
+            
+            // Provide helper methods on the client matching the db interface
+            client.get = async (text, params) => {
+                const res = await client.query(text, params);
+                return res.rows[0];
+            };
+            client.all = async (text, params) => {
+                const res = await client.query(text, params);
+                return res.rows;
+            };
+            client.run = async (text, params) => {
+                const res = await client.query(text, params);
+                return {
+                    lastID: res.rows[0]?.id || null,
+                    changes: res.rowCount
+                };
+            };
+
+            const result = await fn(client);
+            await client.query('COMMIT');
+            return result;
+        } catch (e) {
+            await client.query('ROLLBACK');
+            throw e;
+        } finally {
+            client.release();
+        }
     }
 };
 
-async function initDB() {
+const MAX_RETRIES = 5;
+
+async function initDB(retryCount = 0) {
     try {
         console.log('Attempting to connect to PostgreSQL...');
         
@@ -72,36 +113,31 @@ async function initDB() {
             console.warn('Warning: schema.sql not found at', schemaPath);
         }
 
-        // Seed or Update SuperAdmin
+        // Seed SuperAdmin only if none exists (do NOT reset password on every restart)
         const adminRes = await db.get("SELECT id FROM users WHERE role = $1 LIMIT 1", ['SuperAdmin']);
-        const newPassword = 'ASDFGHJKL';
-        const hash = await bcrypt.hash(newPassword, 10);
         
         if (!adminRes) {
+            const defaultPassword = process.env.SUPERADMIN_PASSWORD || 'ASDFGHJKL';
+            const hash = await bcrypt.hash(defaultPassword, 10);
             console.log('No SuperAdmin found. Seeding default SuperAdmin...');
             await pool.query(
                 'INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4)',
                 ['Default Admin', 'admin@eduman.local', hash, 'SuperAdmin']
             );
-            console.log(`Default SuperAdmin created (admin@eduman.local / ${newPassword}).`);
+            console.log('Default SuperAdmin created (admin@eduman.local). Password set from SUPERADMIN_PASSWORD env var.');
         } else {
-            // Force update password for the existing SuperAdmin to ensure the user's request is applied
-            await pool.query(
-                'UPDATE users SET password_hash = $1 WHERE role = $2',
-                [hash, 'SuperAdmin']
-            );
-            console.log(`SuperAdmin password updated to ${newPassword}.`);
+            console.log('SuperAdmin account already exists — no changes made.');
         }
 
         return db;
     } catch (error) {
         console.error('DATABASE CONNECTION ERROR:', error.message);
         
-        // Retry logic for production
-        if (process.env.NODE_ENV === 'production') {
-            console.log('Retrying database connection in 5 seconds...');
-            await new Promise(resolve => setTimeout(resolve, 5000));
-            return initDB();
+        if (process.env.NODE_ENV === 'production' && retryCount < MAX_RETRIES) {
+            const delay = Math.min(5000 * Math.pow(2, retryCount), 60000); // exponential backoff, max 60s
+            console.log(`Retrying database connection in ${delay / 1000}s... (attempt ${retryCount + 1}/${MAX_RETRIES})`);
+            await new Promise(resolve => setTimeout(resolve, delay));
+            return initDB(retryCount + 1);
         }
         
         throw error;

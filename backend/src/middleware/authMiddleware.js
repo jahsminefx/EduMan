@@ -60,7 +60,7 @@ const requireTeacherResourceAccess = async (req, res, next) => {
         // 2. Check assignment table
         const assignment = await db.get(
             'SELECT id FROM teacher_subject_assignments WHERE teacher_id = $1 AND class_id = $2 AND subject_id = $3',
-            [teacher.id, req.query.class_id, req.query.subject_id]
+            [teacher.id, class_id, subject_id]
         );
 
         if (!assignment) {

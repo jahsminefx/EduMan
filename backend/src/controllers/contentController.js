@@ -59,8 +59,17 @@ exports.deleteContent = async (req, res) => {
     const { id } = req.params;
     try {
         const db = getDB();
-        const result = await db.run('DELETE FROM learning_contents WHERE id = $1', [id]);
-        if (result.changes === 0) return res.status(404).json({ error: 'Not Found' });
+        const school_id = req.user.school_id;
+
+        // Verify the content belongs to the user's school (or is global and user is ContentManager)
+        const content = await db.get('SELECT id, school_id FROM learning_contents WHERE id = $1', [id]);
+        if (!content) return res.status(404).json({ error: 'Not Found' });
+
+        if (content.school_id && content.school_id !== school_id) {
+            return res.status(403).json({ error: 'Forbidden', message: 'You cannot delete content from another school.' });
+        }
+
+        await db.run('DELETE FROM learning_contents WHERE id = $1', [id]);
         res.json({ message: 'Content deleted successfully' });
     } catch (err) {
         res.status(500).json({ error: 'Server Error', message: err.message });

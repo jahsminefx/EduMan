@@ -21,31 +21,30 @@ exports.createQuiz = async (req, res) => {
         );
         if (!assignment) return res.status(403).json({ error: 'Forbidden', message: 'You are not assigned to this class/subject.' });
 
-        await db.run('BEGIN TRANSACTION');
-
-        const quizResult = await db.run(
-            'INSERT INTO quizzes (school_id, class_id, subject_id, teacher_id, title, duration_minutes) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
-            [school_id, class_id, subject_id, teacher.id, title, duration_minutes || 30]
-        );
-        const quizId = quizResult.lastID || quizResult.rows?.[0]?.id;
-
-        for (const q of questions) {
-            await db.run(
-                'INSERT INTO quiz_questions (quiz_id, question_text, options, correct_option_index) VALUES ($1, $2, $3, $4)',
-                [quizId, q.question_text, JSON.stringify(q.options), q.correct_option_index]
+        const quizId = await db.transaction(async (client) => {
+            const quizResult = await client.run(
+                'INSERT INTO quizzes (school_id, class_id, subject_id, teacher_id, title, duration_minutes) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+                [school_id, class_id, subject_id, teacher.id, title, duration_minutes || 30]
             );
-        }
+            const id = quizResult.lastID;
 
-        await db.run('COMMIT');
+            for (const q of questions) {
+                await client.run(
+                    'INSERT INTO quiz_questions (quiz_id, question_text, options, correct_option_index) VALUES ($1, $2, $3, $4)',
+                    [id, q.question_text, JSON.stringify(q.options), q.correct_option_index]
+                );
+            }
+
+            return id;
+        });
+
         res.json({ message: 'Quiz created successfully', id: quizId });
     } catch (err) {
-        const db = getDB();
-        await db.run('ROLLBACK');
         res.status(500).json({ error: 'Server Error', message: err.message });
     }
 };
 
-// Get quizzes for a class (Teacher sees all, Student sees their class)
+// Get quizzes for a class
 exports.getQuizzes = async (req, res) => {
     const { class_id } = req.query;
     try {
@@ -70,7 +69,7 @@ exports.getQuizzes = async (req, res) => {
     }
 };
 
-// Get quiz details with questions (for taking a quiz)
+// Get quiz details with questions
 exports.getQuizDetails = async (req, res) => {
     const { id } = req.params;
     try {
@@ -81,7 +80,6 @@ exports.getQuizDetails = async (req, res) => {
         if (!quiz) return res.status(404).json({ error: 'Not Found' });
 
         const questions = await db.all('SELECT id, question_text, options FROM quiz_questions WHERE quiz_id = $1', [id]);
-        // Parse options JSON and strip correct answer for students
         const parsed = questions.map(q => ({
             ...q,
             options: JSON.parse(q.options)
@@ -95,7 +93,7 @@ exports.getQuizDetails = async (req, res) => {
 
 // Student: Submit quiz attempt
 exports.submitQuiz = async (req, res) => {
-    const { quiz_id, answers } = req.body; // answers: { questionId: selectedIndex }
+    const { quiz_id, answers } = req.body;
 
     try {
         const db = getDB();
@@ -108,7 +106,6 @@ exports.submitQuiz = async (req, res) => {
             [req.user.id, school_id, quiz.class_id]);
         if (!student) return res.status(403).json({ error: 'Forbidden', message: 'You are not enrolled in this class.' });
 
-        // Check for existing attempt
         const existing = await db.get('SELECT id FROM quiz_attempts WHERE quiz_id = $1 AND student_id = $2', [quiz_id, student.id]);
         if (existing) return res.status(400).json({ error: 'Already Submitted', message: 'You have already attempted this quiz.' });
 
@@ -125,7 +122,7 @@ exports.submitQuiz = async (req, res) => {
             [quiz_id, student.id, score]
         );
 
-        res.json({ message: 'Quiz submitted', score, total: questions.length, correct, attemptId: result.lastID || result.rows?.[0]?.id });
+        res.json({ message: 'Quiz submitted', score, total: questions.length, correct, attemptId: result.lastID });
     } catch (err) {
         res.status(500).json({ error: 'Server Error', message: err.message });
     }

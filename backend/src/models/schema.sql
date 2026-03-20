@@ -258,3 +258,22 @@ CREATE TABLE IF NOT EXISTS quiz_attempts (
     FOREIGN KEY(quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE,
     FOREIGN KEY(student_id) REFERENCES students(id) ON DELETE CASCADE
 );
+
+-- Assignment Submissions (for file-based submissions via submissionRoutes)
+CREATE TABLE IF NOT EXISTS assignment_submissions (
+    id SERIAL PRIMARY KEY,
+    assignment_id INTEGER NOT NULL,
+    student_id INTEGER NOT NULL,
+    file_path TEXT NOT NULL,
+    file_type TEXT,
+    submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(assignment_id) REFERENCES homework(id) ON DELETE CASCADE,
+    FOREIGN KEY(student_id) REFERENCES students(id) ON DELETE CASCADE
+);
+
+-- Unique constraints (required for ON CONFLICT DO NOTHING in PostgreSQL)
+CREATE UNIQUE INDEX IF NOT EXISTS uq_tsa_teacher_class_subject
+    ON teacher_subject_assignments (teacher_id, class_id, subject_id);
+
+CREATE UNIQUE INDEX IF NOT EXISTS uq_tc_teacher_class_school
+    ON teacher_classes (teacher_id, class_id, school_id);

@@ -1,7 +1,6 @@
 const { getDB } = require('../config/database');
 
 exports.saveGrades = async (req, res) => {
-    // Expected: { term_id, class_id, subject_id, type, max_score, records: [{ student_id, score }] }
     const { term_id, class_id, subject_id, type, max_score, records } = req.body;
 
     if (!term_id || !class_id || !subject_id || !type || !max_score || !Array.isArray(records)) {
@@ -34,34 +33,31 @@ exports.saveGrades = async (req, res) => {
             }
         }
 
-        await db.run('BEGIN TRANSACTION');
-
-        for (const record of records) {
-            const existing = await db.get(
-                `SELECT id FROM assessments 
-                 WHERE term_id = $1 AND class_id = $2 AND subject_id = $3 AND student_id = $4 AND type = $5`,
-                [term_id, class_id, subject_id, record.student_id, type]
-            );
-
-            if (existing) {
-                await db.run(
-                    'UPDATE assessments SET score = $1, max_score = $2, recorded_by = $3 WHERE id = $4',
-                    [record.score, max_score, req.user.id, existing.id]
+        await db.transaction(async (client) => {
+            for (const record of records) {
+                const existing = await client.get(
+                    `SELECT id FROM assessments 
+                     WHERE term_id = $1 AND class_id = $2 AND subject_id = $3 AND student_id = $4 AND type = $5`,
+                    [term_id, class_id, subject_id, record.student_id, type]
                 );
-            } else {
-                await db.run(
-                    `INSERT INTO assessments (student_id, class_id, subject_id, term_id, type, score, max_score, recorded_by) 
-                     VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-                    [record.student_id, class_id, subject_id, term_id, type, record.score, max_score, req.user.id]
-                );
+
+                if (existing) {
+                    await client.run(
+                        'UPDATE assessments SET score = $1, max_score = $2, recorded_by = $3 WHERE id = $4',
+                        [record.score, max_score, req.user.id, existing.id]
+                    );
+                } else {
+                    await client.run(
+                        `INSERT INTO assessments (student_id, class_id, subject_id, term_id, type, score, max_score, recorded_by) 
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+                        [record.student_id, class_id, subject_id, term_id, type, record.score, max_score, req.user.id]
+                    );
+                }
             }
-        }
+        });
 
-        await db.run('COMMIT');
         res.json({ message: 'Grades saved successfully' });
     } catch (err) {
-        const db = getDB();
-        await db.run('ROLLBACK');
         res.status(500).json({ error: 'Server Error', message: err.message });
     }
 };
@@ -77,7 +73,6 @@ exports.getGrades = async (req, res) => {
         const db = getDB();
         const school_id = req.user.school_id;
 
-        // Verify class belongs to user's school
         const classObj = await db.get('SELECT id FROM classes WHERE id = $1 AND school_id = $2', [class_id, school_id]);
         if (!classObj) {
             return res.status(403).json({ error: 'Forbidden', message: 'Class does not belong to your school.' });
@@ -105,7 +100,6 @@ exports.getStudentReport = async (req, res) => {
         const db = getDB();
         const school_id = req.user.school_id;
 
-        // Verify student belongs to user's school (or if Parent, linked via parent_student_links)
         if (req.user.role === 'Parent') {
             const link = await db.get(
                 'SELECT id FROM parent_student_links WHERE parent_user_id = $1 AND student_id = $2',
