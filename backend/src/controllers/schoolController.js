@@ -1,5 +1,5 @@
 const { getDB } = require('../config/database');
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 // SuperAdmin: Get all schools
 exports.getAllSchools = async (req, res) => {

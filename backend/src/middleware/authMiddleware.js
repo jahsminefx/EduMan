@@ -54,13 +54,13 @@ const requireTeacherResourceAccess = async (req, res, next) => {
     try {
         const db = getDB();
         // 1. Get teacher_id for the logged in user
-        const teacher = await db.get('SELECT id FROM teachers WHERE user_id = ?', [req.user.id]);
-        if (!teacher) return res.status(403).json({ error: 'Forbidden', message: 'Teacher profile not found.' });
+        const teacher = await db.get('SELECT id FROM teachers WHERE user_id = $1', [req.user.id]);
+        if (!teacher) return res.status(403).json({ message: 'Teacher record not found.' });
 
         // 2. Check assignment table
         const assignment = await db.get(
-            'SELECT id FROM teacher_subject_assignments WHERE teacher_id = ? AND class_id = ? AND subject_id = ?',
-            [teacher.id, class_id, subject_id]
+            'SELECT id FROM teacher_subject_assignments WHERE teacher_id = $1 AND class_id = $2 AND subject_id = $3',
+            [teacher.id, req.query.class_id, req.query.subject_id]
         );
 
         if (!assignment) {

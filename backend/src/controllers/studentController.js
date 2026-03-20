@@ -18,7 +18,7 @@ exports.getStudents = async (req, res) => {
     }
 };
 
-const bcrypt = require('bcrypt');
+const bcrypt = require('bcryptjs');
 
 exports.createStudent = async (req, res) => {
     const { admission_number, first_name, last_name, gender, dob, class_id, parent_name, parent_phone, email, password } = req.body;
