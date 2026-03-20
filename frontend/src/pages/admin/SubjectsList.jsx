@@ -19,7 +19,7 @@ export default function SubjectsList() {
   const [assignData, setAssignData] = useState({
     subject_id: null,
     teacher_id: '',
-    class_id: ''
+    class_ids: []
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -72,7 +72,7 @@ export default function SubjectsList() {
       setError('');
       await axios.post(`${API_URL}/subjects/${assignData.subject_id}/assign`, {
         teacher_id: assignData.teacher_id,
-        class_id: assignData.class_id
+        class_ids: assignData.class_ids
       });
       setSuccess('Teacher assigned successfully!');
       setTimeout(() => {
@@ -123,6 +123,29 @@ export default function SubjectsList() {
       class_ids: prev.class_ids.includes(classId)
         ? prev.class_ids.filter(id => id !== classId)
         : [...prev.class_ids, classId]
+    }));
+  };
+
+  const toggleAllClasses = () => {
+    setFormData(prev => ({
+      ...prev,
+      class_ids: prev.class_ids.length === classes.length ? [] : classes.map(c => c.id)
+    }));
+  };
+
+  const toggleAssignClass = (classId) => {
+    setAssignData(prev => ({
+      ...prev,
+      class_ids: prev.class_ids.includes(classId)
+        ? prev.class_ids.filter(id => id !== classId)
+        : [...prev.class_ids, classId]
+    }));
+  };
+
+  const toggleAllAssignClasses = (subjectClasses) => {
+    setAssignData(prev => ({
+      ...prev,
+      class_ids: prev.class_ids.length === subjectClasses.length ? [] : subjectClasses.map(c => c.id)
     }));
   };
 
@@ -197,7 +220,7 @@ export default function SubjectsList() {
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                       <button 
                         onClick={() => {
-                          setAssignData({ subject_id: sub.id, teacher_id: '', class_id: sub.classes[0]?.id || '' });
+                          setAssignData({ subject_id: sub.id, teacher_id: '', class_ids: [] });
                           setShowAssignModal(true);
                         }} 
                         className="text-green-600 hover:text-green-900 mr-4"
@@ -251,7 +274,18 @@ export default function SubjectsList() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Assign to Classes</label>
+                  <div className="flex justify-between items-center mb-2">
+                    <label className="block text-sm font-medium text-gray-700">Assign to Classes</label>
+                    {classes.length > 0 && (
+                      <button 
+                        type="button" 
+                        onClick={toggleAllClasses}
+                        className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                      >
+                        {formData.class_ids.length === classes.length ? 'Deselect All' : 'Select All'}
+                      </button>
+                    )}
+                  </div>
                   <div className="border border-gray-200 rounded-lg p-3 max-h-48 overflow-y-auto space-y-2 bg-gray-50">
                     {classes.length === 0 ? (
                       <p className="text-xs text-gray-500 italic">No classes found. Please create classes first.</p>
@@ -307,18 +341,38 @@ export default function SubjectsList() {
                 </select>
               </div>
               <div>
-                <label className="block text-sm font-medium text-gray-700">Select Class *</label>
-                <select 
-                  required 
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900"
-                  value={assignData.class_id}
-                  onChange={(e) => setAssignData({...assignData, class_id: e.target.value})}
-                >
-                  <option value="">Select class</option>
-                  {subjects.find(s => s.id === assignData.subject_id)?.classes.map(c => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
+                <div className="flex justify-between items-center mb-1">
+                  <label className="block text-sm font-medium text-gray-700">Select Classes *</label>
+                  {subjects.find(s => s.id === assignData.subject_id)?.classes.length > 0 && (
+                    <button 
+                      type="button" 
+                      onClick={() => toggleAllAssignClasses(subjects.find(s => s.id === assignData.subject_id)?.classes || [])}
+                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                    >
+                      {assignData.class_ids.length === (subjects.find(s => s.id === assignData.subject_id)?.classes || []).length ? 'Deselect All' : 'Select All'}
+                    </button>
+                  )}
+                </div>
+                <div className="mt-1 border border-gray-200 rounded-lg p-3 max-h-40 overflow-y-auto space-y-2 bg-gray-50">
+                  {subjects.find(s => s.id === assignData.subject_id)?.classes.length === 0 ? (
+                    <p className="text-sm text-gray-500 italic">No classes available for this subject.</p>
+                  ) : (
+                    subjects.find(s => s.id === assignData.subject_id)?.classes.map(c => (
+                      <div 
+                        key={c.id} 
+                        onClick={() => toggleAssignClass(c.id)}
+                        className={`flex items-center justify-between p-2 rounded-md cursor-pointer transition-colors ${
+                          assignData.class_ids.includes(c.id) 
+                            ? 'bg-blue-100 border border-blue-200' 
+                            : 'bg-white border border-gray-200 hover:bg-gray-100'
+                        }`}
+                      >
+                        <span className="text-sm text-gray-700">{c.name}</span>
+                        {assignData.class_ids.includes(c.id) && <Check className="w-4 h-4 text-blue-600" />}
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
               {error && <p className="text-red-500 text-sm">{error}</p>}
               {success && <p className="text-green-500 text-sm">{success}</p>}

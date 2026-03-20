@@ -34,10 +34,10 @@ exports.getSubjects = async (req, res) => {
 
 exports.assignTeacher = async (req, res) => {
     const { id: subject_id } = req.params;
-    const { teacher_id, class_id } = req.body;
+    const { teacher_id, class_ids } = req.body;
 
-    if (!teacher_id || !class_id) {
-        return res.status(400).json({ error: 'Bad Request', message: 'teacher_id and class_id are required' });
+    if (!teacher_id || !class_ids || !Array.isArray(class_ids) || class_ids.length === 0) {
+        return res.status(400).json({ error: 'Bad Request', message: 'teacher_id and an array of class_ids are required' });
     }
 
     try {
@@ -52,19 +52,21 @@ exports.assignTeacher = async (req, res) => {
         }
 
         await db.transaction(async (client) => {
-            // 1. Assign teacher to subject in this class (ignore if already exists)
-            await client.run(`
-                INSERT INTO teacher_subject_assignments (teacher_id, class_id, subject_id)
-                VALUES ($1, $2, $3)
-                ON CONFLICT (teacher_id, class_id, subject_id) DO NOTHING
-            `, [teacher_id, class_id, subject_id]);
+            for (const class_id of class_ids) {
+                // 1. Assign teacher to subject in this class (ignore if already exists)
+                await client.run(`
+                    INSERT INTO teacher_subject_assignments (teacher_id, class_id, subject_id)
+                    VALUES ($1, $2, $3)
+                    ON CONFLICT (teacher_id, class_id, subject_id) DO NOTHING
+                `, [teacher_id, class_id, subject_id]);
 
-            // 2. Ensure teacher is assigned to this class generally
-            await client.run(`
-                INSERT INTO teacher_classes (teacher_id, class_id, school_id)
-                VALUES ($1, $2, $3)
-                ON CONFLICT (teacher_id, class_id, school_id) DO NOTHING
-            `, [teacher_id, class_id, school_id]);
+                // 2. Ensure teacher is assigned to this class generally
+                await client.run(`
+                    INSERT INTO teacher_classes (teacher_id, class_id, school_id)
+                    VALUES ($1, $2, $3)
+                    ON CONFLICT (teacher_id, class_id, school_id) DO NOTHING
+                `, [teacher_id, class_id, school_id]);
+            }
         });
 
         res.json({ message: 'Teacher assigned to subject successfully' });
@@ -133,9 +135,21 @@ exports.deleteSubject = async (req, res) => {
     try {
         const db = getDB();
         const school_id = req.user.school_id;
-        // class_subjects will be deleted via ON DELETE CASCADE
+
+        // Check for dependencies (quizzes or assessments)
+        const assessments = await db.get('SELECT COUNT(*) as count FROM assessments WHERE subject_id = $1', [id]);
+        const quizzes = await db.get('SELECT COUNT(*) as count FROM quizzes WHERE subject_id = $1', [id]);
+
+        if ((assessments && parseInt(assessments.count) > 0) || (quizzes && parseInt(quizzes.count) > 0)) {
+            return res.status(400).json({
+                error: 'Bad Request',
+                message: 'Cannot delete subject. It has existing assessments or quizzes associated with it.'
+            });
+        }
+
+        // class_subjects and teacher_subject_assignments will be deleted via ON DELETE CASCADE
         await db.run('DELETE FROM subjects WHERE id = $1 AND school_id = $2', [id, school_id]);
-        res.json({ message: 'Subject deleted' });
+        res.json({ message: 'Subject deleted successfully' });
     } catch (err) {
         res.status(500).json({ error: 'Server Error', message: err.message });
     }

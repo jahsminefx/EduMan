@@ -7,6 +7,7 @@ export default function ClassesList() {
   const [classes, setClasses] = useState([]);
   const [loading, setLoading] = useState(true);
   const [showModal, setShowModal] = useState(false);
+  const [editingId, setEditingId] = useState(null);
   const [formData, setFormData] = useState({ name: '', level: 1 });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
@@ -26,19 +27,48 @@ export default function ClassesList() {
     }
   };
 
-  const handleCreate = async (e) => {
+  const handleOpenModal = (cls = null) => {
+    if (cls) {
+      setEditingId(cls.id);
+      setFormData({ name: cls.name, level: cls.level });
+    } else {
+      setEditingId(null);
+      setFormData({ name: '', level: 1 });
+    }
+    setError('');
+    setSuccess('');
+    setShowModal(true);
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
     try {
       setError('');
-      await axios.post(`${API_URL}/classes/classes`, formData);
-      setSuccess('Class created successfully!');
+      if (editingId) {
+        await axios.put(`${API_URL}/classes/${editingId}`, formData);
+        setSuccess('Class updated successfully!');
+      } else {
+        await axios.post(`${API_URL}/classes/classes`, formData);
+        setSuccess('Class created successfully!');
+      }
       setTimeout(() => setSuccess(''), 3000);
       setShowModal(false);
       fetchClasses();
       setFormData({ name: '', level: 1 });
     } catch (err) {
       console.error(err);
-      setError(err.response?.data?.message || 'Failed to create class');
+      setError(err.response?.data?.message || 'Operation failed');
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (window.confirm('Are you sure you want to delete this class? This will completely remove it from the system.')) {
+      try {
+        await axios.delete(`${API_URL}/classes/${id}`);
+        fetchClasses();
+      } catch (err) {
+        alert(err.response?.data?.message || 'Failed to delete class');
+      }
     }
   };
 
@@ -50,7 +80,7 @@ export default function ClassesList() {
           <p className="text-sm text-gray-500">Manage school classes and levels</p>
         </div>
         <button 
-          onClick={() => setShowModal(true)}
+          onClick={() => handleOpenModal()}
           className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
         >
           <Plus className="w-4 h-4 mr-2" /> Add Class
@@ -77,8 +107,8 @@ export default function ClassesList() {
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{cls.level}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{cls.name}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                    <button className="text-blue-600 hover:text-blue-900 mr-4"><Edit2 className="w-4 h-4 inline" /></button>
-                    <button className="text-red-600 hover:text-red-900"><Trash2 className="w-4 h-4 inline" /></button>
+                    <button onClick={() => handleOpenModal(cls)} className="text-blue-600 hover:text-blue-900 mr-4"><Edit2 className="w-4 h-4 inline" /></button>
+                    <button onClick={() => handleDelete(cls.id)} className="text-red-600 hover:text-red-900"><Trash2 className="w-4 h-4 inline" /></button>
                   </td>
                 </tr>
               ))}
@@ -90,8 +120,8 @@ export default function ClassesList() {
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
           <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-md">
-            <h3 className="text-lg font-bold mb-4">Create New Class</h3>
-            <form onSubmit={handleCreate}>
+            <h3 className="text-lg font-bold mb-4">{editingId ? 'Edit Class' : 'Create New Class'}</h3>
+            <form onSubmit={handleSubmit}>
               <div className="space-y-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Class Name (e.g., Grade 1A)</label>
