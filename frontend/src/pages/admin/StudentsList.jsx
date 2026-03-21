@@ -23,6 +23,10 @@ export default function StudentsList() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
 
+  const [editingId, setEditingId] = useState(null);
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortConfig, setSortConfig] = useState({ key: 'last_name', direction: 'asc' });
+
   useEffect(() => {
     fetchData();
   }, []);
@@ -45,6 +49,67 @@ export default function StudentsList() {
     }
   };
 
+  const handleOpenModal = (student = null) => {
+    if (student) {
+      setEditingId(student.id);
+      setFormData({
+        admission_number: student.admission_number,
+        first_name: student.first_name,
+        last_name: student.last_name,
+        gender: student.gender || 'M',
+        dob: student.dob ? new Date(student.dob).toISOString().split('T')[0] : '',
+        class_id: student.class_id || '',
+        parent_name: student.parent_name || '',
+        parent_phone: student.parent_phone || '',
+        email: '', password: '' // Password hidden for edits
+      });
+    } else {
+      setEditingId(null);
+      setFormData({
+        admission_number: '', first_name: '', last_name: '', gender: 'M',
+        dob: '', class_id: classes[0]?.id || '', parent_name: '', parent_phone: '',
+        email: '', password: ''
+      });
+    }
+    setError('');
+    setSuccess('');
+    setShowModal(true);
+  };
+
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
+    setSortConfig({ key, direction });
+  };
+
+  const handleExport = () => {
+    const headers = ['Admission No', 'First Name', 'Last Name', 'Gender', 'Class', 'Parent Name', 'Parent Phone'];
+    const csvContent = [
+      headers.join(','),
+      ...filteredStudents.map(s => [
+        s.admission_number, s.first_name, s.last_name, s.gender, s.class_name, s.parent_name, s.parent_phone
+      ].map(field => `"${(field || '').toString().replace(/"/g, '""')}"`).join(','))
+    ].join('\\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'students_export.csv';
+    link.click();
+  };
+
+  const filteredStudents = [...students]
+    .filter(s => {
+      const q = searchTerm.toLowerCase();
+      return (s.first_name + ' ' + s.last_name).toLowerCase().includes(q) || s.admission_number.toLowerCase().includes(q);
+    })
+    .sort((a, b) => {
+      const aVal = a[sortConfig.key] || '';
+      const bVal = b[sortConfig.key] || '';
+      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
+
   const handleCreate = async (e) => {
     e.preventDefault();
     try {
@@ -53,8 +118,13 @@ export default function StudentsList() {
           setError('Please create a class first.');
           return;
       }
-      await axios.post(`${API_URL}/students`, formData);
-      setSuccess('Student record created successfully!');
+      if (editingId) {
+          await axios.put(`${API_URL}/students/${editingId}`, formData);
+          setSuccess('Student record updated successfully!');
+      } else {
+          await axios.post(`${API_URL}/students`, formData);
+          setSuccess('Student record created successfully!');
+      }
       setTimeout(() => setSuccess(''), 3000);
       setShowModal(false);
       fetchData();
@@ -94,40 +164,55 @@ export default function StudentsList() {
           <h2 className="text-xl font-semibold text-gray-800">Students Directory</h2>
           <p className="text-sm text-gray-500">Manage student records and enrollments</p>
         </div>
-        <button 
-          onClick={() => setShowModal(true)}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-        >
-          <Plus className="w-4 h-4 mr-2" /> Add Student
-        </button>
+        <div className="flex items-center gap-3">
+          <input 
+            type="text" 
+            placeholder="Search students..." 
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <button 
+            onClick={handleExport}
+            className="flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition"
+          >
+            Export CSV
+          </button>
+          <button 
+            onClick={() => handleOpenModal()}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition"
+          >
+            <Plus className="w-4 h-4 mr-2" /> Add Student
+          </button>
+        </div>
       </div>
 
       <div className="bg-white shadow-sm border border-gray-100 rounded-xl overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-gray-500">Loading students...</div>
-        ) : students.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No students found. Add one to get started.</div>
+        ) : filteredStudents.length === 0 ? (
+          <div className="p-8 text-center text-gray-500">No students match your search.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Admission No</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                  <th onClick={() => handleSort('admission_number')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">Admission No {sortConfig.key === 'admission_number' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
+                  <th onClick={() => handleSort('last_name')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">Name {sortConfig.key === 'last_name' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Class</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Parent Phone</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {students.map((stu) => (
+                {filteredStudents.map((stu) => (
                   <tr key={stu.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{stu.admission_number}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{stu.first_name} {stu.last_name}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{stu.class_name || 'Unassigned'}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{stu.parent_phone || 'N/A'}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button className="text-blue-600 hover:text-blue-900 mr-4"><Edit2 className="w-4 h-4 inline" /></button>
+                      <button onClick={() => handleOpenModal(stu)} className="text-blue-600 hover:text-blue-900 mr-4"><Edit2 className="w-4 h-4 inline" /></button>
                       <button onClick={() => handleDelete(stu.id)} className="text-red-600 hover:text-red-900"><Trash2 className="w-4 h-4 inline" /></button>
                     </td>
                   </tr>

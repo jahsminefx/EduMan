@@ -2,12 +2,17 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 const submissionController = require('../controllers/submissionController');
 const { protect, authorize, requireSchoolScope } = require('../middleware/authMiddleware');
 
 // Multer config for assignment submissions
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, path.join(__dirname, '../../uploads/submissions')),
+    destination: (req, file, cb) => {
+        const dir = path.join(__dirname, '../../uploads/submissions');
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        cb(null, dir);
+    },
     filename: (req, file, cb) => cb(null, `sub_${Date.now()}_${Math.round(Math.random() * 1E9)}${path.extname(file.originalname)}`)
 });
 

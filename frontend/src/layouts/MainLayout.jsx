@@ -12,7 +12,8 @@ import {
   HelpCircle,
   Library,
   Menu,
-  X
+  X,
+  Settings
 } from 'lucide-react';
 
 export default function MainLayout() {
@@ -39,7 +40,8 @@ export default function MainLayout() {
           { name: 'Subjects', path: '/dashboard/admin/subjects', icon: Library },
           { name: 'Teachers', path: '/dashboard/admin/teachers', icon: Users },
           { name: 'Students', path: '/dashboard/admin/students', icon: GraduationCap },
-          { name: 'Report Cards', path: '/dashboard/reports/card', icon: FolderOpen }
+          { name: 'Report Cards', path: '/dashboard/reports/card', icon: FolderOpen },
+          { name: 'Settings', path: '/dashboard/admin/settings', icon: Settings }
         );
         break;
 

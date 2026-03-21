@@ -20,6 +20,9 @@ export default function TeachersList() {
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  
+  const [searchTerm, setSearchTerm] = useState('');
+  const [sortConfig, setSortConfig] = useState({ key: 'last_name', direction: 'asc' });
 
   useEffect(() => {
     fetchData();
@@ -39,6 +42,44 @@ export default function TeachersList() {
       setLoading(false);
     }
   };
+
+  const handleSort = (key) => {
+    let direction = 'asc';
+    if (sortConfig.key === key && sortConfig.direction === 'asc') direction = 'desc';
+    setSortConfig({ key, direction });
+  };
+
+  const handleExport = () => {
+    const headers = ['First Name', 'Last Name', 'Email', 'Phone', 'Assigned Classes'];
+    const csvContent = [
+      headers.join(','),
+      ...filteredTeachers.map(t => [
+        t.first_name, 
+        t.last_name, 
+        t.email, 
+        t.phone, 
+        (t.classes || []).map(c => c.name).join('; ')
+      ].map(field => `"${(field || '').toString().replace(/"/g, '""')}"`).join(','))
+    ].join('\\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const link = document.createElement('a');
+    link.href = URL.createObjectURL(blob);
+    link.download = 'teachers_export.csv';
+    link.click();
+  };
+
+  const filteredTeachers = [...teachers]
+    .filter(t => {
+      const q = searchTerm.toLowerCase();
+      return (t.first_name + ' ' + t.last_name).toLowerCase().includes(q) || t.email.toLowerCase().includes(q) || (t.phone && t.phone.toLowerCase().includes(q));
+    })
+    .sort((a, b) => {
+      const aVal = a[sortConfig.key] || '';
+      const bVal = b[sortConfig.key] || '';
+      if (aVal < bVal) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (aVal > bVal) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
+    });
 
   const handleOpenModal = (teacher = null) => {
     if (teacher) {
@@ -115,32 +156,47 @@ export default function TeachersList() {
           <h2 className="text-xl font-semibold text-gray-800">Teachers Directory</h2>
           <p className="text-sm text-gray-500">Manage teaching staff and their class assignments</p>
         </div>
-        <button 
-          onClick={() => handleOpenModal()}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-        >
-          <Plus className="w-4 h-4 mr-2" /> Add Teacher
-        </button>
+        <div className="flex items-center gap-3">
+          <input 
+            type="text" 
+            placeholder="Search teachers..." 
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <button 
+            onClick={handleExport}
+            className="flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition"
+          >
+            Export CSV
+          </button>
+          <button 
+            onClick={() => handleOpenModal()}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition"
+          >
+            <Plus className="w-4 h-4 mr-2" /> Add Teacher
+          </button>
+        </div>
       </div>
 
       <div className="bg-white shadow-sm border border-gray-100 rounded-xl overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-gray-500">Loading teachers...</div>
-        ) : teachers.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No teachers found. Add one to get started.</div>
+        ) : filteredTeachers.length === 0 ? (
+          <div className="p-8 text-center text-gray-500">No teachers match your search.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Teacher Name</th>
+                  <th onClick={() => handleSort('first_name')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">Teacher Name {sortConfig.key === 'first_name' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Assigned Classes</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {teachers.map((teacher) => (
+                {filteredTeachers.map((teacher) => (
                   <tr key={teacher.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{teacher.first_name} {teacher.last_name}</div>

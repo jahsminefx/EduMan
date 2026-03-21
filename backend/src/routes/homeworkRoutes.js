@@ -2,12 +2,17 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
+const fs = require('fs');
 const homeworkController = require('../controllers/homeworkController');
 const { protect, authorize, requireSchoolScope } = require('../middleware/authMiddleware');
 
 // Multer config for homework file attachments
 const storage = multer.diskStorage({
-    destination: (req, file, cb) => cb(null, path.join(__dirname, '../../uploads')),
+    destination: (req, file, cb) => {
+        const dir = path.join(__dirname, '../../uploads');
+        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+        cb(null, dir);
+    },
     filename: (req, file, cb) => cb(null, `hw_${Date.now()}${path.extname(file.originalname)}`)
 });
 const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB

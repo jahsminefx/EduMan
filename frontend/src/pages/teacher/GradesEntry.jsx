@@ -10,7 +10,7 @@ export default function GradesEntry() {
   const [subjects, setSubjects] = useState([]);
   const [selectedClass, setSelectedClass] = useState('');
   const [selectedSubject, setSelectedSubject] = useState('');
-  const [termId, setTermId] = useState('1'); // Hardcoded for MVP, ideally fetched from active term
+  const [termId, setTermId] = useState(''); // Dynamically fetched from profile
   const [assessmentType, setAssessmentType] = useState('test');
   const [maxScore, setMaxScore] = useState(100);
   
@@ -18,6 +18,7 @@ export default function GradesEntry() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [errorConfig, setErrorConfig] = useState('');
 
   useEffect(() => {
     fetchOptions();
@@ -33,12 +34,21 @@ export default function GradesEntry() {
 
   const fetchOptions = async () => {
     try {
-      const [clsRes, subRes] = await Promise.all([
+      const [clsRes, subRes, profileRes] = await Promise.all([
         axios.get(`${API_URL}/classes/classes`),
-        axios.get(`${API_URL}/classes/subjects`)
+        axios.get(`${API_URL}/classes/subjects`),
+        axios.get(`${API_URL}/schools/profile`)
       ]);
       setClasses(clsRes.data.classes);
       setSubjects(subRes.data.subjects);
+      
+      const profile = profileRes.data.profile;
+      if (profile?.current_term_id) {
+          setTermId(profile.current_term_id.toString());
+      } else {
+          setErrorConfig('Your school has not set an Active Academic Term yet. Please contact the School Admin to configure it in Settings.');
+      }
+
       if (clsRes.data.classes.length > 0) setSelectedClass(clsRes.data.classes[0].id);
       if (subRes.data.subjects.length > 0) setSelectedSubject(subRes.data.subjects[0].id);
     } catch (err) {
@@ -159,12 +169,13 @@ export default function GradesEntry() {
             min="1"
           />
         </div>
-        <div>
-             {/* Term would ideally be fetched, hardcoding 1 for MVP simplicity */}
-             <label className="block text-sm font-medium text-gray-700 mb-1">Term ID (MVP)</label>
-             <input type="text" value={termId} onChange={(e) => setTermId(e.target.value)} className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900" />
-        </div>
       </div>
+
+      {errorConfig && (
+        <div className="p-4 bg-yellow-50 text-yellow-800 rounded-lg border border-yellow-200 text-sm font-medium shadow-sm flex items-start">
+          <span className="text-xl mr-2">⚠️</span> {errorConfig}
+        </div>
+      )}
 
       {message && (
         <div className={`p-4 rounded-lg text-sm font-medium ${message.includes('success') ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>

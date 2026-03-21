@@ -23,6 +23,12 @@ export default function SubjectsList() {
   });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredSubjects = subjects.filter(s => 
+    s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
+    (s.code || '').toLowerCase().includes(searchTerm.toLowerCase())
+  );
 
   useEffect(() => {
     fetchData();
@@ -156,19 +162,28 @@ export default function SubjectsList() {
           <h2 className="text-xl font-semibold text-gray-800">Subjects Management</h2>
           <p className="text-sm text-gray-500">Define curriculum subjects and link them to classes</p>
         </div>
-        <button 
-          onClick={() => handleOpenModal()}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-        >
-          <Plus className="w-4 h-4 mr-2" /> Add Subject
-        </button>
+        <div className="flex items-center gap-3">
+          <input 
+            type="text" 
+            placeholder="Search subjects..." 
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <button 
+            onClick={() => handleOpenModal()}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            <Plus className="w-4 h-4 mr-2" /> Add Subject
+          </button>
+        </div>
       </div>
 
       <div className="bg-white shadow-sm border border-gray-100 rounded-xl overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-gray-500">Loading subjects...</div>
-        ) : subjects.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No subjects found. Create one to define your school's curriculum.</div>
+        ) : filteredSubjects.length === 0 ? (
+          <div className="p-8 text-center text-gray-500">No subjects match your search.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
@@ -182,7 +197,7 @@ export default function SubjectsList() {
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
-                {subjects.map((sub) => (
+                {filteredSubjects.map((sub) => (
                   <tr key={sub.id} className="hover:bg-gray-50 transition-colors">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">

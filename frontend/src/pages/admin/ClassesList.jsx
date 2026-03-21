@@ -11,6 +11,9 @@ export default function ClassesList() {
   const [formData, setFormData] = useState({ name: '', level: 1 });
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+
+  const filteredClasses = classes.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
   useEffect(() => {
     fetchClasses();
@@ -79,19 +82,28 @@ export default function ClassesList() {
           <h2 className="text-xl font-semibold text-gray-800">Classes</h2>
           <p className="text-sm text-gray-500">Manage school classes and levels</p>
         </div>
-        <button 
-          onClick={() => handleOpenModal()}
-          className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
-        >
-          <Plus className="w-4 h-4 mr-2" /> Add Class
-        </button>
+        <div className="flex items-center gap-3">
+          <input 
+            type="text" 
+            placeholder="Search classes..." 
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+          <button 
+            onClick={() => handleOpenModal()}
+            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+          >
+            <Plus className="w-4 h-4 mr-2" /> Add Class
+          </button>
+        </div>
       </div>
 
       <div className="bg-white shadow-sm border border-gray-100 rounded-xl overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-gray-500">Loading classes...</div>
-        ) : classes.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No classes found. Create one to get started.</div>
+        ) : filteredClasses.length === 0 ? (
+          <div className="p-8 text-center text-gray-500">No classes match your search.</div>
         ) : (
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -102,7 +114,7 @@ export default function ClassesList() {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {classes.map((cls) => (
+              {filteredClasses.map((cls) => (
                 <tr key={cls.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{cls.level}</td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{cls.name}</td>

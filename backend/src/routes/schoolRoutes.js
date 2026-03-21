@@ -14,4 +14,7 @@ router.put('/profile', protect, authorize('SchoolAdmin'), requireSchoolScope, sc
 router.get('/sessions', protect, requireSchoolScope, schoolController.getSessions);
 router.post('/sessions', protect, authorize('SchoolAdmin'), requireSchoolScope, schoolController.createSession);
 
+router.get('/terms', protect, requireSchoolScope, schoolController.getTerms);
+router.post('/terms', protect, authorize('SchoolAdmin'), requireSchoolScope, schoolController.createTerm);
+
 module.exports = router;

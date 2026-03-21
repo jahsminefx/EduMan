@@ -118,3 +118,37 @@ exports.createSession = async (req, res) => {
         res.status(500).json({ error: 'Server Error', message: err.message });
     }
 };
+
+exports.getTerms = async (req, res) => {
+    const { session_id } = req.query;
+    try {
+        const db = getDB();
+        const school_id = req.user.school_id;
+        let query = "SELECT * FROM academic_terms WHERE school_id = $1";
+        let params = [school_id];
+
+        if (session_id) {
+            query += " AND session_id = $2 ORDER BY id ASC";
+            params.push(session_id);
+        } else {
+            query += " ORDER BY id DESC";
+        }
+
+        const terms = await db.all(query, params);
+        res.json({ terms });
+    } catch (err) {
+        res.status(500).json({ error: 'Server Error', message: err.message });
+    }
+};
+
+exports.createTerm = async (req, res) => {
+    const { session_id, name } = req.body;
+    try {
+        const db = getDB();
+        const school_id = req.user.school_id;
+        const result = await db.run('INSERT INTO academic_terms (school_id, session_id, name) VALUES ($1, $2, $3) RETURNING id', [school_id, session_id, name]);
+        res.json({ message: 'Term created', id: result.lastID });
+    } catch (err) {
+        res.status(500).json({ error: 'Server Error', message: err.message });
+    }
+};

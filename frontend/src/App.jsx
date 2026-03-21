@@ -17,6 +17,7 @@ import ClassesList from './pages/admin/ClassesList';
 import StudentsList from './pages/admin/StudentsList';
 import TeachersList from './pages/admin/TeachersList';
 import SubjectsList from './pages/admin/SubjectsList';
+import Settings from './pages/admin/Settings';
 import AttendanceEntry from './pages/teacher/AttendanceEntry';
 import GradesEntry from './pages/teacher/GradesEntry';
 import HomeworkPage from './pages/teacher/HomeworkPage';
@@ -94,6 +95,14 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute allowedRoles={['SuperAdmin', 'SchoolAdmin']}>
               <TeachersList />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="admin/settings" 
+          element={
+            <ProtectedRoute allowedRoles={['SuperAdmin', 'SchoolAdmin']}>
+              <Settings />
             </ProtectedRoute>
           } 
         />
