@@ -24,9 +24,11 @@ import HomeworkPage from './pages/teacher/HomeworkPage';
 import ContentLibrary from './pages/content/ContentLibrary';
 import QuizPage from './pages/quiz/QuizPage';
 import ReportCard from './pages/reports/ReportCard';
+import SchoolsList from './pages/superadmin/SchoolsList';
+import SchoolAdminsList from './pages/superadmin/SchoolAdminsList';
 
 // Placeholder Components for future features
-const AdminSchools = () => <div className="p-8"><h1>Manage Schools</h1><p>SuperAdmin only area.</p></div>;
+// SuperAdmin pages are now real components imported above
 const ParentDashboard = () => <div className="p-8"><h1>Parent Dashboard</h1><p>View your children and fee statements here.</p></div>;
 const ContentDashboard = () => <ContentLibrary />;
 const FinanceDashboard = () => <div className="p-8"><h1>Fee Management</h1><p>Manage school finances here.</p></div>;
@@ -160,7 +162,15 @@ const AppRoutes = () => {
           path="admin/schools" 
           element={
             <ProtectedRoute allowedRoles={['SuperAdmin']}>
-              <AdminSchools />
+              <SchoolsList />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="admin/school-admins" 
+          element={
+            <ProtectedRoute allowedRoles={['SuperAdmin']}>
+              <SchoolAdminsList />
             </ProtectedRoute>
           } 
         />

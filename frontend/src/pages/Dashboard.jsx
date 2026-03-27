@@ -49,10 +49,29 @@ export default function Dashboard() {
     <div className="space-y-8">
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard name="Total Schools" stat={stats?.schools || 0} icon={BookOpen} color="bg-indigo-500" />
-        <StatCard name="Active Subscriptions" stat={stats?.subscriptions || 0} icon={TrendingUp} color="bg-green-500" />
+        <StatCard name="Active Schools" stat={stats?.subscriptions || 0} icon={TrendingUp} color="bg-green-500" />
         <StatCard name="Total System Users" stat={stats?.users || 0} icon={Users} color="bg-blue-500" />
       </div>
       
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <a href="/dashboard/admin/schools" className="block bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all group">
+          <h3 className="text-lg font-bold text-gray-900 mb-2 flex items-center">
+            <BookOpen className="w-5 h-5 mr-2 text-indigo-500" />
+            Manage Schools
+          </h3>
+          <p className="text-sm text-gray-500">View, create, edit, and manage all registered schools on the platform.</p>
+          <span className="mt-3 inline-block text-sm font-bold text-indigo-600 group-hover:underline">Go to Schools →</span>
+        </a>
+        <a href="/dashboard/admin/school-admins" className="block bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all group">
+          <h3 className="text-lg font-bold text-gray-900 mb-2 flex items-center">
+            <Users className="w-5 h-5 mr-2 text-emerald-500" />
+            Manage School Admins
+          </h3>
+          <p className="text-sm text-gray-500">Create, assign, edit, and manage School Administrator accounts.</p>
+          <span className="mt-3 inline-block text-sm font-bold text-emerald-600 group-hover:underline">Go to Admins →</span>
+        </a>
+      </div>
+
       <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm">
         <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
           <BarChart3 className="w-6 h-6 mr-2 text-indigo-500" />

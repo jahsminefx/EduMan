@@ -27,6 +27,7 @@ const quizRoutes = require('./routes/quizRoutes');
 const statsRoutes = require('./routes/statsRoutes');
 const subjectRoutes = require('./routes/subjectRoutes');
 const submissionRoutes = require('./routes/submissionRoutes');
+const superAdminRoutes = require('./routes/superAdminRoutes');
 
 // Simple health check route
 app.get('/api/health', (req, res) => {
@@ -47,6 +48,7 @@ app.use('/api/content', contentRoutes);
 app.use('/api/quizzes', quizRoutes);
 app.use('/api/subjects', subjectRoutes);
 app.use('/api/submissions', submissionRoutes);
+app.use('/api/superadmin', superAdminRoutes);
 
 // Error handling middleware
 app.use((err, req, res, next) => {

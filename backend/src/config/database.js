@@ -109,6 +109,20 @@ async function initDB(retryCount = 0) {
             const schema = fs.readFileSync(schemaPath, 'utf8');
             await pool.query(schema);
             console.log('Database schema synchronized successfully.');
+
+            // ── Safe incremental schema patches (idempotent) ──
+            try {
+                await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS is_active INTEGER DEFAULT 1");
+                await pool.query("ALTER TABLE users ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
+            } catch (patchErr) {
+                // Column may already exist – safe to continue
+                console.log('Schema patch (users columns) skipped or already applied.');
+            }
+            try {
+                await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS uq_saa_user_school ON school_admin_assignments (user_id, school_id)");
+            } catch (patchErr) {
+                console.log('Schema patch (school_admin_assignments unique index) skipped or already applied.');
+            }
         } else {
             console.warn('Warning: schema.sql not found at', schemaPath);
         }

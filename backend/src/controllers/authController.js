@@ -23,6 +23,11 @@ exports.login = async (req, res) => {
             return res.status(401).json({ error: 'Unauthorized', message: 'Invalid email or password' });
         }
 
+        // Block login for disabled accounts
+        if (user.is_active === 0) {
+            return res.status(403).json({ error: 'Forbidden', message: 'Your account has been deactivated. Please contact the administrator.' });
+        }
+
         let school_id = null;
         let school_name = null;
         if (user.role === 'SchoolAdmin') {

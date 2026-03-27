@@ -13,7 +13,8 @@ import {
   Library,
   Menu,
   X,
-  Settings
+  Settings,
+  UserCog
 } from 'lucide-react';
 
 export default function MainLayout() {
@@ -30,7 +31,7 @@ export default function MainLayout() {
       case 'SuperAdmin':
         base.push(
           { name: 'Manage Schools', path: '/dashboard/admin/schools', icon: BookOpen },
-          { name: 'Global Metrics', path: '/dashboard/admin/metrics', icon: LayoutDashboard }
+          { name: 'School Admins', path: '/dashboard/admin/school-admins', icon: UserCog }
         );
         break;
       
