@@ -3,8 +3,8 @@ import { Mail, Phone, MapPin, Send, CheckCircle } from 'lucide-react';
 
 const contactInfo = [
   { icon: Mail, label: 'Email', value: 'hello@eduman.local', href: 'mailto:hello@eduman.local' },
-  { icon: Phone, label: 'Phone', value: '+234 800 EDU MAN0', href: 'tel:+234800338626' },
-  { icon: MapPin, label: 'Office', value: 'Lagos, Nigeria', href: null },
+  { icon: Phone, label: 'Phone', value: '09156457073', href: 'tel:09156457073' },
+  { icon: MapPin, label: 'Office', value: 'Delta state, Nigeria', href: null },
 ];
 
 export default function ContactPage() {
