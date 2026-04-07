@@ -145,7 +145,7 @@ exports.getPerformanceSnapshot = async (req, res) => {
             `, [school_id]);
 
             const attendanceTrend = await db.all(`
-                SELECT date, ROUND(SUM(CASE WHEN status = 'Present' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) as percentage
+                SELECT TO_CHAR(date, 'YYYY-MM-DD') as date, ROUND(SUM(CASE WHEN status = 'Present' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) as percentage
                 FROM attendance_records ar
                 JOIN students s ON ar.student_id = s.id
                 WHERE s.school_id = $1
@@ -244,7 +244,7 @@ exports.getPerformanceSnapshot = async (req, res) => {
 exports.getPendingTasks = async (req, res) => {
     try {
         const db = getDB();
-        const { role, id: user_id } = req.user;
+        const { role, school_id, id: user_id } = req.user;
 
         if (role === 'Teacher') {
             const teacher = await db.get("SELECT id FROM teachers WHERE user_id = $1", [user_id]);
@@ -263,15 +263,29 @@ exports.getPendingTasks = async (req, res) => {
             `, [teacher.id]);
 
             return res.json([
-                { label: 'Assignments to review', count: pendingHomework.count || 0, action: '/homework' },
-                { label: 'Classes without attendance', count: attendanceDue.count || 0, action: '/attendance' }
+                { label: 'Assignments to review', count: pendingHomework.count || 0, action: '/dashboard/teacher/homework' },
+                { label: 'Classes without attendance', count: attendanceDue.count || 0, action: '/dashboard/teacher/attendance' }
             ]);
         }
 
         if (role === 'SchoolAdmin') {
+            const unassignedSubjects = await db.get(`
+                SELECT COUNT(s.id) as count 
+                FROM subjects s
+                LEFT JOIN class_subjects cs ON s.id = cs.subject_id
+                WHERE cs.id IS NULL AND s.school_id = $1
+            `, [school_id]);
+
+            const teachersWithoutClasses = await db.get(`
+                SELECT COUNT(t.id) as count 
+                FROM teachers t
+                LEFT JOIN teacher_classes tc ON t.id = tc.teacher_id
+                WHERE tc.id IS NULL AND t.school_id = $1
+            `, [school_id]);
+
             return res.json([
-                { label: 'Unassigned Subjects', count: 0, action: '/subjects' },
-                { label: 'Teachers without Classes', count: 0, action: '/teachers' }
+                { label: 'Unassigned Subjects', count: unassignedSubjects.count || 0, action: '/dashboard/admin/subjects' },
+                { label: 'Teachers without Classes', count: teachersWithoutClasses.count || 0, action: '/dashboard/admin/teachers' }
             ]);
         }
 

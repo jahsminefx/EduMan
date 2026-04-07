@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
+import { Link } from 'react-router-dom';
 import axios from 'axios';
 import API_URL from '../config/api';
 import { 
@@ -54,22 +55,22 @@ export default function Dashboard() {
       </div>
       
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <a href="/dashboard/admin/schools" className="block bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all group">
+        <Link to="/dashboard/admin/schools" className="block bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all group">
           <h3 className="text-lg font-bold text-gray-900 mb-2 flex items-center">
             <BookOpen className="w-5 h-5 mr-2 text-indigo-500" />
             Manage Schools
           </h3>
           <p className="text-sm text-gray-500">View, create, edit, and manage all registered schools on the platform.</p>
           <span className="mt-3 inline-block text-sm font-bold text-indigo-600 group-hover:underline">Go to Schools →</span>
-        </a>
-        <a href="/dashboard/admin/school-admins" className="block bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all group">
+        </Link>
+        <Link to="/dashboard/admin/school-admins" className="block bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all group">
           <h3 className="text-lg font-bold text-gray-900 mb-2 flex items-center">
             <Users className="w-5 h-5 mr-2 text-emerald-500" />
             Manage School Admins
           </h3>
           <p className="text-sm text-gray-500">Create, assign, edit, and manage School Administrator accounts.</p>
           <span className="mt-3 inline-block text-sm font-bold text-emerald-600 group-hover:underline">Go to Admins →</span>
-        </a>
+        </Link>
       </div>
 
       <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm">
@@ -111,20 +112,38 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
-            <Award className="w-5 h-5 mr-2 text-yellow-500" />
-            Performance Snapshot
-          </h3>
-          <div className="space-y-6">
-            <div className="p-4 bg-yellow-50 rounded-xl border border-yellow-100">
-              <span className="text-sm text-yellow-700 font-medium block">Best Performing Class</span>
-              <span className="text-2xl font-bold text-yellow-900">{performance?.bestClass?.name || 'N/A'}</span>
-              <span className="text-sm text-yellow-600 block mt-1">Average: {performance?.bestClass?.score || 0}%</span>
+        <div className="space-y-6">
+          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+            <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
+              <Award className="w-5 h-5 mr-2 text-yellow-500" />
+              Performance Snapshot
+            </h3>
+            <div className="space-y-6">
+              <div className="p-4 bg-yellow-50 rounded-xl border border-yellow-100">
+                <span className="text-sm text-yellow-700 font-medium block">Best Performing Class</span>
+                <span className="text-2xl font-bold text-yellow-900">{performance?.bestClass?.name || 'N/A'}</span>
+                <span className="text-sm text-yellow-600 block mt-1">Average: {performance?.bestClass?.score || 0}%</span>
+              </div>
+              <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
+                <span className="text-sm text-blue-700 font-medium block">Today's Attendance</span>
+                <span className="text-2xl font-bold text-blue-900">{stats?.todayAttendance || '0%'}</span>
+              </div>
             </div>
-            <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
-              <span className="text-sm text-blue-700 font-medium block">Today's Attendance</span>
-              <span className="text-2xl font-bold text-blue-900">{stats?.todayAttendance || '0%'}</span>
+          </div>
+
+          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
+            <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
+              <CheckCircle className="w-5 h-5 mr-2 text-red-500" />
+              Pending Tasks
+            </h3>
+            <div className="space-y-4">
+              {pending.length > 0 ? (
+                pending.map((task, i) => (
+                  <PendingTask key={i} {...task} color={task.label.includes('Subjects') ? 'yellow' : 'blue'} />
+                ))
+              ) : (
+                <p className="text-sm text-gray-500 text-center py-4 italic">No pending tasks!</p>
+              )}
             </div>
           </div>
         </div>
