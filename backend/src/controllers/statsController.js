@@ -145,12 +145,12 @@ exports.getPerformanceSnapshot = async (req, res) => {
             `, [school_id]);
 
             const attendanceTrend = await db.all(`
-                SELECT TO_CHAR(date, 'YYYY-MM-DD') as date, ROUND(SUM(CASE WHEN status = 'Present' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) as percentage
+                SELECT TO_CHAR(ar.date, 'YYYY-MM-DD') as date, ROUND(SUM(CASE WHEN status = 'Present' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) as percentage
                 FROM attendance_records ar
                 JOIN students s ON ar.student_id = s.id
                 WHERE s.school_id = $1
-                GROUP BY date
-                ORDER BY date DESC LIMIT 7
+                GROUP BY ar.date
+                ORDER BY ar.date DESC LIMIT 7
             `, [school_id]);
 
             return res.json({
