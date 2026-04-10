@@ -63,6 +63,22 @@ exports.getQuizzes = async (req, res) => {
 
         query += ' ORDER BY q.id DESC';
         const quizzes = await db.all(query, params);
+
+        // If student, check which quizzes they've already attempted
+        if (req.user.role === 'Student') {
+            const student = await db.get('SELECT id FROM students WHERE user_id = $1 AND school_id = $2', [req.user.id, school_id]);
+            if (student) {
+                const attempts = await db.all('SELECT quiz_id, id as attempt_id, score FROM quiz_attempts WHERE student_id = $1', [student.id]);
+                const attemptMap = {};
+                for (const a of attempts) { attemptMap[a.quiz_id] = { attempt_id: a.attempt_id, score: a.score }; }
+                for (const q of quizzes) {
+                    q.attempted = !!attemptMap[q.id];
+                    q.attempt_id = attemptMap[q.id]?.attempt_id || null;
+                    q.score = attemptMap[q.id]?.score || null;
+                }
+            }
+        }
+
         res.json({ quizzes });
     } catch (err) {
         res.status(500).json({ error: 'Server Error', message: err.message });
@@ -117,12 +133,73 @@ exports.submitQuiz = async (req, res) => {
         }
         const score = questions.length > 0 ? (correct / questions.length) * 100 : 0;
 
-        const result = await db.run(
-            'INSERT INTO quiz_attempts (quiz_id, student_id, score, completed_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP) RETURNING id',
-            [quiz_id, student.id, score]
-        );
+        const attemptId = await db.transaction(async (client) => {
+            const result = await client.run(
+                'INSERT INTO quiz_attempts (quiz_id, student_id, score, completed_at) VALUES ($1, $2, $3, CURRENT_TIMESTAMP) RETURNING id',
+                [quiz_id, student.id, score]
+            );
+            const attempt_id = result.lastID;
 
-        res.json({ message: 'Quiz submitted', score, total: questions.length, correct, attemptId: result.lastID });
+            // Save individual answers for review
+            for (const q of questions) {
+                const selectedOption = answers[q.id] !== undefined ? answers[q.id] : null;
+                await client.run(
+                    'INSERT INTO quiz_attempt_answers (attempt_id, question_id, selected_option_index) VALUES ($1, $2, $3)',
+                    [attempt_id, q.id, selectedOption]
+                );
+            }
+
+            return attempt_id;
+        });
+
+        res.json({ message: 'Quiz submitted', score, total: questions.length, correct, attemptId });
+    } catch (err) {
+        res.status(500).json({ error: 'Server Error', message: err.message });
+    }
+};
+
+// Student: Review quiz attempt
+exports.reviewQuiz = async (req, res) => {
+    const { id } = req.params; // quiz id
+    try {
+        const db = getDB();
+        const school_id = req.user.school_id;
+
+        const quiz = await db.get('SELECT * FROM quizzes WHERE id = $1 AND school_id = $2', [id, school_id]);
+        if (!quiz) return res.status(404).json({ error: 'Not Found', message: 'Quiz not found.' });
+
+        const student = await db.get('SELECT id FROM students WHERE user_id = $1', [req.user.id]);
+        if (!student) return res.status(403).json({ error: 'Forbidden', message: 'Student profile not found.' });
+
+        const attempt = await db.get('SELECT * FROM quiz_attempts WHERE quiz_id = $1 AND student_id = $2', [id, student.id]);
+        if (!attempt) return res.status(404).json({ error: 'Not Found', message: 'You have not attempted this quiz.' });
+
+        // Get questions with correct answers and student's answers
+        const questions = await db.all(`
+            SELECT qq.id, qq.question_text, qq.options, qq.correct_option_index,
+                   qaa.selected_option_index
+            FROM quiz_questions qq
+            LEFT JOIN quiz_attempt_answers qaa ON qq.id = qaa.question_id AND qaa.attempt_id = $1
+            WHERE qq.quiz_id = $2
+            ORDER BY qq.id ASC
+        `, [attempt.id, id]);
+
+        const review = questions.map(q => ({
+            id: q.id,
+            question_text: q.question_text,
+            options: JSON.parse(q.options),
+            correct_option_index: q.correct_option_index,
+            selected_option_index: q.selected_option_index,
+            is_correct: q.selected_option_index === q.correct_option_index
+        }));
+
+        res.json({
+            quiz: { id: quiz.id, title: quiz.title },
+            attempt: { id: attempt.id, score: attempt.score, completed_at: attempt.completed_at },
+            total: questions.length,
+            correct: review.filter(r => r.is_correct).length,
+            questions: review
+        });
     } catch (err) {
         res.status(500).json({ error: 'Server Error', message: err.message });
     }

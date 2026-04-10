@@ -32,8 +32,23 @@ const upload = multer({
     limits: { fileSize: 50 * 1024 * 1024 } // 50MB
 });
 
-router.post('/submit', protect, authorize('Student'), requireSchoolScope, upload.single('file'), submissionController.submitAssignment);
+router.post('/submit', protect, authorize('Student'), requireSchoolScope, (req, res, next) => {
+    upload.single('file')(req, res, (err) => {
+        if (err instanceof multer.MulterError) {
+            if (err.code === 'LIMIT_FILE_SIZE') {
+                return res.status(400).json({ error: 'File Too Large', message: 'File size exceeds 50MB limit.' });
+            }
+            return res.status(400).json({ error: 'Upload Error', message: err.message });
+        } else if (err) {
+            return res.status(400).json({ error: 'Upload Error', message: err.message });
+        }
+        next();
+    });
+}, submissionController.submitAssignment);
+
 router.get('/my-submissions', protect, authorize('Student'), requireSchoolScope, submissionController.getMySubmissions);
+router.get('/status/:assignment_id', protect, authorize('Student'), requireSchoolScope, submissionController.getSubmissionStatus);
+router.get('/statuses', protect, authorize('Student'), requireSchoolScope, submissionController.getSubmissionStatuses);
 router.get('/assignment/:assignment_id', protect, authorize('SchoolAdmin', 'Teacher'), requireSchoolScope, submissionController.getSubmissions);
 
 module.exports = router;

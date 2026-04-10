@@ -12,23 +12,19 @@ exports.markAttendance = async (req, res) => {
         const school_id = req.user.school_id;
 
         // Verify that the class belongs to this school
-        const classObj = await db.get('SELECT id FROM classes WHERE id = $1 AND school_id = $2', [class_id, school_id]);
+        const classObj = await db.get('SELECT id, form_teacher_id FROM classes WHERE id = $1 AND school_id = $2', [class_id, school_id]);
         if (!classObj) {
             return res.status(403).json({ error: 'Forbidden', message: 'This class does not belong to your school.' });
         }
 
-        // If the user is a Teacher, verify they are assigned to this class
+        // If the user is a Teacher, verify they are the Form Teacher for this class
         if (req.user.role === 'Teacher') {
             const teacher = await db.get('SELECT id FROM teachers WHERE user_id = $1 AND school_id = $2', [req.user.id, school_id]);
             if (!teacher) {
                 return res.status(403).json({ error: 'Forbidden', message: 'Teacher profile not found.' });
             }
-            const assignment = await db.get(
-                'SELECT id FROM teacher_classes WHERE teacher_id = $1 AND class_id = $2',
-                [teacher.id, class_id]
-            );
-            if (!assignment) {
-                return res.status(403).json({ error: 'Forbidden', message: 'You are not assigned to this class.' });
+            if (classObj.form_teacher_id !== teacher.id) {
+                return res.status(403).json({ error: 'Forbidden', message: 'Only the Form Teacher of this class can record attendance.' });
             }
         }
 

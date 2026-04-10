@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Calendar, Save, CheckCircle, XCircle } from 'lucide-react';
+import { Calendar, Save, CheckCircle, XCircle, ShieldAlert } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import API_URL from '../../config/api';
 
@@ -13,6 +13,7 @@ export default function AttendanceEntry() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
+  const [isFormTeacher, setIsFormTeacher] = useState(true); // default true for admins
 
   useEffect(() => {
     fetchClasses();
@@ -29,9 +30,22 @@ export default function AttendanceEntry() {
   const fetchClasses = async () => {
     try {
       const res = await axios.get(`${API_URL}/classes/classes`);
-      setClasses(res.data.classes);
-      if (res.data.classes.length > 0) {
-        setSelectedClass(res.data.classes[0].id);
+      let classList = res.data.classes;
+
+      // For teachers: only show classes where they are the form teacher
+      if (user.role === 'Teacher') {
+        const teacherRes = await axios.get(`${API_URL}/teachers`);
+        const teacherProfile = teacherRes.data.teachers.find(t => t.user_id === user.id);
+        if (teacherProfile) {
+          classList = classList.filter(c => c.form_teacher_id === teacherProfile.id);
+        } else {
+          classList = [];
+        }
+      }
+
+      setClasses(classList);
+      if (classList.length > 0) {
+        setSelectedClass(classList[0].id);
       }
     } catch (err) {
       console.error(err);
@@ -41,6 +55,7 @@ export default function AttendanceEntry() {
   const fetchAttendance = async () => {
     setLoading(true);
     setMessage('');
+    setIsFormTeacher(true);
     try {
       const res = await axios.get(`${API_URL}/attendance?class_id=${selectedClass}&date=${selectedDate}`);
       // Initialize any null status to 'present' by default to save clicks, or leave empty to force choice
@@ -53,6 +68,7 @@ export default function AttendanceEntry() {
       console.error(err);
       if (err.response && err.response.status === 403) {
         setMessage(err.response.data.message || 'You are not authorized to view this class.');
+        setIsFormTeacher(false);
       } else {
         setMessage('Failed to load students.');
       }
@@ -99,6 +115,16 @@ export default function AttendanceEntry() {
           <p className="text-sm text-gray-500">Mark daily student attendance</p>
         </div>
       </div>
+
+      {user.role === 'Teacher' && classes.length === 0 && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 flex items-start gap-3">
+          <ShieldAlert className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
+          <div>
+            <h4 className="text-sm font-bold text-amber-800">No Classes Assigned</h4>
+            <p className="text-xs text-amber-700 mt-1">You are not assigned as a Form Teacher for any class. Only Form Teachers can record attendance. Please contact your School Admin.</p>
+          </div>
+        </div>
+      )}
 
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex gap-4 items-end flex-wrap">
         <div className="flex-1 min-w-[200px]">

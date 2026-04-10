@@ -109,10 +109,16 @@ exports.getSessions = async (req, res) => {
 
 exports.createSession = async (req, res) => {
     const { name, start_date, end_date } = req.body;
+    if (!name || !name.trim()) {
+        return res.status(400).json({ error: 'Validation Error', message: 'Session name is required.' });
+    }
     try {
         const db = getDB();
         const school_id = req.user.school_id;
-        const result = await db.run('INSERT INTO academic_sessions (school_id, name, start_date, end_date) VALUES ($1, $2, $3, $4) RETURNING id', [school_id, name, start_date, end_date]);
+        // Convert empty strings to null for PostgreSQL DATE columns
+        const safeStartDate = start_date || null;
+        const safeEndDate = end_date || null;
+        const result = await db.run('INSERT INTO academic_sessions (school_id, name, start_date, end_date) VALUES ($1, $2, $3, $4) RETURNING id', [school_id, name.trim(), safeStartDate, safeEndDate]);
         res.json({ message: 'Session created', id: result.lastID });
     } catch (err) {
         res.status(500).json({ error: 'Server Error', message: err.message });

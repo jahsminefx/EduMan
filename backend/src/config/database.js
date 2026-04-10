@@ -123,6 +123,28 @@ async function initDB(retryCount = 0) {
             } catch (patchErr) {
                 console.log('Schema patch (school_admin_assignments unique index) skipped or already applied.');
             }
+            // ── Form Teacher column on classes ──
+            try {
+                await pool.query("ALTER TABLE classes ADD COLUMN IF NOT EXISTS form_teacher_id INTEGER REFERENCES teachers(id) ON DELETE SET NULL");
+                console.log('Schema patch (classes.form_teacher_id) applied.');
+            } catch (patchErr) {
+                console.log('Schema patch (classes.form_teacher_id) skipped or already applied.');
+            }
+            // ── Quiz attempt answers table for review feature ──
+            try {
+                await pool.query(`
+                    CREATE TABLE IF NOT EXISTS quiz_attempt_answers (
+                        id SERIAL PRIMARY KEY,
+                        attempt_id INTEGER NOT NULL REFERENCES quiz_attempts(id) ON DELETE CASCADE,
+                        question_id INTEGER NOT NULL REFERENCES quiz_questions(id) ON DELETE CASCADE,
+                        selected_option_index INTEGER
+                    )
+                `);
+                await pool.query("CREATE UNIQUE INDEX IF NOT EXISTS uq_qaa_attempt_question ON quiz_attempt_answers (attempt_id, question_id)");
+                console.log('Schema patch (quiz_attempt_answers) applied.');
+            } catch (patchErr) {
+                console.log('Schema patch (quiz_attempt_answers) skipped or already applied.');
+            }
         } else {
             console.warn('Warning: schema.sql not found at', schemaPath);
         }

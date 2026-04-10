@@ -50,6 +50,26 @@ app.use('/api/subjects', subjectRoutes);
 app.use('/api/submissions', submissionRoutes);
 app.use('/api/superadmin', superAdminRoutes);
 
+// ── Serve frontend build in production ──
+// This fixes "Not Found" on page refresh when backend serves the frontend
+const frontendBuildPath = path.join(__dirname, '../../frontend/dist');
+app.use(express.static(frontendBuildPath));
+
+// Catch-all: serve index.html for any non-API route (SPA client-side routing)
+app.get('*', (req, res, next) => {
+  // Don't intercept API routes
+  if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) {
+    return next();
+  }
+  const indexPath = path.join(frontendBuildPath, 'index.html');
+  const fs = require('fs');
+  if (fs.existsSync(indexPath)) {
+    res.sendFile(indexPath);
+  } else {
+    next();
+  }
+});
+
 // Error handling middleware
 app.use((err, req, res, next) => {
   console.error(err.stack);

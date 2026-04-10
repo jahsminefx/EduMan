@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { HelpCircle, Plus, Clock, CheckCircle, Trash2, Send } from 'lucide-react';
+import { HelpCircle, Plus, Clock, CheckCircle, Trash2, Send, XCircle, Eye, ArrowLeft, Award } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import API_URL from '../../config/api';
 
@@ -12,6 +12,7 @@ export default function QuizPage() {
   const [showCreate, setShowCreate] = useState(false);
   const [activeQuiz, setActiveQuiz] = useState(null); // quiz being taken by student
   const [answers, setAnswers] = useState({});
+  const [reviewData, setReviewData] = useState(null); // quiz review data
 
   // Create form
   const [classes, setClasses] = useState([]);
@@ -85,9 +86,21 @@ export default function QuizPage() {
       });
       setMessage(`Score: ${res.data.correct}/${res.data.total} (${res.data.score.toFixed(0)}%)`);
       setActiveQuiz(null);
+      // Immediately load review
+      loadReview(activeQuiz.quiz.id);
+      fetchData(); // refresh quiz list to show attempted status
       setTimeout(() => setMessage(''), 5000);
     } catch (err) {
       setMessage(err.response?.data?.message || 'Error submitting quiz.');
+    }
+  };
+
+  const loadReview = async (quizId) => {
+    try {
+      const res = await axios.get(`${API_URL}/quizzes/${quizId}/review`);
+      setReviewData(res.data);
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Could not load quiz review.');
     }
   };
 
@@ -98,6 +111,111 @@ export default function QuizPage() {
       fetchData();
     } catch (err) { console.error(err); }
   };
+
+  // Quiz Review View
+  if (reviewData) {
+    const percentage = reviewData.total > 0 ? ((reviewData.correct / reviewData.total) * 100).toFixed(0) : 0;
+    return (
+      <div className="space-y-6">
+        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+          <div className="flex items-center justify-between">
+            <div>
+              <h2 className="text-xl font-semibold text-gray-800 flex items-center gap-2">
+                <Eye className="w-5 h-5 text-blue-600" /> Quiz Review: {reviewData.quiz.title}
+              </h2>
+              <p className="text-sm text-gray-500 mt-1">Reviewing your answers</p>
+            </div>
+            <button 
+              onClick={() => setReviewData(null)}
+              className="flex items-center px-4 py-2 text-gray-600 hover:bg-gray-100 rounded-lg transition text-sm font-medium"
+            >
+              <ArrowLeft className="w-4 h-4 mr-1" /> Back to Quizzes
+            </button>
+          </div>
+        </div>
+
+        {/* Score Summary */}
+        <div className={`p-6 rounded-xl border shadow-sm ${
+          percentage >= 70 ? 'bg-green-50 border-green-200' : percentage >= 50 ? 'bg-yellow-50 border-yellow-200' : 'bg-red-50 border-red-200'
+        }`}>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-4">
+              <div className={`w-16 h-16 rounded-full flex items-center justify-center ${
+                percentage >= 70 ? 'bg-green-100' : percentage >= 50 ? 'bg-yellow-100' : 'bg-red-100'
+              }`}>
+                <Award className={`w-8 h-8 ${
+                  percentage >= 70 ? 'text-green-600' : percentage >= 50 ? 'text-yellow-600' : 'text-red-600'
+                }`} />
+              </div>
+              <div>
+                <h3 className="text-2xl font-black text-gray-900">{percentage}%</h3>
+                <p className="text-sm text-gray-600">{reviewData.correct} out of {reviewData.total} correct</p>
+              </div>
+            </div>
+            <div className="text-right">
+              <span className={`text-sm font-bold px-3 py-1 rounded-full ${
+                percentage >= 70 ? 'bg-green-200 text-green-800' : percentage >= 50 ? 'bg-yellow-200 text-yellow-800' : 'bg-red-200 text-red-800'
+              }`}>
+                {percentage >= 70 ? 'Excellent!' : percentage >= 50 ? 'Good effort' : 'Needs improvement'}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Questions Review */}
+        {reviewData.questions.map((q, qi) => (
+          <div key={q.id} className={`bg-white p-5 rounded-xl shadow-sm border-2 ${
+            q.is_correct ? 'border-green-200' : 'border-red-200'
+          }`}>
+            <div className="flex items-start justify-between mb-3">
+              <p className="font-medium text-gray-800">Q{qi + 1}. {q.question_text}</p>
+              {q.is_correct ? (
+                <span className="flex items-center gap-1 text-xs font-bold text-green-600 bg-green-50 px-2 py-1 rounded-full flex-shrink-0 ml-3">
+                  <CheckCircle className="w-3 h-3" /> Correct
+                </span>
+              ) : (
+                <span className="flex items-center gap-1 text-xs font-bold text-red-600 bg-red-50 px-2 py-1 rounded-full flex-shrink-0 ml-3">
+                  <XCircle className="w-3 h-3" /> Wrong
+                </span>
+              )}
+            </div>
+            <div className="space-y-2">
+              {q.options.map((opt, oi) => {
+                const isSelected = q.selected_option_index === oi;
+                const isCorrect = q.correct_option_index === oi;
+                let borderClass = 'border-gray-200 bg-white';
+                let textClass = 'text-gray-700';
+                
+                if (isCorrect) {
+                  borderClass = 'border-green-400 bg-green-50';
+                  textClass = 'text-green-800 font-medium';
+                }
+                if (isSelected && !isCorrect) {
+                  borderClass = 'border-red-400 bg-red-50';
+                  textClass = 'text-red-800 font-medium';
+                }
+
+                return (
+                  <div key={oi} className={`flex items-center gap-3 p-3 rounded-lg border ${borderClass} transition`}>
+                    {isCorrect ? (
+                      <CheckCircle className="w-4 h-4 text-green-600 flex-shrink-0" />
+                    ) : isSelected ? (
+                      <XCircle className="w-4 h-4 text-red-600 flex-shrink-0" />
+                    ) : (
+                      <div className="w-4 h-4 rounded-full border-2 border-gray-300 flex-shrink-0" />
+                    )}
+                    <span className={`text-sm ${textClass}`}>{opt}</span>
+                    {isCorrect && <span className="text-[10px] font-bold text-green-600 ml-auto">✓ Correct Answer</span>}
+                    {isSelected && !isCorrect && <span className="text-[10px] font-bold text-red-600 ml-auto">✗ Your Answer</span>}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        ))}
+      </div>
+    );
+  }
 
   // Quiz-taking view for students
   if (activeQuiz) {
@@ -202,9 +320,25 @@ export default function QuizPage() {
                 <Clock className="w-3 h-3" /> {q.duration_minutes} min
               </div>
               {user.role === 'Student' && (
-                <button onClick={() => takeQuiz(q.id)} className="mt-3 flex items-center px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-xs font-medium">
-                  <CheckCircle className="w-3 h-3 mr-1" /> Take Quiz
-                </button>
+                <div className="mt-3">
+                  {q.attempted ? (
+                    <div className="flex gap-2">
+                      <span className="flex items-center gap-1 px-3 py-1.5 bg-green-50 text-green-700 rounded-lg text-xs font-bold border border-green-100">
+                        <CheckCircle className="w-3 h-3" /> Score: {q.score?.toFixed(0)}%
+                      </span>
+                      <button 
+                        onClick={() => loadReview(q.id)} 
+                        className="flex items-center px-3 py-1.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition text-xs font-bold border border-blue-100"
+                      >
+                        <Eye className="w-3 h-3 mr-1" /> Review
+                      </button>
+                    </div>
+                  ) : (
+                    <button onClick={() => takeQuiz(q.id)} className="flex items-center px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition text-xs font-medium">
+                      <CheckCircle className="w-3 h-3 mr-1" /> Take Quiz
+                    </button>
+                  )}
+                </div>
               )}
             </div>
           ))}

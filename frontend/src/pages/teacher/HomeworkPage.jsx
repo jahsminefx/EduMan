@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { BookOpen, Plus, Trash2, Upload, Calendar, Send, FileCheck, Eye, X } from 'lucide-react';
+import { BookOpen, Plus, Trash2, Upload, Calendar, Send, FileCheck, Eye, X, CheckCircle as CheckCircleIcon } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { API_URL, API_BASE_URL } from '../../config/api';
 import AssignmentSubmit from '../../components/AssignmentSubmit';
@@ -13,6 +13,7 @@ export default function HomeworkPage() {
   const [showForm, setShowForm] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
+  const [submittedMap, setSubmittedMap] = useState({}); // { hw_id: true/false }
   
   // Submission Modal state
   const [selectedHw, setSelectedHw] = useState(null);
@@ -36,6 +37,17 @@ export default function HomeworkPage() {
       setHomework(hwRes.data.homework);
       setClasses(clsRes.data.classes);
       setSubjects(subRes.data.subjects);
+
+      // If student, check which assignments are already submitted
+      if (user.role === 'Student' && hwRes.data.homework.length > 0) {
+        const ids = hwRes.data.homework.map(hw => hw.id).join(',');
+        try {
+          const statusRes = await axios.get(`${API_URL}/submissions/statuses?assignment_ids=${ids}`);
+          setSubmittedMap(statusRes.data.statuses || {});
+        } catch (err) {
+          console.error('Failed to fetch submission statuses:', err);
+        }
+      }
     } catch (err) { console.error(err); }
     finally { setLoading(false); }
   };
@@ -76,8 +88,15 @@ export default function HomeworkPage() {
       setSubmissionsList(res.data.submissions);
       setShowSubmissions(hwId);
     } catch (err) {
-      alert('Failed to load submissions');
+      console.error('Failed to load submissions:', err);
+      alert(err.response?.data?.message || 'Failed to load submissions');
     }
+  };
+
+  const handleSubmissionComplete = (hwId) => {
+    setSelectedHw(null);
+    // Mark as submitted in local state
+    setSubmittedMap(prev => ({ ...prev, [hwId]: true }));
   };
 
   return (
@@ -133,56 +152,68 @@ export default function HomeworkPage() {
         <div className="p-8 text-center text-gray-500 bg-white rounded-xl border border-gray-100 shadow-sm">No homework found.</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-          {homework.map(hw => (
-            <div key={hw.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-lg transition-all flex flex-col h-full group">
-              <div className="flex justify-between items-start mb-2">
-                <div>
-                  <h3 className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors uppercase tracking-tight">{hw.title}</h3>
-                  <p className="text-[10px] font-bold text-blue-600 mt-0.5 bg-blue-50 px-2 py-0.5 rounded-full inline-block border border-blue-100">{hw.class_name} • {hw.subject_name}</p>
-                </div>
-                {(user.role === 'Teacher' || user.role === 'SchoolAdmin') && (
-                  <button onClick={() => handleDelete(hw.id)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
-                )}
-              </div>
-              
-              {hw.description && <p className="text-xs text-gray-600 mt-2 line-clamp-3 leading-relaxed">{hw.description}</p>}
-              
-              <div className="mt-auto pt-4 space-y-3">
-                <div className="flex items-center justify-between text-[11px] text-gray-500 border-t pt-3">
-                  <div className="flex items-center gap-1.5">
-                    <Calendar className="w-3.5 h-3.5 text-gray-400" />
-                    <span>Due: <span className="font-semibold text-gray-700">{hw.due_date || 'N/A'}</span></span>
+          {homework.map(hw => {
+            const isSubmitted = submittedMap[hw.id];
+            return (
+              <div key={hw.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-lg transition-all flex flex-col h-full group">
+                <div className="flex justify-between items-start mb-2">
+                  <div>
+                    <h3 className="font-bold text-gray-900 group-hover:text-blue-600 transition-colors uppercase tracking-tight">{hw.title}</h3>
+                    <p className="text-[10px] font-bold text-blue-600 mt-0.5 bg-blue-50 px-2 py-0.5 rounded-full inline-block border border-blue-100">{hw.class_name} • {hw.subject_name}</p>
                   </div>
-                  <span className="italic">By {hw.teacher_name}</span>
-                </div>
-
-                {hw.file_path && (
-                  <a href={`${API_BASE_URL}${hw.file_path}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg text-xs text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-all font-medium">
-                    <Plus className="w-3.5 h-3.5 rotate-45" /> View Reference Material
-                  </a>
-                )}
-
-                <div className="flex gap-2">
-                  {user.role === 'Student' && (
-                    <button 
-                      onClick={() => setSelectedHw(hw)}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-bold text-xs shadow-sm active:scale-[0.98]"
-                    >
-                      <Send className="w-3.5 h-3.5" /> Submit Work
-                    </button>
-                  )}
                   {(user.role === 'Teacher' || user.role === 'SchoolAdmin') && (
-                    <button 
-                      onClick={() => fetchSubmissions(hw.id)}
-                      className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition font-bold text-xs border border-blue-100 shadow-sm"
-                    >
-                      <Eye className="w-3.5 h-3.5" /> View Submissions
-                    </button>
+                    <button onClick={() => handleDelete(hw.id)} className="text-gray-300 hover:text-red-500 transition-colors"><Trash2 className="w-4 h-4" /></button>
                   )}
+                </div>
+                
+                {hw.description && <p className="text-xs text-gray-600 mt-2 line-clamp-3 leading-relaxed">{hw.description}</p>}
+                
+                <div className="mt-auto pt-4 space-y-3">
+                  <div className="flex items-center justify-between text-[11px] text-gray-500 border-t pt-3">
+                    <div className="flex items-center gap-1.5">
+                      <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                      <span>Due: <span className="font-semibold text-gray-700">{hw.due_date || 'N/A'}</span></span>
+                    </div>
+                    <span className="italic">By {hw.teacher_name}</span>
+                  </div>
+
+                  {hw.file_path && (
+                    <a href={`${API_BASE_URL}${hw.file_path}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg text-xs text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-all font-medium">
+                      <Plus className="w-3.5 h-3.5 rotate-45" /> View Reference Material
+                    </a>
+                  )}
+
+                  <div className="flex gap-2">
+                    {user.role === 'Student' && (
+                      isSubmitted ? (
+                        <button
+                          disabled
+                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-gray-100 text-green-700 rounded-lg font-bold text-xs border border-green-200 cursor-not-allowed"
+                        >
+                          <CheckCircleIcon className="w-3.5 h-3.5" /> Submitted
+                        </button>
+                      ) : (
+                        <button 
+                          onClick={() => setSelectedHw(hw)}
+                          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 text-white rounded-lg hover:bg-green-700 transition font-bold text-xs shadow-sm active:scale-[0.98]"
+                        >
+                          <Send className="w-3.5 h-3.5" /> Submit Work
+                        </button>
+                      )
+                    )}
+                    {(user.role === 'Teacher' || user.role === 'SchoolAdmin') && (
+                      <button 
+                        onClick={() => fetchSubmissions(hw.id)}
+                        className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition font-bold text-xs border border-blue-100 shadow-sm"
+                      >
+                        <Eye className="w-3.5 h-3.5" /> View Submissions
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
@@ -197,7 +228,7 @@ export default function HomeworkPage() {
             </div>
             <AssignmentSubmit 
               assignmentId={selectedHw.id} 
-              onComplete={() => setSelectedHw(null)} 
+              onComplete={() => handleSubmissionComplete(selectedHw.id)} 
             />
           </div>
         </div>
