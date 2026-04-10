@@ -56,7 +56,10 @@ const frontendBuildPath = path.join(__dirname, '../../frontend/dist');
 app.use(express.static(frontendBuildPath));
 
 // Catch-all: serve index.html for any non-API route (SPA client-side routing)
-app.get('*', (req, res, next) => {
+app.use((req, res, next) => {
+  // Only intercept GET requests
+  if (req.method !== 'GET') return next();
+
   // Don't intercept API routes
   if (req.path.startsWith('/api/') || req.path.startsWith('/uploads/')) {
     return next();
