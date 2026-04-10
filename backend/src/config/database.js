@@ -25,28 +25,28 @@ const schemaPath = path.join(__dirname, '../models/schema.sql');
 // Database helper wrapping pg Pool for convenience
 const db = {
     query: (text, params) => pool.query(text, params),
-    
+
     // Returns first row
     get: async (text, params) => {
         const res = await pool.query(text, params);
         return res.rows[0];
     },
-    
+
     // Returns all rows
     all: async (text, params) => {
         const res = await pool.query(text, params);
         return res.rows;
     },
-    
+
     // Returns { lastID, changes }
     run: async (text, params) => {
         const res = await pool.query(text, params);
         return {
-            lastID: res.rows[0]?.id || null, 
+            lastID: res.rows[0]?.id || null,
             changes: res.rowCount
         };
     },
-    
+
     // Execute raw SQL
     exec: async (text) => {
         return pool.query(text);
@@ -64,7 +64,7 @@ const db = {
         const client = await pool.connect();
         try {
             await client.query('BEGIN');
-            
+
             // Provide helper methods on the client matching the db interface
             client.get = async (text, params) => {
                 const res = await client.query(text, params);
@@ -99,7 +99,7 @@ const MAX_RETRIES = 5;
 async function initDB(retryCount = 0) {
     try {
         console.log('Attempting to connect to PostgreSQL...');
-        
+
         // Test connection
         const testRes = await pool.query('SELECT NOW()');
         console.log(`Successfully connected to PostgreSQL at ${testRes.rows[0].now}`);
@@ -151,7 +151,7 @@ async function initDB(retryCount = 0) {
 
         // Seed SuperAdmin only if none exists (do NOT reset password on every restart)
         const adminRes = await db.get("SELECT id FROM users WHERE role = $1 LIMIT 1", ['SuperAdmin']);
-        
+
         if (!adminRes) {
             const defaultPassword = process.env.SUPERADMIN_PASSWORD || 'ASDFGHJKL';
             const hash = await bcrypt.hash(defaultPassword, 10);
@@ -168,14 +168,14 @@ async function initDB(retryCount = 0) {
         return db;
     } catch (error) {
         console.error('DATABASE CONNECTION ERROR:', error.message);
-        
+
         if (process.env.NODE_ENV === 'production' && retryCount < MAX_RETRIES) {
             const delay = Math.min(5000 * Math.pow(2, retryCount), 60000); // exponential backoff, max 60s
             console.log(`Retrying database connection in ${delay / 1000}s... (attempt ${retryCount + 1}/${MAX_RETRIES})`);
             await new Promise(resolve => setTimeout(resolve, delay));
             return initDB(retryCount + 1);
         }
-        
+
         throw error;
     }
 }
