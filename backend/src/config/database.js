@@ -16,8 +16,14 @@ const pool = new Pool({
     connectionString,
     ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
     max: 20,
-    idleTimeoutMillis: 30000,
-    connectionTimeoutMillis: 2000
+    idleTimeoutMillis: 10000, // Reduced from 30s to 10s to drop idle connections cleanly
+    connectionTimeoutMillis: 60000, // INCREASED to 60 seconds specifically for free Render DB cold starts!
+    keepAlive: true
+});
+
+// Prevent Node process from crashing on idle client errors
+pool.on('error', (err, client) => {
+    console.error('Unexpected error on idle client', err);
 });
 
 const schemaPath = path.join(__dirname, '../models/schema.sql');
