@@ -8,27 +8,29 @@ const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
 const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-    console.error('ERROR: DATABASE_URL not set. Check your .env file.');
-    process.exit(1);
+
+function createConfiguredPool() {
+    if (!connectionString) {
+        throw new Error('DATABASE_URL not set. Check your .env file.');
+    }
+
+    return new Pool({
+        connectionString,
+        ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
+    });
 }
 
-const pool = new Pool({
-    connectionString,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false
-});
+async function seed(pool, options = {}) {
+    const { closePool = true, resetPasswords = true } = options;
+    const get = async (text, params) => {
+        const res = await pool.query(text, params);
+        return res.rows[0];
+    };
+    const run = async (text, params) => {
+        const res = await pool.query(text, params);
+        return { lastID: res.rows[0]?.id || null, changes: res.rowCount };
+    };
 
-// Helper functions for pg
-const get = async (text, params) => {
-    const res = await pool.query(text, params);
-    return res.rows[0];
-};
-const run = async (text, params) => {
-    const res = await pool.query(text, params);
-    return { lastID: res.rows[0]?.id || null, changes: res.rowCount };
-};
-
-async function seed() {
     const hash = await bcrypt.hash('password123', 10);
     console.log('🌱 Seeding EduMan database...\n');
 
@@ -66,6 +68,7 @@ async function seed() {
     // 3. USERS (all 8 roles)
     // ──────────────────────────────────────
     const users = [
+        { name: 'Default Admin', email: 'admin@eduman.local', role: 'SuperAdmin' },
         // SchoolAdmins
         { name: 'Mrs. Adebayo', email: 'adebayo@greenfield.edu.ng', role: 'SchoolAdmin', schoolIdx: 0 },
         { name: 'Mr. Okonkwo', email: 'okonkwo@sunrise.edu.ng', role: 'SchoolAdmin', schoolIdx: 1 },
@@ -92,7 +95,13 @@ async function seed() {
     const userMap = {};
     for (const u of users) {
         const existing = await get('SELECT id FROM users WHERE email = $1', [u.email]);
-        if (existing) { userMap[u.email] = existing.id; continue; }
+        if (existing) {
+            userMap[u.email] = existing.id;
+            if (resetPasswords) {
+                await run('UPDATE users SET name = $1, password_hash = $2, role = $3 WHERE id = $4', [u.name, hash, u.role, existing.id]);
+            }
+            continue;
+        }
         const r = await run('INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id', [u.name, u.email, hash, u.role]);
         userMap[u.email] = r.lastID;
     }
@@ -290,11 +299,21 @@ async function seed() {
     console.log('   Accountant:      fashola@greenfield.edu.ng');
     console.log('   Support:         emeka@eduman.local');
 
-    await pool.end();
+    if (closePool) {
+        await pool.end();
+    }
 }
 
-seed().catch(err => {
-    console.error('Seed error:', err);
-    pool.end();
-    process.exit(1);
-});
+if (require.main === module) {
+    const pool = createConfiguredPool();
+    seed(pool).catch(err => {
+        console.error('Seed error:', err);
+        pool.end();
+        process.exit(1);
+    });
+}
+
+module.exports = {
+    seed,
+    createConfiguredPool
+};

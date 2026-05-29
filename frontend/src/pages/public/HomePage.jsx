@@ -12,7 +12,7 @@ const features = [
   { icon: Calendar, title: 'Attendance Tracking', desc: 'Daily attendance with class-level filters and reports.' },
   { icon: BarChart3, title: 'Grade Management', desc: 'Enter CA and exam scores, auto-generate report cards.' },
   { icon: ClipboardCheck, title: 'Homework System', desc: 'Assign homework, collect submissions with file uploads.' },
-  { icon: Library, title: 'Learning Library', desc: 'Upload PDFs, videos, and documents for offline access.' },
+  { icon: Library, title: 'Learning Library', desc: 'Upload images, videos, and documents for offline access.' },
   { icon: HelpCircle, title: 'Quiz System', desc: 'Create MCQ quizzes with instant auto-grading.' },
   { icon: FileText, title: 'Report Cards', desc: 'Print-friendly, professional report cards per term.' },
 ];

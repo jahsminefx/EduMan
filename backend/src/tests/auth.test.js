@@ -1,11 +1,13 @@
 const request = require('supertest');
 const app = require('../app');
-const { initDB, getDB } = require('../config/database');
-
-let db;
+const { initDB, closeDB } = require('../config/database');
 
 beforeAll(async () => {
-  db = await initDB();
+  await initDB();
+});
+
+afterAll(async () => {
+  await closeDB();
 });
 
 describe('Auth API', () => {
@@ -16,7 +18,7 @@ describe('Auth API', () => {
   });
 
   it('should login with default admin credentials', async () => {
-    const defaultPassword = process.env.SUPERADMIN_PASSWORD || 'ASDFGHJKL';
+    const defaultPassword = process.env.NODE_ENV === 'test' ? 'password123' : (process.env.SUPERADMIN_PASSWORD || 'ASDFGHJKL');
     const res = await request(app)
       .post('/api/auth/login')
       .send({
@@ -41,7 +43,7 @@ describe('Auth API', () => {
   });
 
   it('should get current user info with valid token', async () => {
-    const defaultPassword = process.env.SUPERADMIN_PASSWORD || 'ASDFGHJKL';
+    const defaultPassword = process.env.NODE_ENV === 'test' ? 'password123' : (process.env.SUPERADMIN_PASSWORD || 'ASDFGHJKL');
     const loginRes = await request(app)
       .post('/api/auth/login')
       .send({

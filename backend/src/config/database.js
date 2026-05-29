@@ -5,21 +5,42 @@ const bcrypt = require('bcryptjs');
 require('dotenv').config();
 
 const connectionString = process.env.DATABASE_URL;
+const isProduction = process.env.NODE_ENV === 'production';
+let usingMemoryDb = false;
 
-if (!connectionString) {
-    console.error('CRITICAL ERROR: DATABASE_URL environment variable is missing.');
-    console.error('The application cannot start without a valid PostgreSQL connection string.');
-    process.exit(1);
+function createPostgresPool() {
+    if (!connectionString) return null;
+
+    return new Pool({
+        connectionString,
+        ssl: isProduction ? { rejectUnauthorized: false } : false,
+        max: 20,
+        idleTimeoutMillis: 10000,
+        connectionTimeoutMillis: 60000,
+        keepAlive: true
+    });
 }
 
-const pool = new Pool({
-    connectionString,
-    ssl: process.env.NODE_ENV === 'production' ? { rejectUnauthorized: false } : false,
-    max: 20,
-    idleTimeoutMillis: 10000, // Reduced from 30s to 10s to drop idle connections cleanly
-    connectionTimeoutMillis: 60000, // INCREASED to 60 seconds specifically for free Render DB cold starts!
-    keepAlive: true
-});
+function createMemoryPool() {
+    const { newDb } = require('pg-mem');
+    const memoryDb = newDb({ autoCreateForeignKeyIndices: true });
+    const adapter = memoryDb.adapters.createPg();
+    usingMemoryDb = true;
+    return new adapter.Pool();
+}
+
+let pool = createPostgresPool();
+
+if (!pool) {
+    if (isProduction) {
+        console.error('CRITICAL ERROR: DATABASE_URL environment variable is missing.');
+        console.error('The application cannot start in production without a valid PostgreSQL connection string.');
+        process.exit(1);
+    }
+
+    console.warn('DATABASE_URL is missing. Using an in-memory database for local development.');
+    pool = createMemoryPool();
+}
 
 // Prevent Node process from crashing on idle client errors
 pool.on('error', (err, client) => {
@@ -27,6 +48,33 @@ pool.on('error', (err, client) => {
 });
 
 const schemaPath = path.join(__dirname, '../models/schema.sql');
+
+async function runSqlScript(sql) {
+    const statements = sql
+        .split(';')
+        .map(statement => statement.trim())
+        .filter(Boolean);
+
+    for (const statement of statements) {
+        if (
+            usingMemoryDb &&
+            statement.includes('DELETE FROM teacher_subject_assignments') &&
+            statement.includes('GROUP BY teacher_id, class_id, subject_id')
+        ) {
+            continue;
+        }
+
+        if (
+            usingMemoryDb &&
+            statement.includes('DELETE FROM teacher_classes') &&
+            statement.includes('GROUP BY teacher_id, class_id, school_id')
+        ) {
+            continue;
+        }
+
+        await pool.query(statement);
+    }
+}
 
 // Database helper wrapping pg Pool for convenience
 const db = {
@@ -104,16 +152,16 @@ const MAX_RETRIES = 5;
 
 async function initDB(retryCount = 0) {
     try {
-        console.log('Attempting to connect to PostgreSQL...');
+        console.log(`Attempting to connect to ${usingMemoryDb ? 'in-memory PostgreSQL' : 'PostgreSQL'}...`);
 
         // Test connection
         const testRes = await pool.query('SELECT NOW()');
-        console.log(`Successfully connected to PostgreSQL at ${testRes.rows[0].now}`);
+        console.log(`Successfully connected to ${usingMemoryDb ? 'in-memory PostgreSQL' : 'PostgreSQL'} at ${testRes.rows[0].now}`);
 
         // Run schema
         if (fs.existsSync(schemaPath)) {
             const schema = fs.readFileSync(schemaPath, 'utf8');
-            await pool.query(schema);
+            await runSqlScript(schema);
             console.log('Database schema synchronized successfully.');
 
             // ── Safe incremental schema patches (idempotent) ──
@@ -155,6 +203,11 @@ async function initDB(retryCount = 0) {
             console.warn('Warning: schema.sql not found at', schemaPath);
         }
 
+        if (usingMemoryDb) {
+            const { seed } = require('../../seed');
+            await seed(pool, { closePool: false, resetPasswords: true });
+        }
+
         // Seed SuperAdmin only if none exists (do NOT reset password on every restart)
         const adminRes = await db.get("SELECT id FROM users WHERE role = $1 LIMIT 1", ['SuperAdmin']);
 
@@ -173,9 +226,16 @@ async function initDB(retryCount = 0) {
 
         return db;
     } catch (error) {
+        if (!usingMemoryDb && !isProduction) {
+            console.warn(`PostgreSQL connection failed (${error.message || error.code || 'unknown error'}). Falling back to in-memory database.`);
+            await pool.end().catch(() => {});
+            pool = createMemoryPool();
+            return initDB(retryCount);
+        }
+
         console.error('DATABASE CONNECTION ERROR:', error.message);
 
-        if (process.env.NODE_ENV === 'production' && retryCount < MAX_RETRIES) {
+        if (isProduction && retryCount < MAX_RETRIES) {
             const delay = Math.min(5000 * Math.pow(2, retryCount), 60000); // exponential backoff, max 60s
             console.log(`Retrying database connection in ${delay / 1000}s... (attempt ${retryCount + 1}/${MAX_RETRIES})`);
             await new Promise(resolve => setTimeout(resolve, delay));
@@ -190,8 +250,15 @@ function getDB() {
     return db;
 }
 
+async function closeDB() {
+    await pool.end();
+}
+
 module.exports = {
     initDB,
     getDB,
-    pool
+    closeDB,
+    get pool() {
+        return pool;
+    }
 };

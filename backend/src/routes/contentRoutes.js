@@ -15,7 +15,19 @@ const storage = multer.diskStorage({
     },
     filename: (req, file, cb) => cb(null, `content_${Date.now()}${path.extname(file.originalname)}`)
 });
-const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } }); // 50MB for videos
+const allowedExtensions = new Set([
+    '.jpg', '.jpeg', '.png', '.gif', '.webp',
+    '.mp4', '.mov', '.webm', '.m4v',
+    '.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx', '.txt', '.rtf'
+]);
+const upload = multer({
+    storage,
+    limits: { fileSize: 50 * 1024 * 1024 },
+    fileFilter: (req, file, cb) => {
+        const ext = path.extname(file.originalname).toLowerCase();
+        cb(null, allowedExtensions.has(ext));
+    }
+});
 
 router.get('/', protect, contentController.getContents);
 router.post('/', protect, authorize('ContentManager', 'Teacher', 'SchoolAdmin'), upload.single('file'), contentController.uploadContent);

@@ -212,7 +212,7 @@ CREATE TABLE IF NOT EXISTS learning_contents (
     subject_id INTEGER,
     title TEXT NOT NULL,
     description TEXT,
-    type TEXT NOT NULL, -- 'video', 'pdf', 'document'
+    type TEXT NOT NULL, -- 'image', 'video', 'document' ('pdf' kept for older records)
     file_path TEXT NOT NULL,
     thumbnail_path TEXT,
     uploaded_by INTEGER,

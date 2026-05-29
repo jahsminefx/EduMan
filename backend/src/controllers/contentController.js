@@ -1,11 +1,55 @@
+const fs = require('fs');
+const path = require('path');
 const { getDB } = require('../config/database');
+
+const allowedContentTypes = new Set(['image', 'video', 'document', 'pdf']);
+const documentExtensions = new Set(['.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx', '.txt', '.rtf']);
+const videoExtensions = new Set(['.mp4', '.mov', '.webm', '.m4v']);
+const imageExtensions = new Set(['.jpg', '.jpeg', '.png', '.gif', '.webp']);
+
+function deleteUploadedFile(file) {
+    if (!file?.path) return;
+    fs.unlink(file.path, () => {});
+}
+
+function normalizeContentType(type) {
+    return type === 'pdf' ? 'document' : type;
+}
+
+function fileMatchesType(file, type) {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const mime = file.mimetype || '';
+
+    if (type === 'image') {
+        return mime.startsWith('image/') && imageExtensions.has(ext);
+    }
+
+    if (type === 'video') {
+        return mime.startsWith('video/') && videoExtensions.has(ext);
+    }
+
+    if (type === 'document') {
+        return documentExtensions.has(ext);
+    }
+
+    return false;
+}
 
 // Upload content (ContentManager or Teacher)
 exports.uploadContent = async (req, res) => {
     const { title, description, type, class_id, subject_id } = req.body;
+    const normalizedType = normalizeContentType(type);
 
     if (!title || !type || !req.file) {
         return res.status(400).json({ error: 'Validation Error', message: 'title, type, and a file are required.' });
+    }
+
+    if (!allowedContentTypes.has(type) || !fileMatchesType(req.file, normalizedType)) {
+        deleteUploadedFile(req.file);
+        return res.status(400).json({
+            error: 'Validation Error',
+            message: 'Upload an image, video, or document file that matches the selected content type.'
+        });
     }
 
     try {
@@ -15,7 +59,7 @@ exports.uploadContent = async (req, res) => {
 
         const result = await db.run(
             'INSERT INTO learning_contents (school_id, class_id, subject_id, title, description, type, file_path, uploaded_by) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
-            [school_id, class_id || null, subject_id || null, title, description, type, file_path, req.user.id]
+            [school_id, class_id || null, subject_id || null, title, description, normalizedType, file_path, req.user.id]
         );
 
         res.json({ message: 'Content uploaded successfully', id: result.lastID || result.rows?.[0]?.id });
@@ -41,7 +85,13 @@ exports.getContents = async (req, res) => {
             params.push(school_id);
         }
 
-        if (type) { query += ` AND lc.type = $${params.length + 1}`; params.push(type); }
+        if (type === 'document') {
+            query += ` AND lc.type IN ($${params.length + 1}, $${params.length + 2})`;
+            params.push('document', 'pdf');
+        } else if (type) {
+            query += ` AND lc.type = $${params.length + 1}`;
+            params.push(type);
+        }
         if (class_id) { query += ` AND lc.class_id = $${params.length + 1}`; params.push(class_id); }
         if (subject_id) { query += ` AND lc.subject_id = $${params.length + 1}`; params.push(subject_id); }
 

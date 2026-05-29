@@ -16,7 +16,7 @@ const coreFeatures = [
   { icon: Calendar, title: 'Attendance Tracking', desc: 'Daily class attendance with Present/Absent toggles and historical data.' },
   { icon: BarChart3, title: 'Grade Management', desc: 'Enter CA and exam scores with automatic grade computation.' },
   { icon: ClipboardCheck, title: 'Homework System', desc: 'Teachers assign, students submit with file attachments.' },
-  { icon: Library, title: 'Offline Learning Library', desc: 'Upload and browse PDFs, videos, and documents without internet.' },
+  { icon: Library, title: 'Offline Learning Library', desc: 'Upload and browse images, videos, and documents without internet.' },
   { icon: HelpCircle, title: 'Quiz & Assessment', desc: 'Create MCQ quizzes with instant auto-grading for students.' },
   { icon: FileText, title: 'Automated Report Cards', desc: 'Print-ready, professional report cards generated per term.' },
 ];
