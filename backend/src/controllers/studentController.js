@@ -5,6 +5,17 @@ exports.getStudents = async (req, res) => {
     try {
         const db = getDB();
         const school_id = req.user.school_id;
+
+        if (req.user.role === 'Student') {
+            const student = await db.get(`
+                SELECT s.*, c.name as class_name, c.level as class_level
+                FROM students s
+                LEFT JOIN classes c ON s.class_id = c.id
+                WHERE s.user_id = $1 AND s.school_id = $2
+            `, [req.user.id, school_id]);
+            return res.json({ students: student ? [student] : [] });
+        }
+
         const students = await db.all(`
             SELECT s.*, c.name as class_name, c.level as class_level
             FROM students s
@@ -13,6 +24,26 @@ exports.getStudents = async (req, res) => {
             ORDER BY s.last_name ASC
         `, [school_id]);
         res.json({ students });
+    } catch (err) {
+        res.status(500).json({ error: 'Server Error', message: err.message });
+    }
+};
+
+exports.getMyStudentProfile = async (req, res) => {
+    try {
+        const db = getDB();
+        const student = await db.get(`
+            SELECT s.*, c.name as class_name, c.level as class_level
+            FROM students s
+            LEFT JOIN classes c ON s.class_id = c.id
+            WHERE s.user_id = $1 AND s.school_id = $2
+        `, [req.user.id, req.user.school_id]);
+
+        if (!student) {
+            return res.status(404).json({ error: 'Not Found', message: 'Student profile not found.' });
+        }
+
+        res.json({ student });
     } catch (err) {
         res.status(500).json({ error: 'Server Error', message: err.message });
     }

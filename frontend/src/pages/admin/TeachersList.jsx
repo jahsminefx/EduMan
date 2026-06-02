@@ -1,6 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useAuth } from '../../contexts/AuthContext';
 import { Plus, Trash2, Mail, Phone, Edit2, Check, BookOpen } from 'lucide-react';
 import API_URL from '../../config/api';
 
@@ -134,7 +133,7 @@ export default function TeachersList() {
       try {
         await axios.delete(`${API_URL}/teachers/${id}`);
         fetchData();
-      } catch (err) {
+      } catch {
         alert('Failed to delete teacher');
       }
     }

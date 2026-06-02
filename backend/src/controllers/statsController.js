@@ -2,6 +2,7 @@ const { getDB } = require('../config/database');
 
 exports.getDashboardStats = async (req, res) => {
     try {
+        res.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
         const db = getDB();
         const { role, school_id, id: user_id } = req.user;
 
@@ -34,10 +35,13 @@ exports.getDashboardStats = async (req, res) => {
             const subjectsCount = await db.get("SELECT COUNT(*) as count FROM subjects WHERE school_id = $1", [school_id]);
 
             const attendanceData = await db.get(`
-                SELECT COUNT(*) as total, SUM(CASE WHEN status = 'Present' THEN 1 ELSE 0 END) as present
+                SELECT COUNT(*) as total, SUM(CASE WHEN LOWER(status) = 'present' THEN 1 ELSE 0 END) as present
                 FROM attendance_records ar
                 JOIN students s ON ar.student_id = s.id
-                WHERE s.school_id = $1 AND ar.date = CURRENT_DATE
+                JOIN classes c ON ar.class_id = c.id
+                WHERE s.school_id = $1
+                    AND c.school_id = $1
+                    AND ar.date = CURRENT_DATE
             `, [school_id]);
 
             let attendancePercentage = 0;
@@ -55,17 +59,21 @@ exports.getDashboardStats = async (req, res) => {
         }
 
         if (role === 'Teacher') {
-            const teacher = await db.get("SELECT id FROM teachers WHERE user_id = $1", [user_id]);
+            const teacher = await db.get("SELECT id FROM teachers WHERE user_id = $1 AND school_id = $2", [user_id, school_id]);
             if (!teacher) return res.status(404).json({ error: 'Not Found', message: 'Teacher record not found' });
 
             const studentsCount = await db.get(`
                 SELECT COUNT(DISTINCT s.id) as count 
                 FROM students s
                 JOIN teacher_classes tc ON s.class_id = tc.class_id
-                WHERE tc.teacher_id = $1
-            `, [teacher.id]);
+                JOIN classes c ON s.class_id = c.id
+                WHERE tc.teacher_id = $1 AND c.school_id = $2
+            `, [teacher.id, school_id]);
 
-            const classesCount = await db.get("SELECT COUNT(*) as count FROM teacher_classes WHERE teacher_id = $1", [teacher.id]);
+            const classesCount = await db.get(
+                "SELECT COUNT(*) as count FROM classes WHERE form_teacher_id = $1 AND school_id = $2",
+                [teacher.id, school_id]
+            );
             
             const pendingHomework = await db.get(`
                 SELECT COUNT(*) as count 
@@ -75,11 +83,13 @@ exports.getDashboardStats = async (req, res) => {
             `, [teacher.id]);
 
             const attendanceData = await db.get(`
-                SELECT COUNT(*) as total, SUM(CASE WHEN status = 'Present' THEN 1 ELSE 0 END) as present
+                SELECT COUNT(*) as total, SUM(CASE WHEN LOWER(status) = 'present' THEN 1 ELSE 0 END) as present
                 FROM attendance_records ar
-                JOIN teacher_classes tc ON ar.class_id = tc.class_id
-                WHERE tc.teacher_id = $1 AND ar.date = CURRENT_DATE
-            `, [teacher.id]);
+                JOIN classes c ON ar.class_id = c.id
+                WHERE c.form_teacher_id = $1
+                    AND c.school_id = $2
+                    AND ar.date = CURRENT_DATE
+            `, [teacher.id, school_id]);
 
             let attendancePercentage = 0;
             if (attendanceData && attendanceData.total > 0) {
@@ -95,14 +105,14 @@ exports.getDashboardStats = async (req, res) => {
         }
 
         if (role === 'Student') {
-            const student = await db.get("SELECT id, class_id FROM students WHERE user_id = $1", [user_id]);
+            const student = await db.get("SELECT id, class_id FROM students WHERE user_id = $1 AND school_id = $2", [user_id, school_id]);
             if (!student) return res.status(404).json({ error: 'Not Found', message: 'Student record not found' });
 
             const subjectsCount = await db.get("SELECT COUNT(*) as count FROM class_subjects WHERE class_id = $1", [student.class_id]);
             const completedAssignments = await db.get("SELECT COUNT(*) as count FROM homework_submissions WHERE student_id = $1 AND status != 'pending'", [student.id]);
             
             const attendanceData = await db.get(`
-                SELECT COUNT(*) as total, SUM(CASE WHEN status = 'Present' THEN 1 ELSE 0 END) as present
+                SELECT COUNT(*) as total, SUM(CASE WHEN LOWER(status) = 'present' THEN 1 ELSE 0 END) as present
                 FROM attendance_records
                 WHERE student_id = $1
             `, [student.id]);
@@ -145,7 +155,7 @@ exports.getPerformanceSnapshot = async (req, res) => {
             `, [school_id]);
 
             const attendanceTrend = await db.all(`
-                SELECT TO_CHAR(ar.date, 'YYYY-MM-DD') as date, ROUND(SUM(CASE WHEN status = 'Present' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) as percentage
+                SELECT TO_CHAR(ar.date, 'YYYY-MM-DD') as date, ROUND(SUM(CASE WHEN LOWER(status) = 'present' THEN 1 ELSE 0 END) * 100.0 / COUNT(*)) as percentage
                 FROM attendance_records ar
                 JOIN students s ON ar.student_id = s.id
                 WHERE s.school_id = $1
@@ -257,10 +267,13 @@ exports.getPendingTasks = async (req, res) => {
             `, [teacher.id]);
 
             const attendanceDue = await db.get(`
-                SELECT COUNT(*) as count FROM teacher_classes tc
-                LEFT JOIN attendance_records ar ON tc.class_id = ar.class_id AND ar.date = CURRENT_DATE
-                WHERE tc.teacher_id = $1 AND ar.id IS NULL
-            `, [teacher.id]);
+                SELECT COUNT(*) as count
+                FROM classes c
+                LEFT JOIN attendance_records ar ON c.id = ar.class_id AND ar.date = CURRENT_DATE
+                WHERE c.form_teacher_id = $1
+                    AND c.school_id = $2
+                    AND ar.id IS NULL
+            `, [teacher.id, school_id]);
 
             return res.json([
                 { label: 'Assignments to review', count: pendingHomework.count || 0, action: '/dashboard/teacher/homework' },

@@ -1,10 +1,13 @@
 import React from 'react';
 
-export default function StatCard({ name, stat, icon: Icon, color, subtext }) {
+export default function StatCard({ name, stat, icon, color, subtext }) {
   return (
     <div className="bg-white overflow-hidden shadow-sm rounded-2xl border border-gray-100 p-6 flex items-center hover:shadow-md transition-all duration-300">
       <div className={`p-4 rounded-xl ${color.replace('bg-', 'bg-opacity-10 text-').replace('500', '600')}`}>
-        <Icon className={`h-8 w-8 ${color.replace('bg-', 'text-')}`} aria-hidden="true" />
+        {React.createElement(icon, {
+          className: `h-8 w-8 ${color.replace('bg-', 'text-')}`,
+          'aria-hidden': true
+        })}
       </div>
       <div className="ml-5 w-0 flex-1">
         <dt className="text-sm font-medium text-gray-500 truncate">{name}</dt>

@@ -4,6 +4,7 @@ const studentController = require('../controllers/studentController');
 const { protect, authorize, requireSchoolScope } = require('../middleware/authMiddleware');
 
 router.get('/', protect, requireSchoolScope, studentController.getStudents);
+router.get('/me', protect, authorize('Student'), requireSchoolScope, studentController.getMyStudentProfile);
 router.post('/', protect, authorize('SuperAdmin', 'SchoolAdmin'), requireSchoolScope, studentController.createStudent);
 router.put('/:id', protect, authorize('SuperAdmin', 'SchoolAdmin'), requireSchoolScope, studentController.updateStudent);
 router.delete('/:id', protect, authorize('SuperAdmin', 'SchoolAdmin'), requireSchoolScope, studentController.deleteStudent);

@@ -174,6 +174,28 @@ CREATE TABLE IF NOT EXISTS assessments (
     FOREIGN KEY(recorded_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
+-- School Announcements
+CREATE TABLE IF NOT EXISTS announcements (
+    id SERIAL PRIMARY KEY,
+    school_id INTEGER NOT NULL,
+    author_id INTEGER NOT NULL,
+    title VARCHAR(255) NOT NULL,
+    content TEXT NOT NULL,
+    featured_image VARCHAR(500),
+    status VARCHAR(20) NOT NULL DEFAULT 'Draft' CHECK(status IN ('Draft', 'Published')),
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    published_at TIMESTAMP,
+    FOREIGN KEY(school_id) REFERENCES schools(id) ON DELETE CASCADE,
+    FOREIGN KEY(author_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+CREATE INDEX IF NOT EXISTS idx_announcements_school_id
+    ON announcements (school_id);
+
+CREATE INDEX IF NOT EXISTS idx_announcements_school_status
+    ON announcements (school_id, status);
+
 -- Homework
 CREATE TABLE IF NOT EXISTS homework (
     id SERIAL PRIMARY KEY,

@@ -20,6 +20,43 @@ exports.getAssignments = async (req, res) => {
     }
 };
 
+exports.getMyAssignments = async (req, res) => {
+    try {
+        const db = getDB();
+        const school_id = req.user.school_id;
+        const teacher = await db.get(
+            'SELECT id FROM teachers WHERE user_id = $1 AND school_id = $2',
+            [req.user.id, school_id]
+        );
+
+        if (!teacher) {
+            return res.status(404).json({ error: 'Not Found', message: 'Teacher profile not found.' });
+        }
+
+        const assignments = await db.all(`
+            SELECT
+                tsa.id,
+                c.id as class_id,
+                c.name as class_name,
+                c.level as class_level,
+                s.id as subject_id,
+                s.name as subject_name,
+                s.code as subject_code
+            FROM teacher_subject_assignments tsa
+            JOIN classes c ON tsa.class_id = c.id
+            JOIN subjects s ON tsa.subject_id = s.id
+            WHERE tsa.teacher_id = $1
+                AND c.school_id = $2
+                AND s.school_id = $2
+            ORDER BY c.level ASC, c.name ASC, s.name ASC
+        `, [teacher.id, school_id]);
+
+        res.json({ assignments });
+    } catch (err) {
+        res.status(500).json({ error: 'Server Error', message: err.message });
+    }
+};
+
 exports.assignTeacher = async (req, res) => {
     const { teacher_id, class_id, subject_id } = req.body;
     

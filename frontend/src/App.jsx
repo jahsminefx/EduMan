@@ -24,6 +24,9 @@ import HomeworkPage from './pages/teacher/HomeworkPage';
 import ContentLibrary from './pages/content/ContentLibrary';
 import QuizPage from './pages/quiz/QuizPage';
 import ReportCard from './pages/reports/ReportCard';
+import AnnouncementList from './pages/announcements/AnnouncementList';
+import AnnouncementDetail from './pages/announcements/AnnouncementDetail';
+import AnnouncementManage from './pages/announcements/AnnouncementManage';
 import SchoolsList from './pages/superadmin/SchoolsList';
 import SchoolAdminsList from './pages/superadmin/SchoolAdminsList';
 
@@ -157,6 +160,10 @@ const AppRoutes = () => {
           } 
         />
 
+        <Route path="announcements" element={<Navigate to="/announcements" />} />
+        <Route path="announcements/manage" element={<Navigate to="/announcements/manage" />} />
+        <Route path="announcements/:id" element={<Navigate to="/announcements" />} />
+
         {/* Super Admin Routes */}
         <Route 
           path="admin/schools" 
@@ -214,6 +221,26 @@ const AppRoutes = () => {
             </ProtectedRoute>
           } 
         />
+      </Route>
+
+      <Route
+        path="/announcements"
+        element={
+          <ProtectedRoute>
+            <MainLayout />
+          </ProtectedRoute>
+        }
+      >
+        <Route index element={<AnnouncementList />} />
+        <Route
+          path="manage"
+          element={
+            <ProtectedRoute allowedRoles={['SchoolAdmin', 'Teacher']}>
+              <AnnouncementManage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path=":id" element={<AnnouncementDetail />} />
       </Route>
 
       {/* Catch-all */}

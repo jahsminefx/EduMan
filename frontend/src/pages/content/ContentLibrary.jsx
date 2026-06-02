@@ -157,14 +157,14 @@ export default function ContentLibrary() {
           <Library className="w-4 h-4" />
           All
         </button>
-        {contentTypes.map(({ value, label, Icon }) => (
+        {contentTypes.map((type) => (
           <button
-            key={value}
-            onClick={() => setFilterType(value)}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${filterType === value ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+            key={type.value}
+            onClick={() => setFilterType(type.value)}
+            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${filterType === type.value ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
           >
-            <Icon className="w-4 h-4" />
-            {label}
+            {React.createElement(type.Icon, { className: 'w-4 h-4' })}
+            {type.label}
           </button>
         ))}
       </div>
@@ -218,7 +218,6 @@ export default function ContentLibrary() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {contents.map(content => {
             const meta = getContentType(content.type);
-            const Icon = meta.Icon;
             const fileUrl = `${API_BASE_URL}${content.file_path}`;
             const isImage = meta.value === 'image';
             const isVideo = meta.value === 'video';
@@ -232,7 +231,7 @@ export default function ContentLibrary() {
                     <video src={fileUrl} controls preload="metadata" className="w-full h-full bg-black object-contain" />
                   ) : (
                     <div className="flex flex-col items-center justify-center gap-2 text-gray-500">
-                      <Icon className="w-10 h-10 text-blue-500" />
+                      {React.createElement(meta.Icon, { className: 'w-10 h-10 text-blue-500' })}
                       <span className="text-xs font-semibold uppercase tracking-wide">{content.type === 'pdf' ? 'PDF' : 'Document'}</span>
                     </div>
                   )}
@@ -241,7 +240,7 @@ export default function ContentLibrary() {
                 <div className="mt-4 flex justify-between items-start gap-3">
                   <div className="min-w-0">
                     <div className="flex items-center gap-2">
-                      <Icon className={`w-5 h-5 flex-shrink-0 ${meta.iconClass}`} />
+                      {React.createElement(meta.Icon, { className: `w-5 h-5 flex-shrink-0 ${meta.iconClass}` })}
                       <h3 className="font-semibold text-gray-800 truncate">{content.title}</h3>
                     </div>
                     {content.description && <p className="text-sm text-gray-500 mt-2 line-clamp-2">{content.description}</p>}

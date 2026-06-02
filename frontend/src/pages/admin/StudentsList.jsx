@@ -151,7 +151,7 @@ export default function StudentsList() {
       try {
         await axios.delete(`${API_URL}/students/${id}`);
         fetchData();
-      } catch (err) {
+      } catch {
         alert('Failed to delete');
       }
     }

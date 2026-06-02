@@ -13,7 +13,6 @@ export default function AttendanceEntry() {
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
-  const [isFormTeacher, setIsFormTeacher] = useState(true); // default true for admins
 
   useEffect(() => {
     fetchClasses();
@@ -55,20 +54,18 @@ export default function AttendanceEntry() {
   const fetchAttendance = async () => {
     setLoading(true);
     setMessage('');
-    setIsFormTeacher(true);
     try {
       const res = await axios.get(`${API_URL}/attendance?class_id=${selectedClass}&date=${selectedDate}`);
       // Initialize any null status to 'present' by default to save clicks, or leave empty to force choice
       const records = res.data.records.map(r => ({
         ...r,
-        status: r.status || 'present'
+        status: (r.status || 'present').toLowerCase()
       }));
       setStudents(records);
     } catch (err) {
       console.error(err);
       if (err.response && err.response.status === 403) {
         setMessage(err.response.data.message || 'You are not authorized to view this class.');
-        setIsFormTeacher(false);
       } else {
         setMessage('Failed to load students.');
       }
@@ -93,6 +90,9 @@ export default function AttendanceEntry() {
         records: students.map(s => ({ student_id: s.student_id, status: s.status }))
       };
       await axios.post(`${API_URL}/attendance`, payload);
+      const refreshToken = new Date().toISOString();
+      localStorage.setItem('eduman:dashboard-refresh', refreshToken);
+      window.dispatchEvent(new Event('eduman:dashboard-refresh'));
       setMessage('Attendance saved successfully!');
       setTimeout(() => setMessage(''), 3000);
     } catch (err) {

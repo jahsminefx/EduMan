@@ -51,6 +51,13 @@ exports.assignTeacher = async (req, res) => {
             return res.status(404).json({ error: 'Not Found', message: 'Teacher or Subject not found in your school' });
         }
 
+        for (const class_id of class_ids) {
+            const classObj = await db.get('SELECT id FROM classes WHERE id = $1 AND school_id = $2', [class_id, school_id]);
+            if (!classObj) {
+                return res.status(403).json({ error: 'Forbidden', message: 'Selected class does not belong to your school.' });
+            }
+        }
+
         await db.transaction(async (client) => {
             for (const class_id of class_ids) {
                 // 1. Assign teacher to subject in this class (ignore if already exists)

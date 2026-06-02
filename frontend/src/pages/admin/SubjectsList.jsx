@@ -117,7 +117,7 @@ export default function SubjectsList() {
       try {
         await axios.delete(`${API_URL}/subjects/${id}`);
         fetchData();
-      } catch (err) {
+      } catch {
         alert('Failed to delete subject');
       }
     }

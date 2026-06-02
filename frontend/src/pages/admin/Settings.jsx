@@ -1,11 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { useAuth } from '../../contexts/AuthContext';
 import { Plus, CheckCircle, AlertCircle, Settings as SettingsIcon } from 'lucide-react';
 import API_URL from '../../config/api';
 
 export default function Settings() {
-  const { user } = useAuth();
   const [profile, setProfile] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [terms, setTerms] = useState([]);

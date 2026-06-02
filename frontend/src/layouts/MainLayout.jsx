@@ -12,6 +12,7 @@ import {
   HelpCircle,
   Library,
   Menu,
+  Megaphone,
   X,
   Settings,
   UserCog
@@ -25,6 +26,7 @@ export default function MainLayout() {
   const getLinks = () => {
     const base = [
       { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
+      { name: 'Announcements', path: '/announcements', icon: Megaphone },
     ];
 
     switch(user.role) {
@@ -61,7 +63,7 @@ export default function MainLayout() {
         base.push(
           { name: 'My Homework', path: '/dashboard/teacher/homework', icon: FolderOpen },
           { name: 'Quizzes', path: '/dashboard/quiz', icon: HelpCircle },
-          { name: 'My Results', path: '/dashboard/reports/card', icon: BookOpen },
+          { name: 'My Report Card', path: '/dashboard/reports/card', icon: BookOpen },
           { name: 'Library', path: '/dashboard/content/library', icon: Library },
         );
         break;
@@ -134,7 +136,9 @@ export default function MainLayout() {
           <nav className="px-3 space-y-1">
             {links.map((link) => {
               const Icon = link.icon;
-              const isActive = location.pathname === link.path;
+              const isActive = link.path === '/dashboard'
+                ? location.pathname === link.path
+                : location.pathname === link.path || location.pathname.startsWith(`${link.path}/`);
               return (
                 <Link
                   key={link.name}

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
@@ -18,25 +18,41 @@ export default function Dashboard() {
   const [pending, setPending] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  useEffect(() => {
-    const fetchData = async () => {
-      try {
-        const [statsRes, perfRes, pendingRes] = await Promise.all([
-          axios.get(`${API_URL}/stats/dashboard`),
-          axios.get(`${API_URL}/stats/performance`),
-          axios.get(`${API_URL}/stats/pending`)
-        ]);
-        setStats(statsRes.data);
-        setPerformance(perfRes.data);
-        setPending(pendingRes.data);
-      } catch (err) {
-        console.error('Failed to fetch dashboard data:', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    fetchData();
+  const fetchData = useCallback(async ({ silent = false } = {}) => {
+    if (!silent) setLoading(true);
+    try {
+      const cacheBust = Date.now();
+      const [statsRes, perfRes, pendingRes] = await Promise.all([
+        axios.get(`${API_URL}/stats/dashboard?t=${cacheBust}`),
+        axios.get(`${API_URL}/stats/performance?t=${cacheBust}`),
+        axios.get(`${API_URL}/stats/pending?t=${cacheBust}`)
+      ]);
+      setStats(statsRes.data);
+      setPerformance(perfRes.data);
+      setPending(pendingRes.data);
+    } catch (err) {
+      console.error('Failed to fetch dashboard data:', err);
+    } finally {
+      setLoading(false);
+    }
   }, []);
+
+  useEffect(() => {
+    fetchData();
+
+    const refreshDashboard = () => fetchData({ silent: true });
+    const handleStorageRefresh = (event) => {
+      if (event.key === 'eduman:dashboard-refresh') refreshDashboard();
+    };
+
+    window.addEventListener('eduman:dashboard-refresh', refreshDashboard);
+    window.addEventListener('storage', handleStorageRefresh);
+
+    return () => {
+      window.removeEventListener('eduman:dashboard-refresh', refreshDashboard);
+      window.removeEventListener('storage', handleStorageRefresh);
+    };
+  }, [fetchData]);
 
   if (loading) {
     return (
@@ -155,7 +171,7 @@ export default function Dashboard() {
     <div className="space-y-8">
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard name="Total Students" stat={stats?.totalStudents || 0} icon={Users} color="bg-blue-500" />
-        <StatCard name="Classes Assigned" stat={stats?.classesAssigned || 0} icon={Award} color="bg-purple-500" />
+        <StatCard name="Form Classes" stat={stats?.classesAssigned || 0} icon={Award} color="bg-purple-500" />
         <StatCard name="Pending Homework" stat={stats?.pendingHomework || 0} icon={AlertCircle} color="bg-red-500" />
         <StatCard name="Today's Attendance" stat={stats?.todayAttendance || '0%'} icon={Calendar} color="bg-green-500" />
       </div>

@@ -28,6 +28,7 @@ const statsRoutes = require('./routes/statsRoutes');
 const subjectRoutes = require('./routes/subjectRoutes');
 const submissionRoutes = require('./routes/submissionRoutes');
 const superAdminRoutes = require('./routes/superAdminRoutes');
+const announcementRoutes = require('./routes/announcementRoutes');
 
 // Simple health check route
 app.get('/api/health', (req, res) => {
@@ -49,6 +50,7 @@ app.use('/api/quizzes', quizRoutes);
 app.use('/api/subjects', subjectRoutes);
 app.use('/api/submissions', submissionRoutes);
 app.use('/api/superadmin', superAdminRoutes);
+app.use('/api/announcements', announcementRoutes);
 
 // ── Serve frontend build in production ──
 // This fixes "Not Found" on page refresh when backend serves the frontend
