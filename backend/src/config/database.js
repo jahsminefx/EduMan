@@ -184,6 +184,89 @@ async function initDB(retryCount = 0) {
             } catch (patchErr) {
                 console.log('Schema patch (classes.form_teacher_id) skipped or already applied.');
             }
+            // Announcement attachments
+            try {
+                await pool.query("ALTER TABLE announcements ADD COLUMN IF NOT EXISTS attachment_path VARCHAR(500)");
+                await pool.query("ALTER TABLE announcements ADD COLUMN IF NOT EXISTS attachment_name VARCHAR(255)");
+                await pool.query("ALTER TABLE announcements ADD COLUMN IF NOT EXISTS attachment_type VARCHAR(30)");
+                await pool.query("ALTER TABLE announcements ADD COLUMN IF NOT EXISTS attachment_mime VARCHAR(120)");
+                console.log('Schema patch (announcement attachments) applied.');
+            } catch (patchErr) {
+                console.log('Schema patch (announcement attachments) skipped or already applied.', patchErr.message);
+            }
+            // School profile, gender, report metadata, and class-info tables
+            try {
+                await pool.query("ALTER TABLE schools ADD COLUMN IF NOT EXISTS logo_url TEXT");
+                await pool.query("ALTER TABLE schools ADD COLUMN IF NOT EXISTS motto TEXT");
+                await pool.query("ALTER TABLE schools ADD COLUMN IF NOT EXISTS website TEXT");
+                await pool.query("ALTER TABLE schools ADD COLUMN IF NOT EXISTS principal_name TEXT");
+                await pool.query("ALTER TABLE schools ADD COLUMN IF NOT EXISTS school_type TEXT");
+                await pool.query("ALTER TABLE schools ADD COLUMN IF NOT EXISTS city TEXT");
+                await pool.query("ALTER TABLE schools ADD COLUMN IF NOT EXISTS state TEXT");
+                await pool.query("ALTER TABLE schools ADD COLUMN IF NOT EXISTS country TEXT");
+                await pool.query("ALTER TABLE teachers ADD COLUMN IF NOT EXISTS gender TEXT");
+                await pool.query("ALTER TABLE students ADD COLUMN IF NOT EXISTS age INTEGER");
+                await pool.query("ALTER TABLE assessments ADD COLUMN IF NOT EXISTS session_id INTEGER REFERENCES academic_sessions(id) ON DELETE SET NULL");
+                await pool.query("ALTER TABLE assessments ADD COLUMN IF NOT EXISTS academic_session TEXT");
+                await pool.query("ALTER TABLE assessments ADD COLUMN IF NOT EXISTS term TEXT");
+                await pool.query(`
+                    CREATE TABLE IF NOT EXISTS timetables (
+                        id SERIAL PRIMARY KEY,
+                        school_id INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+                        class_id INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+                        day_of_week TEXT NOT NULL,
+                        start_time TIME NOT NULL,
+                        end_time TIME NOT NULL,
+                        subject TEXT NOT NULL,
+                        room TEXT,
+                        notes TEXT,
+                        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                `);
+                await pool.query(`
+                    CREATE TABLE IF NOT EXISTS class_announcements (
+                        id SERIAL PRIMARY KEY,
+                        school_id INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+                        class_id INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+                        title TEXT NOT NULL,
+                        message TEXT NOT NULL,
+                        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                `);
+                await pool.query(`
+                    CREATE TABLE IF NOT EXISTS class_events (
+                        id SERIAL PRIMARY KEY,
+                        school_id INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+                        class_id INTEGER NOT NULL REFERENCES classes(id) ON DELETE CASCADE,
+                        title TEXT NOT NULL,
+                        event_date DATE NOT NULL,
+                        description TEXT,
+                        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                `);
+                await pool.query("CREATE INDEX IF NOT EXISTS idx_timetables_school_class ON timetables (school_id, class_id)");
+                await pool.query("CREATE INDEX IF NOT EXISTS idx_class_announcements_school_class ON class_announcements (school_id, class_id)");
+                await pool.query("CREATE INDEX IF NOT EXISTS idx_class_events_school_class_date ON class_events (school_id, class_id, event_date)");
+                await pool.query(`
+                    UPDATE assessments a
+                    SET
+                        session_id = COALESCE(a.session_id, at.session_id),
+                        academic_session = COALESCE(a.academic_session, acs.name),
+                        term = COALESCE(a.term, at.name)
+                    FROM academic_terms at
+                    JOIN academic_sessions acs ON acs.id = at.session_id
+                    WHERE a.term_id = at.id
+                `);
+                console.log('Schema patch (profile/report/class-info) applied.');
+            } catch (patchErr) {
+                console.log('Schema patch (profile/report/class-info) skipped or already applied.', patchErr.message);
+            }
             // ── Quiz attempt answers table for review feature ──
             try {
                 await pool.query(`
@@ -198,6 +281,30 @@ async function initDB(retryCount = 0) {
                 console.log('Schema patch (quiz_attempt_answers) applied.');
             } catch (patchErr) {
                 console.log('Schema patch (quiz_attempt_answers) skipped or already applied.');
+            }
+            // EduMan AI tables and backwards-compatible quiz fields
+            try {
+                await pool.query("ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS generation_id INTEGER REFERENCES ai_generations(id) ON DELETE SET NULL");
+                await pool.query("ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS topic TEXT");
+                await pool.query("ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS difficulty TEXT");
+                await pool.query("ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS question_type TEXT");
+                await pool.query("ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS academic_session TEXT");
+                await pool.query("ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS term TEXT");
+                await pool.query("ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS status TEXT DEFAULT 'published'");
+                await pool.query("ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
+                await pool.query("ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP");
+                await pool.query("ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS published_at TIMESTAMP");
+                await pool.query("UPDATE quizzes SET status = 'published' WHERE status IS NULL");
+                await pool.query("ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS explanation TEXT");
+                await pool.query("ALTER TABLE quiz_questions ADD COLUMN IF NOT EXISTS question_type TEXT DEFAULT 'multiple_choice'");
+                await pool.query("UPDATE quiz_questions SET question_type = 'multiple_choice' WHERE question_type IS NULL");
+                await pool.query("CREATE INDEX IF NOT EXISTS idx_ai_generations_teacher_created ON ai_generations (teacher_id, created_at)");
+                await pool.query("CREATE INDEX IF NOT EXISTS idx_ai_generations_school_created ON ai_generations (school_id, created_at)");
+                await pool.query("CREATE INDEX IF NOT EXISTS idx_quizzes_status_class ON quizzes (status, class_id)");
+                await pool.query("CREATE INDEX IF NOT EXISTS idx_library_resources_status_class ON library_resources (status, class_id)");
+                console.log('Schema patch (EduMan AI) applied.');
+            } catch (patchErr) {
+                console.log('Schema patch (EduMan AI) skipped or already applied.', patchErr.message);
             }
         } else {
             console.warn('Warning: schema.sql not found at', schemaPath);

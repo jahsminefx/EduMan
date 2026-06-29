@@ -1,7 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Plus, Edit2, Trash2, CheckCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
+import { Plus, Edit2, Trash2, CheckCircle, Upload } from 'lucide-react';
 import API_URL from '../../config/api';
+
+const normalizeGender = (value) => {
+  if (value === 'M') return 'Male';
+  if (value === 'F') return 'Female';
+  return value || '';
+};
 
 export default function StudentsList() {
   const [students, setStudents] = useState([]);
@@ -12,7 +19,8 @@ export default function StudentsList() {
     admission_number: '',
     first_name: '',
     last_name: '',
-    gender: 'M',
+    gender: '',
+    age: '',
     dob: '',
     class_id: '',
     parent_name: '',
@@ -56,7 +64,8 @@ export default function StudentsList() {
         admission_number: student.admission_number,
         first_name: student.first_name,
         last_name: student.last_name,
-        gender: student.gender || 'M',
+        gender: normalizeGender(student.gender),
+        age: student.age || '',
         dob: student.dob ? new Date(student.dob).toISOString().split('T')[0] : '',
         class_id: student.class_id || '',
         parent_name: student.parent_name || '',
@@ -66,7 +75,7 @@ export default function StudentsList() {
     } else {
       setEditingId(null);
       setFormData({
-        admission_number: '', first_name: '', last_name: '', gender: 'M',
+        admission_number: '', first_name: '', last_name: '', gender: '', age: '',
         dob: '', class_id: classes[0]?.id || '', parent_name: '', parent_phone: '',
         email: '', password: ''
       });
@@ -83,11 +92,11 @@ export default function StudentsList() {
   };
 
   const handleExport = () => {
-    const headers = ['Admission No', 'First Name', 'Last Name', 'Gender', 'Class', 'Parent Name', 'Parent Phone'];
+    const headers = ['Admission No', 'First Name', 'Last Name', 'Gender', 'Age', 'Class', 'Parent Name', 'Parent Phone'];
     const csvContent = [
       headers.join(','),
       ...filteredStudents.map(s => [
-        s.admission_number, s.first_name, s.last_name, s.gender, s.class_name, s.parent_name, s.parent_phone
+        s.admission_number, s.first_name, s.last_name, s.gender, s.age, s.class_name, s.parent_name, s.parent_phone
       ].map(field => `"${(field || '').toString().replace(/"/g, '""')}"`).join(','))
     ].join('\\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
@@ -118,6 +127,10 @@ export default function StudentsList() {
           setError('Please create a class first.');
           return;
       }
+      if (!formData.gender) {
+          setError('Please select a valid gender.');
+          return;
+      }
       if (editingId) {
           await axios.put(`${API_URL}/students/${editingId}`, formData);
           setSuccess('Student record updated successfully!');
@@ -132,7 +145,8 @@ export default function StudentsList() {
         admission_number: '',
         first_name: '',
         last_name: '',
-        gender: 'M',
+        gender: '',
+        age: '',
         dob: '',
         class_id: classes[0]?.id || '',
         parent_name: '',
@@ -178,6 +192,12 @@ export default function StudentsList() {
           >
             Export CSV
           </button>
+          <Link
+            to="/dashboard/admin/students/bulk-upload"
+            className="flex items-center px-4 py-2 bg-gray-800 text-white text-sm font-medium rounded-lg hover:bg-gray-900 transition"
+          >
+            <Upload className="w-4 h-4 mr-2" /> Bulk Upload
+          </Link>
           <button 
             onClick={() => handleOpenModal()}
             className="flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition"
@@ -226,7 +246,7 @@ export default function StudentsList() {
       {showModal && (
         <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
           <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-bold mb-4">Register New Student</h3>
+            <h3 className="text-lg font-bold mb-4">{editingId ? 'Edit Student' : 'Register New Student'}</h3>
             <form onSubmit={handleCreate}>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
@@ -249,11 +269,17 @@ export default function StudentsList() {
                   <input type="text" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900" value={formData.last_name} onChange={(e) => setFormData({...formData, last_name: e.target.value})} />
                 </div>
                 <div>
-                  <label className="block text-sm font-medium text-gray-700">Gender</label>
-                  <select className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900" value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})}>
-                    <option value="M">Male</option>
-                    <option value="F">Female</option>
+                  <label className="block text-sm font-medium text-gray-700">Gender *</label>
+                  <select required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900" value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})}>
+                    <option value="">Select Gender</option>
+                    <option value="Male">Male</option>
+                    <option value="Female">Female</option>
+                    <option value="Other">Other</option>
                   </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700">Age</label>
+                  <input type="number" min="1" max="120" className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900" value={formData.age} onChange={(e) => setFormData({...formData, age: e.target.value})} />
                 </div>
                 <div>
                   <label className="block text-sm font-medium text-gray-700">Date of Birth</label>
@@ -267,28 +293,30 @@ export default function StudentsList() {
                   <label className="block text-sm font-medium text-gray-700">Parent Phone</label>
                   <input type="tel" className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900" value={formData.parent_phone} onChange={(e) => setFormData({...formData, parent_phone: e.target.value})} />
                 </div>
-                <div className="md:col-span-2 border-t pt-4 mt-2">
-                  <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center">
-                    <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                    Student Login Credentials
-                  </h4>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Email Address *</label>
-                      <input type="email" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} placeholder="student@school.com" />
-                    </div>
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700">Login Password *</label>
-                      <input type="password" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} placeholder="Min 6 characters" />
+                {!editingId && (
+                  <div className="md:col-span-2 border-t pt-4 mt-2">
+                    <h4 className="text-sm font-bold text-gray-900 mb-3 flex items-center">
+                      <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
+                      Student Login Credentials
+                    </h4>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Email Address *</label>
+                        <input type="email" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} placeholder="student@school.com" />
+                      </div>
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700">Login Password *</label>
+                        <input type="password" required minLength="6" className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} placeholder="Min 6 characters" />
+                      </div>
                     </div>
                   </div>
-                </div>
+                )}
               </div>
               {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
               {success && <p className="text-green-500 text-sm mt-2">{success}</p>}
               <div className="mt-6 flex justify-end gap-3 border-t pt-4">
                 <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Register Student</button>
+                <button type="submit" className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">{editingId ? 'Update Student' : 'Register Student'}</button>
               </div>
             </form>
           </div>

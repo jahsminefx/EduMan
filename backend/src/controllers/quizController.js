@@ -23,7 +23,10 @@ exports.createQuiz = async (req, res) => {
 
         const quizId = await db.transaction(async (client) => {
             const quizResult = await client.run(
-                'INSERT INTO quizzes (school_id, class_id, subject_id, teacher_id, title, duration_minutes) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+                `INSERT INTO quizzes
+                    (school_id, class_id, subject_id, teacher_id, title, duration_minutes, status, published_at)
+                 VALUES ($1, $2, $3, $4, $5, $6, 'published', CURRENT_TIMESTAMP)
+                 RETURNING id`,
                 [school_id, class_id, subject_id, teacher.id, title, duration_minutes || 30]
             );
             const id = quizResult.lastID;
@@ -59,7 +62,36 @@ exports.getQuizzes = async (req, res) => {
             WHERE q.school_id = $1
         `;
         const params = [school_id];
-        if (class_id) { query += ' AND q.class_id = $2'; params.push(class_id); }
+
+        if (req.user.role === 'Student') {
+            const student = await db.get(
+                'SELECT id, class_id FROM students WHERE user_id = $1 AND school_id = $2',
+                [req.user.id, school_id]
+            );
+            if (!student) return res.status(403).json({ error: 'Forbidden', message: 'Student profile not found.' });
+            params.push(student.class_id);
+            query += ` AND q.class_id = $${params.length} AND COALESCE(q.status, 'published') = 'published'`;
+        } else if (req.user.role === 'Teacher') {
+            const teacher = await db.get(
+                'SELECT id FROM teachers WHERE user_id = $1 AND school_id = $2',
+                [req.user.id, school_id]
+            );
+            if (!teacher) return res.status(403).json({ error: 'Forbidden', message: 'Teacher profile not found.' });
+            params.push(teacher.id);
+            query += ` AND (
+                q.teacher_id = $${params.length}
+                OR EXISTS (
+                    SELECT 1 FROM teacher_subject_assignments tsa
+                    WHERE tsa.teacher_id = $${params.length}
+                      AND tsa.class_id = q.class_id
+                      AND tsa.subject_id = q.subject_id
+                )
+            )`;
+        }
+        if (class_id) {
+            params.push(class_id);
+            query += ` AND q.class_id = $${params.length}`;
+        }
 
         query += ' ORDER BY q.id DESC';
         const quizzes = await db.all(query, params);
@@ -95,6 +127,26 @@ exports.getQuizDetails = async (req, res) => {
         const quiz = await db.get('SELECT * FROM quizzes WHERE id = $1 AND school_id = $2', [id, school_id]);
         if (!quiz) return res.status(404).json({ error: 'Not Found' });
 
+        if (req.user.role === 'Student') {
+            const student = await db.get(
+                'SELECT class_id FROM students WHERE user_id = $1 AND school_id = $2',
+                [req.user.id, school_id]
+            );
+            if (!student || Number(student.class_id) !== Number(quiz.class_id) || (quiz.status || 'published') !== 'published') {
+                return res.status(404).json({ error: 'Not Found', message: 'Quiz not found.' });
+            }
+        } else if (req.user.role === 'Teacher') {
+            const teacher = await db.get('SELECT id FROM teachers WHERE user_id = $1 AND school_id = $2', [req.user.id, school_id]);
+            const assignment = teacher && await db.get(
+                `SELECT id FROM teacher_subject_assignments
+                 WHERE teacher_id = $1 AND class_id = $2 AND subject_id = $3`,
+                [teacher.id, quiz.class_id, quiz.subject_id]
+            );
+            if (!teacher || (quiz.teacher_id !== teacher.id && !assignment)) {
+                return res.status(404).json({ error: 'Not Found', message: 'Quiz not found.' });
+            }
+        }
+
         const questions = await db.all('SELECT id, question_text, options FROM quiz_questions WHERE quiz_id = $1', [id]);
         const parsed = questions.map(q => ({
             ...q,
@@ -117,6 +169,9 @@ exports.submitQuiz = async (req, res) => {
 
         const quiz = await db.get('SELECT * FROM quizzes WHERE id = $1 AND school_id = $2', [quiz_id, school_id]);
         if (!quiz) return res.status(404).json({ error: 'Not Found' });
+        if ((quiz.status || 'published') !== 'published') {
+            return res.status(403).json({ error: 'Forbidden', message: 'This quiz has not been published.' });
+        }
 
         const student = await db.get('SELECT id FROM students WHERE user_id = $1 AND school_id = $2 AND class_id = $3',
             [req.user.id, school_id, quiz.class_id]);
@@ -176,7 +231,7 @@ exports.reviewQuiz = async (req, res) => {
 
         // Get questions with correct answers and student's answers
         const questions = await db.all(`
-            SELECT qq.id, qq.question_text, qq.options, qq.correct_option_index,
+            SELECT qq.id, qq.question_text, qq.options, qq.correct_option_index, qq.explanation,
                    qaa.selected_option_index
             FROM quiz_questions qq
             LEFT JOIN quiz_attempt_answers qaa ON qq.id = qaa.question_id AND qaa.attempt_id = $1
@@ -190,6 +245,7 @@ exports.reviewQuiz = async (req, res) => {
             options: JSON.parse(q.options),
             correct_option_index: q.correct_option_index,
             selected_option_index: q.selected_option_index,
+            explanation: q.explanation,
             is_correct: q.selected_option_index === q.correct_option_index
         }));
 
@@ -211,7 +267,15 @@ exports.deleteQuiz = async (req, res) => {
     try {
         const db = getDB();
         const school_id = req.user.school_id;
-        const result = await db.run('DELETE FROM quizzes WHERE id = $1 AND school_id = $2', [id, school_id]);
+        let query = 'DELETE FROM quizzes WHERE id = $1 AND school_id = $2';
+        const params = [id, school_id];
+        if (req.user.role === 'Teacher') {
+            const teacher = await db.get('SELECT id FROM teachers WHERE user_id = $1 AND school_id = $2', [req.user.id, school_id]);
+            if (!teacher) return res.status(403).json({ error: 'Forbidden', message: 'Teacher profile not found.' });
+            params.push(teacher.id);
+            query += ' AND teacher_id = $3';
+        }
+        const result = await db.run(query, params);
         if (result.changes === 0) return res.status(404).json({ error: 'Not Found' });
         res.json({ message: 'Quiz deleted successfully' });
     } catch (err) {

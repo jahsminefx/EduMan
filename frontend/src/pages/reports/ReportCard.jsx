@@ -2,15 +2,20 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Printer, GraduationCap, BookOpen } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import API_URL from '../../config/api';
+import API_URL, { API_BASE_URL } from '../../config/api';
 
 export default function ReportCard() {
   const { user } = useAuth();
   const [students, setStudents] = useState([]);
+  const [sessions, setSessions] = useState([]);
+  const [terms, setTerms] = useState([]);
   const [selectedStudent, setSelectedStudent] = useState('');
+  const [sessionId, setSessionId] = useState('');
   const [termId, setTermId] = useState('');
   const [report, setReport] = useState(null);
   const [studentInfo, setStudentInfo] = useState(null);
+  const [schoolInfo, setSchoolInfo] = useState(null);
+  const [academicInfo, setAcademicInfo] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
@@ -23,9 +28,19 @@ export default function ReportCard() {
   const fetchOptions = async () => {
     setError('');
     try {
-      const profileRes = await axios.get(`${API_URL}/schools/profile`);
+      const [profileRes, sessionsRes, termsRes] = await Promise.all([
+        axios.get(`${API_URL}/schools/profile`),
+        axios.get(`${API_URL}/schools/sessions`),
+        axios.get(`${API_URL}/schools/terms`)
+      ]);
+      setSessions(sessionsRes.data.sessions || []);
+      setTerms(termsRes.data.terms || []);
+
+      const activeSessionId = profileRes.data.profile?.current_session_id?.toString() || '';
       const activeTermId = profileRes.data.profile?.current_term_id?.toString() || '';
+      setSessionId(activeSessionId);
       setTermId(activeTermId);
+      setSchoolInfo(profileRes.data.profile || null);
 
       if (isStudent) {
         const studentRes = await axios.get(`${API_URL}/students/me`);
@@ -58,14 +73,24 @@ export default function ReportCard() {
       const res = await axios.get(`${API_URL}/grades/report/${studentId}/${term}`);
       setReport(res.data.report);
       setStudentInfo(res.data.student || students.find(student => student.id === Number(studentId)) || null);
+      setSchoolInfo(res.data.school || schoolInfo);
+      setAcademicInfo(res.data.academic || null);
     } catch (err) {
       console.error(err);
       setReport(null);
       setStudentInfo(null);
+      setAcademicInfo(null);
       setError(err.response?.data?.message || 'Failed to load this report card.');
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleSessionChange = (value) => {
+    setSessionId(value);
+    setTermId('');
+    setReport(null);
+    setAcademicInfo(null);
   };
 
   const handlePrint = () => window.print();
@@ -113,7 +138,22 @@ export default function ReportCard() {
           </div>
 
           {isStudent ? (
-            <div className="flex items-center gap-3">
+            <div className="flex gap-4 items-end flex-wrap">
+              <div className="min-w-[180px]">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Session</label>
+                <select value={sessionId} onChange={event => handleSessionChange(event.target.value)} className="border rounded-md p-2 w-full">
+                  <option value="">Select Session</option>
+                  {sessions.map(session => <option key={session.id} value={session.id}>{session.name}</option>)}
+                </select>
+              </div>
+              <div className="min-w-[180px]">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Term</label>
+                <select value={termId} onChange={event => setTermId(event.target.value)} className="border rounded-md p-2 w-full" disabled={!sessionId}>
+                  <option value="">Select Term</option>
+                  {terms.filter(term => String(term.session_id) === String(sessionId)).map(term => <option key={term.id} value={term.id}>{term.name}</option>)}
+                </select>
+              </div>
+              <button onClick={() => fetchReport()} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">Load Report</button>
               <div className="px-4 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-bold flex items-center">
                 <BookOpen className="w-4 h-4 mr-2" />
                 My Report Card
@@ -137,9 +177,19 @@ export default function ReportCard() {
                   ))}
                 </select>
               </div>
-              <div className="w-32">
+              <div className="min-w-[180px]">
+                <label className="block text-sm font-medium text-gray-700 mb-1">Session</label>
+                <select value={sessionId} onChange={event => handleSessionChange(event.target.value)} className="border rounded-md p-2 w-full">
+                  <option value="">Select Session</option>
+                  {sessions.map(session => <option key={session.id} value={session.id}>{session.name}</option>)}
+                </select>
+              </div>
+              <div className="min-w-[180px]">
                 <label className="block text-sm font-medium text-gray-700 mb-1">Term</label>
-                <input type="text" value={termId} onChange={event => setTermId(event.target.value)} className="border rounded-md p-2 w-full" />
+                <select value={termId} onChange={event => setTermId(event.target.value)} className="border rounded-md p-2 w-full" disabled={!sessionId}>
+                  <option value="">Select Term</option>
+                  {terms.filter(term => String(term.session_id) === String(sessionId)).map(term => <option key={term.id} value={term.id}>{term.name}</option>)}
+                </select>
               </div>
               <button onClick={() => fetchReport()} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">Load Report</button>
               {report && (
@@ -163,18 +213,29 @@ export default function ReportCard() {
       {report && studentInfo && (
         <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100 print:shadow-none print:border-0 print:p-0" id="report-card">
           <div className="text-center border-b-2 border-gray-800 pb-4 mb-6">
-            <div className="flex justify-center mb-2">
-              <GraduationCap className="w-12 h-12 text-blue-600" />
+            <div className="flex justify-center mb-3">
+              {schoolInfo?.logo_url ? (
+                <img src={`${API_BASE_URL}${schoolInfo.logo_url}`} alt="School logo" className="w-16 h-16 object-contain" />
+              ) : (
+                <GraduationCap className="w-12 h-12 text-blue-600" />
+              )}
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 uppercase tracking-wider">Student Report Card</h1>
-            <p className="text-sm text-gray-600 mt-1">Academic Performance Report</p>
+            <h1 className="text-2xl font-bold text-gray-900 uppercase tracking-wider">{schoolInfo?.name || 'School'}</h1>
+            <p className="text-sm text-gray-600 mt-1">{schoolInfo?.address || 'School Address'}</p>
+            <p className="text-xs text-gray-500 mt-1">
+              {schoolInfo?.phone && <span>Phone: {schoolInfo.phone}</span>}
+              {schoolInfo?.email && <span>{schoolInfo?.phone ? ' | ' : ''}{schoolInfo.email}</span>}
+            </p>
+            {schoolInfo?.motto && <p className="text-xs text-gray-500 italic mt-1">{schoolInfo.motto}</p>}
+            <h2 className="text-lg font-bold text-gray-900 uppercase tracking-wider mt-4">Student Report Card</h2>
           </div>
 
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 text-sm">
             <div><span className="font-semibold text-gray-600">Name:</span> <span className="text-gray-900">{studentInfo.first_name} {studentInfo.last_name}</span></div>
             <div><span className="font-semibold text-gray-600">Adm No:</span> <span className="text-gray-900">{studentInfo.admission_number}</span></div>
             <div><span className="font-semibold text-gray-600">Class:</span> <span className="text-gray-900">{studentInfo.class_name || 'N/A'}</span></div>
-            <div><span className="font-semibold text-gray-600">Term:</span> <span className="text-gray-900">{termId}</span></div>
+            <div><span className="font-semibold text-gray-600">Session:</span> <span className="text-gray-900">{academicInfo?.session_name || schoolInfo?.current_session_name || 'N/A'}</span></div>
+            <div><span className="font-semibold text-gray-600">Term:</span> <span className="text-gray-900">{academicInfo?.term_name || schoolInfo?.current_term_name || 'N/A'}</span></div>
           </div>
 
           {subjects.length > 0 ? (

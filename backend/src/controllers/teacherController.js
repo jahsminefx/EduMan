@@ -1,12 +1,22 @@
 const { getDB } = require('../config/database');
 const bcrypt = require('bcryptjs');
 
+const VALID_GENDERS = new Set(['Male', 'Female', 'Other']);
+
+function normalizeGender(value) {
+    const raw = String(value || '').trim().toLowerCase();
+    if (raw === 'm' || raw === 'male') return 'Male';
+    if (raw === 'f' || raw === 'female') return 'Female';
+    if (raw === 'other') return 'Other';
+    return '';
+}
+
 exports.getTeachers = async (req, res) => {
     try {
         const db = getDB();
         const school_id = req.user.school_id;
         const teachers = await db.all(`
-            SELECT t.id, t.user_id, t.first_name, t.last_name, t.phone, u.email 
+            SELECT t.id, t.user_id, t.first_name, t.last_name, t.gender, t.phone, u.email 
             FROM teachers t
             JOIN users u ON t.user_id = u.id
             WHERE t.school_id = $1
@@ -31,10 +41,14 @@ exports.getTeachers = async (req, res) => {
 };
 
 exports.createTeacher = async (req, res) => {
-    const { first_name, last_name, email, password, phone, class_ids } = req.body;
+    const { first_name, last_name, email, password, phone, gender, class_ids } = req.body;
     
     if (!first_name || !last_name || !email || !password) {
         return res.status(400).json({ error: 'Validation Error', message: 'Missing required fields' });
+    }
+    const normalizedGender = normalizeGender(gender);
+    if (!VALID_GENDERS.has(normalizedGender)) {
+        return res.status(400).json({ error: 'Validation Error', message: 'Please select a valid gender.' });
     }
 
     try {
@@ -60,8 +74,8 @@ exports.createTeacher = async (req, res) => {
 
             // 2. Create Teacher Profile
             const teacherResult = await client.run(
-                'INSERT INTO teachers (user_id, school_id, first_name, last_name, phone) VALUES ($1, $2, $3, $4, $5) RETURNING id',
-                [userId, school_id, first_name, last_name, phone]
+                'INSERT INTO teachers (user_id, school_id, first_name, last_name, gender, phone) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id',
+                [userId, school_id, first_name, last_name, normalizedGender, phone]
             );
             const teacherId = teacherResult.lastID;
 
@@ -90,17 +104,21 @@ exports.createTeacher = async (req, res) => {
 
 exports.updateTeacher = async (req, res) => {
     const { id } = req.params;
-    const { first_name, last_name, phone, class_ids } = req.body;
+    const { first_name, last_name, gender, phone, class_ids } = req.body;
     
     try {
         const db = getDB();
         const school_id = req.user.school_id;
+        const normalizedGender = normalizeGender(gender);
+        if (!VALID_GENDERS.has(normalizedGender)) {
+            return res.status(400).json({ error: 'Validation Error', message: 'Please select a valid gender.' });
+        }
 
         await db.transaction(async (client) => {
             // Update profile
             await client.run(
-                'UPDATE teachers SET first_name = $1, last_name = $2, phone = $3 WHERE id = $4 AND school_id = $5',
-                [first_name, last_name, phone, id, school_id]
+                'UPDATE teachers SET first_name = $1, last_name = $2, gender = $3, phone = $4 WHERE id = $5 AND school_id = $6',
+                [first_name, last_name, normalizedGender, phone, id, school_id]
             );
 
             // Update user record name

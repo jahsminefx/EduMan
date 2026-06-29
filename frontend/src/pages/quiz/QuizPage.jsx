@@ -211,6 +211,11 @@ export default function QuizPage() {
                 );
               })}
             </div>
+            {q.explanation && (
+              <div className="mt-4 rounded-lg border border-blue-100 bg-blue-50 p-3 text-sm text-blue-900">
+                <strong>Explanation:</strong> {q.explanation}
+              </div>
+            )}
           </div>
         ))}
       </div>
@@ -310,7 +315,14 @@ export default function QuizPage() {
           {quizzes.map(q => (
             <div key={q.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
               <div className="flex justify-between items-start">
-                <h3 className="font-semibold text-gray-800">{q.title}</h3>
+                <div>
+                  <h3 className="font-semibold text-gray-800">{q.title}</h3>
+                  {q.generation_id && (
+                    <span className={`mt-1 inline-block rounded-full px-2 py-0.5 text-[10px] font-bold uppercase ${q.status === 'published' ? 'bg-violet-50 text-violet-700' : 'bg-amber-50 text-amber-700'}`}>
+                      EduMan AI {q.status || 'published'}
+                    </span>
+                  )}
+                </div>
                 {(user.role === 'Teacher' || user.role === 'SchoolAdmin') && (
                   <button onClick={() => handleDelete(q.id)} className="text-red-400 hover:text-red-600"><Trash2 className="w-4 h-4" /></button>
                 )}

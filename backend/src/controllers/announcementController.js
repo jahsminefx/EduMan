@@ -2,6 +2,42 @@ const { getDB } = require('../config/database');
 
 const VALID_STATUSES = ['Draft', 'Published'];
 
+function cleanString(value) {
+    if (value === undefined || value === null) return '';
+    return String(value).trim();
+}
+
+function uploadedPath(file) {
+    return file ? `/uploads/${file.filename}` : null;
+}
+
+function getUploadedFile(req, fieldName) {
+    return req.files?.[fieldName]?.[0] || null;
+}
+
+function attachmentType(file) {
+    if (!file) return null;
+    return file.mimetype?.startsWith('image/') ? 'image' : 'document';
+}
+
+function buildAttachment(file) {
+    if (!file) {
+        return {
+            attachment_path: null,
+            attachment_name: null,
+            attachment_type: null,
+            attachment_mime: null
+        };
+    }
+
+    return {
+        attachment_path: uploadedPath(file),
+        attachment_name: file.originalname,
+        attachment_type: attachmentType(file),
+        attachment_mime: file.mimetype || null
+    };
+}
+
 function normalizeStatus(status) {
     if (!status) return 'Draft';
     const match = VALID_STATUSES.find(value => value.toLowerCase() === String(status).toLowerCase());
@@ -42,7 +78,7 @@ exports.listAnnouncements = async (req, res) => {
     try {
         const db = getDB();
         const { role, school_id, id: user_id } = req.user;
-        const requestedStatus = normalizeStatus(req.query.status);
+        const requestedStatus = req.query.status ? normalizeStatus(req.query.status) : null;
         const mineOnly = req.query.mine === 'true';
 
         if (req.query.status && !requestedStatus) {
@@ -120,10 +156,14 @@ exports.getAnnouncement = async (req, res) => {
 };
 
 exports.createAnnouncement = async (req, res) => {
-    const { title, content, featured_image } = req.body;
+    const { title, content } = req.body;
     const status = normalizeStatus(req.body.status);
+    const featuredImageFile = getUploadedFile(req, 'featured_image_file');
+    const attachmentFile = getUploadedFile(req, 'attachment_file');
+    const featuredImage = uploadedPath(featuredImageFile) || cleanString(req.body.featured_image) || null;
+    const attachment = buildAttachment(attachmentFile);
 
-    if (!title || !title.trim() || !content || !content.trim()) {
+    if (!title || !cleanString(title) || !content || !cleanString(content)) {
         return res.status(400).json({ error: 'Validation Error', message: 'Title and content are required.' });
     }
 
@@ -133,17 +173,35 @@ exports.createAnnouncement = async (req, res) => {
 
     try {
         const db = getDB();
+        const publishedAt = status === 'Published' ? new Date() : null;
         const result = await db.run(`
-            INSERT INTO announcements (school_id, author_id, title, content, featured_image, status, published_at)
-            VALUES ($1, $2, $3, $4, $5, $6, CASE WHEN $6 = 'Published' THEN CURRENT_TIMESTAMP ELSE NULL END)
+            INSERT INTO announcements (
+                school_id,
+                author_id,
+                title,
+                content,
+                featured_image,
+                attachment_path,
+                attachment_name,
+                attachment_type,
+                attachment_mime,
+                status,
+                published_at
+            )
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
             RETURNING id
         `, [
             req.user.school_id,
             req.user.id,
-            title.trim(),
-            content.trim(),
-            featured_image ? featured_image.trim() : null,
-            status
+            cleanString(title),
+            cleanString(content),
+            featuredImage,
+            attachment.attachment_path,
+            attachment.attachment_name,
+            attachment.attachment_type,
+            attachment.attachment_mime,
+            status,
+            publishedAt
         ]);
 
         const announcement = await findScopedAnnouncement(db, result.lastID, req.user.school_id);
@@ -154,10 +212,12 @@ exports.createAnnouncement = async (req, res) => {
 };
 
 exports.updateAnnouncement = async (req, res) => {
-    const { title, content, featured_image } = req.body;
+    const { title, content } = req.body;
     const status = normalizeStatus(req.body.status);
+    const featuredImageFile = getUploadedFile(req, 'featured_image_file');
+    const attachmentFile = getUploadedFile(req, 'attachment_file');
 
-    if (!title || !title.trim() || !content || !content.trim()) {
+    if (!title || !cleanString(title) || !content || !cleanString(content)) {
         return res.status(400).json({ error: 'Validation Error', message: 'Title and content are required.' });
     }
 
@@ -177,24 +237,49 @@ exports.updateAnnouncement = async (req, res) => {
             return res.status(403).json({ error: 'Forbidden', message: 'You can only manage announcements you authored.' });
         }
 
+        const removeFeaturedImage = req.body.remove_featured_image === 'true';
+        const featuredImage = uploadedPath(featuredImageFile)
+            || (removeFeaturedImage ? '' : cleanString(req.body.featured_image))
+            || (removeFeaturedImage ? null : existing.featured_image);
+
+        const uploadedAttachment = buildAttachment(attachmentFile);
+        const removeAttachment = req.body.remove_attachment === 'true';
+        const attachment = attachmentFile
+            ? uploadedAttachment
+            : {
+                attachment_path: removeAttachment ? null : existing.attachment_path,
+                attachment_name: removeAttachment ? null : existing.attachment_name,
+                attachment_type: removeAttachment ? null : existing.attachment_type,
+                attachment_mime: removeAttachment ? null : existing.attachment_mime
+            };
+
+        const publishedAt = status === 'Published'
+            ? (existing.published_at || new Date())
+            : null;
+
         await db.run(`
             UPDATE announcements
             SET title = $1,
                 content = $2,
                 featured_image = $3,
-                status = $4,
+                attachment_path = $4,
+                attachment_name = $5,
+                attachment_type = $6,
+                attachment_mime = $7,
+                status = $8,
                 updated_at = CURRENT_TIMESTAMP,
-                published_at = CASE
-                    WHEN $4 = 'Published' AND published_at IS NULL THEN CURRENT_TIMESTAMP
-                    WHEN $4 = 'Draft' THEN NULL
-                    ELSE published_at
-                END
-            WHERE id = $5 AND school_id = $6
+                published_at = $9
+            WHERE id = $10 AND school_id = $11
         `, [
-            title.trim(),
-            content.trim(),
-            featured_image ? featured_image.trim() : null,
+            cleanString(title),
+            cleanString(content),
+            featuredImage,
+            attachment.attachment_path,
+            attachment.attachment_name,
+            attachment.attachment_type,
+            attachment.attachment_mime,
             status,
+            publishedAt,
             req.params.id,
             req.user.school_id
         ]);

@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { BookOpen, Menu, X } from 'lucide-react';
+import { Menu, X } from 'lucide-react';
+import BrandLogo from './BrandLogo';
 
 export default function Navbar() {
   const { user } = useAuth();
@@ -19,11 +20,8 @@ export default function Navbar() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16 items-center">
           {/* Logo */}
-          <Link to="/" className="flex items-center gap-2 group">
-            <div className="bg-blue-600 p-2 rounded-lg shadow-md shadow-blue-500/20 group-hover:shadow-blue-500/40 transition-shadow">
-              <BookOpen className="w-5 h-5 text-white" />
-            </div>
-            <span className="text-xl font-bold text-gray-900 tracking-tight">EduMan</span>
+          <Link to="/" className="flex items-center">
+            <BrandLogo className="h-12 w-auto" />
           </Link>
 
           {/* Desktop links */}
@@ -50,12 +48,12 @@ export default function Navbar() {
                 Go to Dashboard
               </Link>
             ) : (
-              <a
-                href="#auth"
+              <Link
+                to="/#auth"
                 className="ml-3 px-5 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 transition-colors shadow-sm shadow-blue-500/20"
               >
                 Sign In
-              </a>
+              </Link>
             )}
           </div>
 
@@ -88,10 +86,10 @@ export default function Navbar() {
                 Go to Dashboard
               </Link>
             ) : (
-              <a href="#auth" onClick={() => setMenuOpen(false)}
+              <Link to="/#auth" onClick={() => setMenuOpen(false)}
                 className="block px-4 py-2.5 text-sm font-medium text-white bg-blue-600 rounded-lg">
                 Sign In
-              </a>
+              </Link>
             )}
           </div>
         )}

@@ -3,6 +3,12 @@ import axios from 'axios';
 import { Plus, Trash2, Mail, Phone, Edit2, Check, BookOpen } from 'lucide-react';
 import API_URL from '../../config/api';
 
+const normalizeGender = (value) => {
+  if (value === 'M') return 'Male';
+  if (value === 'F') return 'Female';
+  return value || '';
+};
+
 export default function TeachersList() {
   const [teachers, setTeachers] = useState([]);
   const [classes, setClasses] = useState([]);
@@ -14,6 +20,7 @@ export default function TeachersList() {
     last_name: '',
     email: '',
     password: '',
+    gender: '',
     phone: '',
     class_ids: []
   });
@@ -49,12 +56,13 @@ export default function TeachersList() {
   };
 
   const handleExport = () => {
-    const headers = ['First Name', 'Last Name', 'Email', 'Phone', 'Assigned Classes'];
+    const headers = ['First Name', 'Last Name', 'Gender', 'Email', 'Phone', 'Assigned Classes'];
     const csvContent = [
       headers.join(','),
       ...filteredTeachers.map(t => [
         t.first_name, 
         t.last_name, 
+        t.gender,
         t.email, 
         t.phone, 
         (t.classes || []).map(c => c.name).join('; ')
@@ -88,6 +96,7 @@ export default function TeachersList() {
         last_name: teacher.last_name,
         email: teacher.email,
         password: '', // Password not editable for security simplified for MVP
+        gender: normalizeGender(teacher.gender),
         phone: teacher.phone || '',
         class_ids: teacher.classes ? teacher.classes.map(c => c.id) : []
       });
@@ -98,6 +107,7 @@ export default function TeachersList() {
         last_name: '',
         email: '',
         password: '',
+        gender: '',
         phone: '',
         class_ids: []
       });
@@ -111,6 +121,10 @@ export default function TeachersList() {
     e.preventDefault();
     try {
       setError('');
+      if (!formData.gender) {
+        setError('Please select a valid gender.');
+        return;
+      }
       if (editingId) {
         await axios.put(`${API_URL}/teachers/${editingId}`, formData);
         setSuccess('Teacher updated successfully!');
@@ -189,6 +203,7 @@ export default function TeachersList() {
               <thead className="bg-gray-50">
                 <tr>
                   <th onClick={() => handleSort('first_name')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">Teacher Name {sortConfig.key === 'first_name' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Gender</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
                   <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Assigned Classes</th>
                   <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
@@ -200,6 +215,7 @@ export default function TeachersList() {
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="text-sm font-medium text-gray-900">{teacher.first_name} {teacher.last_name}</div>
                     </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{teacher.gender || 'N/A'}</td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-col gap-1">
                         <span className="flex items-center text-sm text-gray-500"><Mail className="w-3 h-3 mr-1"/> {teacher.email}</span>
@@ -271,6 +287,16 @@ export default function TeachersList() {
                       </div>
                     </>
                   )}
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700">Gender *</label>
+                    <select required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900 bg-white" value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})}>
+                      <option value="">Select Gender</option>
+                      <option value="Male">Male</option>
+                      <option value="Female">Female</option>
+                      <option value="Other">Other</option>
+                    </select>
+                  </div>
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700">Phone</label>

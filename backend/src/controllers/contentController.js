@@ -12,6 +12,17 @@ function deleteUploadedFile(file) {
     fs.unlink(file.path, () => {});
 }
 
+function deleteStoredContentFile(filePath) {
+    if (!filePath) return;
+    const filename = path.basename(filePath);
+    const absolutePath = path.join(__dirname, '../../uploads', filename);
+    fs.unlink(absolutePath, err => {
+        if (err && err.code !== 'ENOENT') {
+            console.error('Failed to delete library file:', err.message);
+        }
+    });
+}
+
 function normalizeContentType(type) {
     return type === 'pdf' ? 'document' : type;
 }
@@ -111,15 +122,32 @@ exports.deleteContent = async (req, res) => {
         const db = getDB();
         const school_id = req.user.school_id;
 
-        // Verify the content belongs to the user's school (or is global and user is ContentManager)
-        const content = await db.get('SELECT id, school_id FROM learning_contents WHERE id = $1', [id]);
+        const content = await db.get(
+            'SELECT id, school_id, uploaded_by, file_path FROM learning_contents WHERE id = $1',
+            [id]
+        );
         if (!content) return res.status(404).json({ error: 'Not Found' });
 
-        if (content.school_id && content.school_id !== school_id) {
-            return res.status(403).json({ error: 'Forbidden', message: 'You cannot delete content from another school.' });
+        if (req.user.role === 'Teacher') {
+            const ownsContent = Number(content.uploaded_by) === Number(req.user.id);
+            const belongsToSchool = Number(content.school_id) === Number(school_id);
+            if (!ownsContent || !belongsToSchool) {
+                return res.status(403).json({
+                    error: 'Forbidden',
+                    message: 'Teachers can only delete content they uploaded.'
+                });
+            }
+        } else if (req.user.role === 'SchoolAdmin') {
+            if (Number(content.school_id) !== Number(school_id)) {
+                return res.status(403).json({
+                    error: 'Forbidden',
+                    message: 'You can only delete content from your school.'
+                });
+            }
         }
 
         await db.run('DELETE FROM learning_contents WHERE id = $1', [id]);
+        deleteStoredContentFile(content.file_path);
         res.json({ message: 'Content deleted successfully' });
     } catch (err) {
         res.status(500).json({ error: 'Server Error', message: err.message });

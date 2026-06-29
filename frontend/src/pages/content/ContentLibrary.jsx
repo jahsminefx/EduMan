@@ -1,8 +1,9 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { Download, ExternalLink, FileText, Image as ImageIcon, Library, Trash2, Upload, Video } from 'lucide-react';
+import { Download, ExternalLink, Eye, FileText, Image as ImageIcon, Library, Sparkles, Trash2, Upload, Video, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { API_URL, API_BASE_URL } from '../../config/api';
+import { displayLabel, downloadProtected } from '../ai/aiUtils';
 
 const emptyForm = { title: '', description: '', type: 'image', class_id: '', subject_id: '' };
 
@@ -46,6 +47,8 @@ function getContentType(type) {
 export default function ContentLibrary() {
   const { user } = useAuth();
   const [contents, setContents] = useState([]);
+  const [aiResources, setAiResources] = useState([]);
+  const [selectedAiResource, setSelectedAiResource] = useState(null);
   const [showUpload, setShowUpload] = useState(false);
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
@@ -65,8 +68,13 @@ export default function ContentLibrary() {
     setLoading(true);
     try {
       const params = filterType ? `?type=${filterType}` : '';
-      const contentRes = await axios.get(`${API_URL}/content${params}`);
+      const requests = [axios.get(`${API_URL}/content${params}`)];
+      if (user?.school_id && ['SchoolAdmin', 'Teacher', 'Student', 'Parent', 'ContentManager'].includes(user.role)) {
+        requests.push(axios.get(`${API_URL}/ai/library`));
+      }
+      const [contentRes, aiRes] = await Promise.all(requests);
       setContents(contentRes.data.contents || []);
+      setAiResources(aiRes?.data?.resources || []);
 
       if (user?.school_id) {
         const [clsRes, subRes] = await Promise.all([
@@ -121,7 +129,8 @@ export default function ContentLibrary() {
     if (!confirm('Delete this content?')) return;
     try {
       await axios.delete(`${API_URL}/content/${id}`);
-      fetchData();
+      setMessage('Content deleted successfully.');
+      await fetchData();
     } catch (err) {
       console.error(err);
       setMessage(err.response?.data?.message || 'Delete failed.');
@@ -129,7 +138,30 @@ export default function ContentLibrary() {
   };
 
   const canUpload = ['ContentManager', 'Teacher', 'SchoolAdmin'].includes(user.role);
-  const canDelete = ['ContentManager', 'SchoolAdmin'].includes(user.role);
+  const canDeleteContent = (content) => (
+    ['ContentManager', 'SchoolAdmin'].includes(user.role)
+    || (user.role === 'Teacher' && Number(content.uploaded_by) === Number(user.id))
+  );
+
+  const handleAiDownload = async (resource, format) => {
+    try {
+      await downloadProtected(`${API_URL}/ai/library/${resource.id}/download?format=${format}`, `${resource.title}.${format}`);
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Download failed.');
+    }
+  };
+
+  const handleAiDelete = async (resource) => {
+    if (!confirm('Delete this EduMan AI learning content? Students will no longer see it.')) return;
+    try {
+      await axios.delete(`${API_URL}/ai/resources/${resource.id}`);
+      if (selectedAiResource?.id === resource.id) setSelectedAiResource(null);
+      setMessage('EduMan AI learning content deleted successfully.');
+      await fetchData();
+    } catch (err) {
+      setMessage(err.response?.data?.message || 'Delete failed.');
+    }
+  };
 
   return (
     <div className="space-y-6">
@@ -170,7 +202,7 @@ export default function ContentLibrary() {
       </div>
 
       {message && (
-        <div className={`p-4 rounded-lg text-sm font-medium ${message.includes('uploaded') ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+        <div className={`p-4 rounded-lg text-sm font-medium ${message.includes('uploaded') || message.includes('deleted') ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
           {message}
         </div>
       )}
@@ -210,11 +242,44 @@ export default function ContentLibrary() {
         </form>
       )}
 
+      {(!filterType || filterType === 'document') && aiResources.length > 0 && (
+        <section className="space-y-4">
+          <div>
+            <h3 className="flex items-center gap-2 text-lg font-bold text-gray-900"><Sparkles className="h-5 w-5 text-violet-600" /> EduMan AI Learning Content</h3>
+            <p className="mt-1 text-sm text-gray-500">Teacher-reviewed documents published for your class.</p>
+          </div>
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {aiResources.map(resource => (
+              <div key={`ai-${resource.id}`} className="rounded-lg border border-violet-100 bg-white p-5 shadow-sm transition hover:shadow-md">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <span className="inline-flex items-center rounded-full bg-violet-50 px-2 py-1 text-[10px] font-bold uppercase tracking-wide text-violet-700">EduMan AI • Teacher Approved</span>
+                    <h4 className="mt-3 truncate font-bold text-gray-900">{resource.title}</h4>
+                    <p className="mt-1 text-xs text-gray-500">{resource.class_name} • {resource.subject_name}</p>
+                  </div>
+                  <FileText className="h-6 w-6 flex-shrink-0 text-blue-600" />
+                </div>
+                <p className="mt-3 line-clamp-3 text-sm leading-6 text-gray-600">{resource.body}</p>
+                <div className="mt-4 flex flex-wrap items-center gap-2">
+                  <button onClick={() => setSelectedAiResource(resource)} className="inline-flex items-center rounded-lg bg-blue-50 px-3 py-1.5 text-xs font-bold text-blue-700"><Eye className="mr-1 h-3.5 w-3.5" /> View</button>
+                  <button onClick={() => handleAiDownload(resource, 'pdf')} className="inline-flex items-center rounded-lg border px-3 py-1.5 text-xs font-bold text-gray-700"><Download className="mr-1 h-3.5 w-3.5" /> PDF</button>
+                  <button onClick={() => handleAiDownload(resource, 'docx')} className="inline-flex items-center rounded-lg border px-3 py-1.5 text-xs font-bold text-gray-700"><Download className="mr-1 h-3.5 w-3.5" /> DOCX</button>
+                  {user.role === 'Teacher' && Number(resource.teacher_user_id) === Number(user.id) && (
+                    <button onClick={() => handleAiDelete(resource)} className="inline-flex items-center rounded-lg border border-red-200 px-3 py-1.5 text-xs font-bold text-red-600 hover:bg-red-50"><Trash2 className="mr-1 h-3.5 w-3.5" /> Delete</button>
+                  )}
+                </div>
+                <p className="mt-3 text-xs text-gray-400">{displayLabel(resource.content_type)} • By {resource.teacher_name}</p>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+
       {loading ? (
         <div className="p-8 text-center text-gray-500">Loading library...</div>
-      ) : contents.length === 0 ? (
+      ) : contents.length === 0 && aiResources.length === 0 ? (
         <div className="p-8 text-center text-gray-500 bg-white rounded-lg border shadow-sm">No content found.</div>
-      ) : (
+      ) : contents.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {contents.map(content => {
             const meta = getContentType(content.type);
@@ -245,7 +310,7 @@ export default function ContentLibrary() {
                     </div>
                     {content.description && <p className="text-sm text-gray-500 mt-2 line-clamp-2">{content.description}</p>}
                   </div>
-                  {canDelete && (
+                  {canDeleteContent(content) && (
                     <button onClick={() => handleDelete(content.id)} className="text-red-400 hover:text-red-600 p-1" title="Delete content">
                       <Trash2 className="w-4 h-4" />
                     </button>
@@ -271,6 +336,22 @@ export default function ContentLibrary() {
               </div>
             );
           })}
+        </div>
+      ) : null}
+
+      {selectedAiResource && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
+            <div className="flex items-start justify-between gap-4">
+              <div>
+                <span className="text-xs font-bold uppercase tracking-wide text-violet-600">EduMan AI • Teacher Approved</span>
+                <h3 className="mt-1 text-xl font-bold text-gray-900">{selectedAiResource.title}</h3>
+                <p className="text-sm text-gray-500">{selectedAiResource.class_name} • {selectedAiResource.subject_name}</p>
+              </div>
+              <button onClick={() => setSelectedAiResource(null)} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"><X className="h-5 w-5" /></button>
+            </div>
+            <div className="mt-6 whitespace-pre-wrap rounded-xl bg-gray-50 p-5 text-sm leading-7 text-gray-800">{selectedAiResource.body}</div>
+          </div>
         </div>
       )}
     </div>

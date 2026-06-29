@@ -15,6 +15,14 @@ CREATE TABLE IF NOT EXISTS schools (
     address TEXT,
     phone TEXT,
     email TEXT,
+    logo_url TEXT,
+    motto TEXT,
+    website TEXT,
+    principal_name TEXT,
+    school_type TEXT,
+    city TEXT,
+    state TEXT,
+    country TEXT,
     current_session_id INTEGER,
     current_term_id INTEGER,
     is_active INTEGER DEFAULT 1,
@@ -78,6 +86,7 @@ CREATE TABLE IF NOT EXISTS teachers (
     school_id INTEGER NOT NULL,
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
+    gender TEXT,
     phone TEXT,
     FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE,
     FOREIGN KEY(school_id) REFERENCES schools(id) ON DELETE CASCADE
@@ -92,6 +101,7 @@ CREATE TABLE IF NOT EXISTS students (
     first_name TEXT NOT NULL,
     last_name TEXT NOT NULL,
     gender TEXT,
+    age INTEGER,
     dob DATE,
     class_id INTEGER,
     parent_name TEXT,
@@ -163,6 +173,9 @@ CREATE TABLE IF NOT EXISTS assessments (
     class_id INTEGER NOT NULL,
     subject_id INTEGER NOT NULL,
     term_id INTEGER NOT NULL,
+    session_id INTEGER,
+    academic_session TEXT,
+    term TEXT,
     type TEXT NOT NULL, -- 'test', 'exam', 'assignment'
     score REAL,
     max_score REAL,
@@ -171,7 +184,58 @@ CREATE TABLE IF NOT EXISTS assessments (
     FOREIGN KEY(class_id) REFERENCES classes(id) ON DELETE CASCADE,
     FOREIGN KEY(subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
     FOREIGN KEY(term_id) REFERENCES academic_terms(id) ON DELETE CASCADE,
+    FOREIGN KEY(session_id) REFERENCES academic_sessions(id) ON DELETE SET NULL,
     FOREIGN KEY(recorded_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- Class Timetables
+CREATE TABLE IF NOT EXISTS timetables (
+    id SERIAL PRIMARY KEY,
+    school_id INTEGER NOT NULL,
+    class_id INTEGER NOT NULL,
+    day_of_week TEXT NOT NULL,
+    start_time TIME NOT NULL,
+    end_time TIME NOT NULL,
+    subject TEXT NOT NULL,
+    room TEXT,
+    notes TEXT,
+    created_by INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(school_id) REFERENCES schools(id) ON DELETE CASCADE,
+    FOREIGN KEY(class_id) REFERENCES classes(id) ON DELETE CASCADE,
+    FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- Class Announcements
+CREATE TABLE IF NOT EXISTS class_announcements (
+    id SERIAL PRIMARY KEY,
+    school_id INTEGER NOT NULL,
+    class_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    created_by INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(school_id) REFERENCES schools(id) ON DELETE CASCADE,
+    FOREIGN KEY(class_id) REFERENCES classes(id) ON DELETE CASCADE,
+    FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- Class Events / Important Dates
+CREATE TABLE IF NOT EXISTS class_events (
+    id SERIAL PRIMARY KEY,
+    school_id INTEGER NOT NULL,
+    class_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    event_date DATE NOT NULL,
+    description TEXT,
+    created_by INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(school_id) REFERENCES schools(id) ON DELETE CASCADE,
+    FOREIGN KEY(class_id) REFERENCES classes(id) ON DELETE CASCADE,
+    FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- School Announcements
@@ -182,6 +246,10 @@ CREATE TABLE IF NOT EXISTS announcements (
     title VARCHAR(255) NOT NULL,
     content TEXT NOT NULL,
     featured_image VARCHAR(500),
+    attachment_path VARCHAR(500),
+    attachment_name VARCHAR(255),
+    attachment_type VARCHAR(30),
+    attachment_mime VARCHAR(120),
     status VARCHAR(20) NOT NULL DEFAULT 'Draft' CHECK(status IN ('Draft', 'Published')),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -245,18 +313,67 @@ CREATE TABLE IF NOT EXISTS learning_contents (
 );
 
 -- Quizzes
+CREATE TABLE IF NOT EXISTS ai_settings (
+    id SERIAL PRIMARY KEY,
+    school_id INTEGER UNIQUE NOT NULL,
+    model TEXT NOT NULL DEFAULT 'openai/gpt-4o',
+    daily_teacher_limit INTEGER NOT NULL DEFAULT 10,
+    is_enabled INTEGER NOT NULL DEFAULT 1,
+    updated_by INTEGER,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(school_id) REFERENCES schools(id) ON DELETE CASCADE,
+    FOREIGN KEY(updated_by) REFERENCES users(id) ON DELETE SET NULL
+);
+
+CREATE TABLE IF NOT EXISTS ai_generations (
+    id SERIAL PRIMARY KEY,
+    teacher_id INTEGER NOT NULL,
+    school_id INTEGER NOT NULL,
+    class_id INTEGER NOT NULL,
+    subject_id INTEGER NOT NULL,
+    generation_type TEXT NOT NULL,
+    prompt TEXT NOT NULL,
+    response TEXT,
+    status TEXT NOT NULL DEFAULT 'pending',
+    model TEXT,
+    academic_session TEXT,
+    term TEXT,
+    request_metadata TEXT,
+    error_message TEXT,
+    prompt_tokens INTEGER DEFAULT 0,
+    completion_tokens INTEGER DEFAULT 0,
+    total_tokens INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY(teacher_id) REFERENCES teachers(id) ON DELETE CASCADE,
+    FOREIGN KEY(school_id) REFERENCES schools(id) ON DELETE CASCADE,
+    FOREIGN KEY(class_id) REFERENCES classes(id) ON DELETE CASCADE,
+    FOREIGN KEY(subject_id) REFERENCES subjects(id) ON DELETE CASCADE
+);
+
 CREATE TABLE IF NOT EXISTS quizzes (
     id SERIAL PRIMARY KEY,
     school_id INTEGER NOT NULL,
     class_id INTEGER NOT NULL,
     subject_id INTEGER NOT NULL,
     teacher_id INTEGER NOT NULL,
+    generation_id INTEGER,
     title TEXT NOT NULL,
+    topic TEXT,
+    difficulty TEXT,
+    question_type TEXT,
+    academic_session TEXT,
+    term TEXT,
+    status TEXT NOT NULL DEFAULT 'published',
     duration_minutes INTEGER,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    published_at TIMESTAMP,
     FOREIGN KEY(school_id) REFERENCES schools(id) ON DELETE CASCADE,
     FOREIGN KEY(class_id) REFERENCES classes(id) ON DELETE CASCADE,
     FOREIGN KEY(subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
-    FOREIGN KEY(teacher_id) REFERENCES teachers(id) ON DELETE CASCADE
+    FOREIGN KEY(teacher_id) REFERENCES teachers(id) ON DELETE CASCADE,
+    FOREIGN KEY(generation_id) REFERENCES ai_generations(id) ON DELETE SET NULL
 );
 
 -- Quiz Questions
@@ -266,7 +383,33 @@ CREATE TABLE IF NOT EXISTS quiz_questions (
     question_text TEXT NOT NULL,
     options TEXT NOT NULL, -- JSON array of strings
     correct_option_index INTEGER NOT NULL,
+    explanation TEXT,
+    question_type TEXT NOT NULL DEFAULT 'multiple_choice',
     FOREIGN KEY(quiz_id) REFERENCES quizzes(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS library_resources (
+    id SERIAL PRIMARY KEY,
+    teacher_id INTEGER NOT NULL,
+    school_id INTEGER NOT NULL,
+    class_id INTEGER NOT NULL,
+    subject_id INTEGER NOT NULL,
+    generation_id INTEGER,
+    title TEXT NOT NULL,
+    content_type TEXT NOT NULL,
+    body TEXT NOT NULL,
+    file_url TEXT,
+    academic_session TEXT,
+    term TEXT,
+    status TEXT NOT NULL DEFAULT 'draft',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    published_at TIMESTAMP,
+    FOREIGN KEY(teacher_id) REFERENCES teachers(id) ON DELETE CASCADE,
+    FOREIGN KEY(school_id) REFERENCES schools(id) ON DELETE CASCADE,
+    FOREIGN KEY(class_id) REFERENCES classes(id) ON DELETE CASCADE,
+    FOREIGN KEY(subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
+    FOREIGN KEY(generation_id) REFERENCES ai_generations(id) ON DELETE SET NULL
 );
 
 -- Quiz Attempts
@@ -314,3 +457,12 @@ CREATE UNIQUE INDEX IF NOT EXISTS uq_tsa_teacher_class_subject
 
 CREATE UNIQUE INDEX IF NOT EXISTS uq_tc_teacher_class_school
     ON teacher_classes (teacher_id, class_id, school_id);
+
+CREATE INDEX IF NOT EXISTS idx_ai_generations_teacher_created
+    ON ai_generations (teacher_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_ai_generations_school_created
+    ON ai_generations (school_id, created_at);
+
+CREATE INDEX IF NOT EXISTS idx_library_resources_status_class
+    ON library_resources (status, class_id);

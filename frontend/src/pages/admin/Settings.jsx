@@ -1,10 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Plus, CheckCircle, AlertCircle, Settings as SettingsIcon } from 'lucide-react';
+import { Plus, CheckCircle, AlertCircle, Settings as SettingsIcon, Building2, Upload } from 'lucide-react';
 import API_URL from '../../config/api';
+
+const emptyProfileForm = {
+  name: '',
+  address: '',
+  email: '',
+  phone: '',
+  motto: '',
+  website: '',
+  principal_name: '',
+  school_type: '',
+  city: '',
+  state: '',
+  country: ''
+};
 
 export default function Settings() {
   const [profile, setProfile] = useState(null);
+  const [profileForm, setProfileForm] = useState(emptyProfileForm);
+  const [logoFile, setLogoFile] = useState(null);
   const [sessions, setSessions] = useState([]);
   const [terms, setTerms] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -36,6 +52,12 @@ export default function Settings() {
         axios.get(`${API_URL}/schools/terms`)
       ]);
       setProfile(profileRes.data.profile);
+      setProfileForm({
+        ...emptyProfileForm,
+        ...Object.fromEntries(
+          Object.keys(emptyProfileForm).map(key => [key, profileRes.data.profile?.[key] || ''])
+        )
+      });
       setSessions(sessionsRes.data.sessions);
       setTerms(termsRes.data.terms);
       
@@ -80,6 +102,27 @@ export default function Settings() {
     }
   };
 
+  const handleUpdateProfile = async (e) => {
+    e.preventDefault();
+    try {
+      const formData = new FormData();
+      Object.entries(profileForm).forEach(([key, value]) => formData.append(key, value || ''));
+      formData.append('logo_url', profile?.logo_url || '');
+      formData.append('current_session_id', activeSession || '');
+      formData.append('current_term_id', activeTerm || '');
+      if (logoFile) formData.append('logo', logoFile);
+
+      await axios.put(`${API_URL}/schools/profile`, formData, {
+        headers: { 'Content-Type': 'multipart/form-data' }
+      });
+      setLogoFile(null);
+      showMessage('School profile updated successfully!');
+      fetchData();
+    } catch (err) {
+      showMessage(err.response?.data?.message || 'Failed to update school profile.', 'error');
+    }
+  };
+
   const handleUpdateActive = async (e) => {
     e.preventDefault();
     try {
@@ -116,6 +159,86 @@ export default function Settings() {
           {message.text}
         </div>
       )}
+
+      {/* School Profile */}
+      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">
+        <div className="flex items-center justify-between border-b pb-3 mb-5">
+          <h3 className="text-lg font-bold text-gray-900 flex items-center">
+            <Building2 className="w-5 h-5 mr-2 text-blue-600" />
+            School Profile
+          </h3>
+          {profile?.logo_url && (
+            <img src={`${API_URL.replace('/api', '')}${profile.logo_url}`} alt="School logo" className="w-12 h-12 object-contain rounded border border-gray-200 bg-white" />
+          )}
+        </div>
+
+        <form onSubmit={handleUpdateProfile} className="space-y-5">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">School Name *</label>
+              <input required type="text" value={profileForm.name} onChange={e => setProfileForm({...profileForm, name: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">School Type</label>
+              <select value={profileForm.school_type} onChange={e => setProfileForm({...profileForm, school_type: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border bg-white">
+                <option value="">Select school type</option>
+                <option value="Nursery">Nursery</option>
+                <option value="Primary">Primary</option>
+                <option value="Secondary">Secondary</option>
+                <option value="Combined">Combined</option>
+                <option value="College">College</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
+              <input type="email" value={profileForm.email} onChange={e => setProfileForm({...profileForm, email: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Phone</label>
+              <input type="tel" value={profileForm.phone} onChange={e => setProfileForm({...profileForm, phone: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Principal / Head Teacher</label>
+              <input type="text" value={profileForm.principal_name} onChange={e => setProfileForm({...profileForm, principal_name: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Website</label>
+              <input type="url" value={profileForm.website} onChange={e => setProfileForm({...profileForm, website: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border" placeholder="https://example.edu" />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Motto</label>
+              <input type="text" value={profileForm.motto} onChange={e => setProfileForm({...profileForm, motto: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border" />
+            </div>
+            <div className="md:col-span-2">
+              <label className="block text-sm font-medium text-gray-700 mb-1">Address</label>
+              <textarea rows="2" value={profileForm.address} onChange={e => setProfileForm({...profileForm, address: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">City</label>
+              <input type="text" value={profileForm.city} onChange={e => setProfileForm({...profileForm, city: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">State</label>
+              <input type="text" value={profileForm.state} onChange={e => setProfileForm({...profileForm, state: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Country</label>
+              <input type="text" value={profileForm.country} onChange={e => setProfileForm({...profileForm, country: e.target.value})} className="w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border" />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-gray-700 mb-1">Logo</label>
+              <input type="file" accept="image/*" onChange={e => setLogoFile(e.target.files?.[0] || null)} className="block w-full text-sm text-gray-700 file:mr-3 file:rounded-lg file:border-0 file:bg-blue-600 file:px-3 file:py-2 file:text-sm file:font-medium file:text-white hover:file:bg-blue-700" />
+            </div>
+          </div>
+
+          <div className="flex justify-end border-t pt-4">
+            <button type="submit" className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium transition">
+              <Upload className="w-4 h-4 mr-2" />
+              Save Profile
+            </button>
+          </div>
+        </form>
+      </div>
 
       {/* Active Academic Period Settings */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100">

@@ -15,12 +15,15 @@ import ContactPage from './pages/public/ContactPage';
 import Dashboard from './pages/Dashboard';
 import ClassesList from './pages/admin/ClassesList';
 import StudentsList from './pages/admin/StudentsList';
+import BulkUploadStudents from './pages/admin/BulkUploadStudents';
 import TeachersList from './pages/admin/TeachersList';
 import SubjectsList from './pages/admin/SubjectsList';
 import Settings from './pages/admin/Settings';
 import AttendanceEntry from './pages/teacher/AttendanceEntry';
 import GradesEntry from './pages/teacher/GradesEntry';
 import HomeworkPage from './pages/teacher/HomeworkPage';
+import TimetableManagement from './pages/teacher/TimetableManagement';
+import ClassInfo from './pages/student/ClassInfo';
 import ContentLibrary from './pages/content/ContentLibrary';
 import QuizPage from './pages/quiz/QuizPage';
 import ReportCard from './pages/reports/ReportCard';
@@ -29,6 +32,16 @@ import AnnouncementDetail from './pages/announcements/AnnouncementDetail';
 import AnnouncementManage from './pages/announcements/AnnouncementManage';
 import SchoolsList from './pages/superadmin/SchoolsList';
 import SchoolAdminsList from './pages/superadmin/SchoolAdminsList';
+import AIAssistant from './pages/ai/AIAssistant';
+import AIQuizGenerator from './pages/ai/AIQuizGenerator';
+import AIContentGenerator from './pages/ai/AIContentGenerator';
+import AIDrafts from './pages/ai/AIDrafts';
+import AIPublished from './pages/ai/AIPublished';
+import AIManagement from './pages/admin/AIManagement';
+import AIUsageLogs from './pages/admin/AIUsageLogs';
+import AISettings from './pages/admin/AISettings';
+
+const ANNOUNCEMENT_ROLES = ['SchoolAdmin', 'Teacher', 'Student', 'Parent'];
 
 // Placeholder Components for future features
 // SuperAdmin pages are now real components imported above
@@ -96,6 +109,14 @@ const AppRoutes = () => {
           } 
         />
         <Route 
+          path="admin/students/bulk-upload" 
+          element={
+            <ProtectedRoute allowedRoles={['SchoolAdmin']}>
+              <BulkUploadStudents />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
           path="admin/teachers" 
           element={
             <ProtectedRoute allowedRoles={['SuperAdmin', 'SchoolAdmin']}>
@@ -104,12 +125,40 @@ const AppRoutes = () => {
           } 
         />
         <Route 
+          path="admin/school-profile" 
+          element={<Navigate to="/dashboard/admin/settings" replace />}
+        />
+        <Route 
           path="admin/settings" 
           element={
-            <ProtectedRoute allowedRoles={['SuperAdmin', 'SchoolAdmin']}>
+            <ProtectedRoute allowedRoles={['SchoolAdmin']}>
               <Settings />
             </ProtectedRoute>
           } 
+        />
+        <Route
+          path="admin/ai"
+          element={
+            <ProtectedRoute allowedRoles={['SchoolAdmin']}>
+              <AIManagement />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin/ai/usage"
+          element={
+            <ProtectedRoute allowedRoles={['SchoolAdmin']}>
+              <AIUsageLogs />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="admin/ai/settings"
+          element={
+            <ProtectedRoute allowedRoles={['SchoolAdmin']}>
+              <AISettings />
+            </ProtectedRoute>
+          }
         />
 
         {/* Teacher Routes */}
@@ -126,6 +175,63 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute allowedRoles={['SuperAdmin', 'SchoolAdmin', 'Teacher']}>
                <GradesEntry />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="teacher/timetable" 
+          element={
+            <ProtectedRoute allowedRoles={['Teacher']}>
+               <TimetableManagement />
+            </ProtectedRoute>
+          } 
+        />
+        <Route
+          path="teacher/ai"
+          element={
+            <ProtectedRoute allowedRoles={['Teacher']}>
+              <AIAssistant />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="teacher/ai/quiz"
+          element={
+            <ProtectedRoute allowedRoles={['Teacher']}>
+              <AIQuizGenerator />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="teacher/ai/content"
+          element={
+            <ProtectedRoute allowedRoles={['Teacher']}>
+              <AIContentGenerator />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="teacher/ai/drafts"
+          element={
+            <ProtectedRoute allowedRoles={['Teacher']}>
+              <AIDrafts />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="teacher/ai/published"
+          element={
+            <ProtectedRoute allowedRoles={['Teacher']}>
+              <AIPublished />
+            </ProtectedRoute>
+          }
+        />
+
+        <Route 
+          path="student/class-info" 
+          element={
+            <ProtectedRoute allowedRoles={['Student']}>
+               <ClassInfo />
             </ProtectedRoute>
           } 
         />
@@ -226,7 +332,7 @@ const AppRoutes = () => {
       <Route
         path="/announcements"
         element={
-          <ProtectedRoute>
+          <ProtectedRoute allowedRoles={ANNOUNCEMENT_ROLES}>
             <MainLayout />
           </ProtectedRoute>
         }

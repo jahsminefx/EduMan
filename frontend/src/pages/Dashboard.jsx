@@ -16,26 +16,34 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [performance, setPerformance] = useState(null);
   const [pending, setPending] = useState([]);
+  const [schoolProfile, setSchoolProfile] = useState(null);
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async ({ silent = false } = {}) => {
     if (!silent) setLoading(true);
     try {
       const cacheBust = Date.now();
-      const [statsRes, perfRes, pendingRes] = await Promise.all([
+      const requests = [
         axios.get(`${API_URL}/stats/dashboard?t=${cacheBust}`),
         axios.get(`${API_URL}/stats/performance?t=${cacheBust}`),
         axios.get(`${API_URL}/stats/pending?t=${cacheBust}`)
-      ]);
+      ];
+
+      if (user.role !== 'SuperAdmin') {
+        requests.push(axios.get(`${API_URL}/schools/profile?t=${cacheBust}`));
+      }
+
+      const [statsRes, perfRes, pendingRes, profileRes] = await Promise.all(requests);
       setStats(statsRes.data);
       setPerformance(perfRes.data);
       setPending(pendingRes.data);
+      if (profileRes) setSchoolProfile(profileRes.data.profile);
     } catch (err) {
       console.error('Failed to fetch dashboard data:', err);
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [user.role]);
 
   useEffect(() => {
     fetchData();
@@ -310,7 +318,10 @@ export default function Dashboard() {
         </div>
         <div className="hidden sm:block text-right">
           <span className="text-xs font-bold text-gray-400 block uppercase">CURRENT SESSION</span>
-          <span className="text-sm font-black text-blue-600">2023/2024 Academic Year</span>
+          <span className="text-sm font-black text-blue-600">
+            {schoolProfile?.current_session_name || 'Not Set'}
+            {schoolProfile?.current_term_name ? ` - ${schoolProfile.current_term_name}` : ''}
+          </span>
         </div>
       </div>
 

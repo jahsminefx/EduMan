@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { BookOpen, Lock, Mail } from 'lucide-react';
+import { Lock, Mail } from 'lucide-react';
+import BrandLogo from '../components/BrandLogo';
 
 export default function Login() {
   const [email, setEmail] = useState('');
@@ -29,11 +30,9 @@ export default function Login() {
     <div className="min-h-screen bg-gray-50 flex flex-col justify-center py-12 sm:px-6 lg:px-8">
       <div className="sm:mx-auto sm:w-full sm:max-w-md">
         <div className="flex justify-center">
-          <div className="bg-blue-600 p-3 rounded-xl shadow-lg shadow-blue-500/30">
-            <BookOpen className="w-10 h-10 text-white" />
-          </div>
+          <BrandLogo className="h-32 w-auto" />
         </div>
-        <h2 className="mt-6 text-center text-3xl font-extrabold text-gray-900">
+        <h2 className="sr-only">
           EduMan
         </h2>
         <p className="mt-2 text-center text-sm text-gray-600">

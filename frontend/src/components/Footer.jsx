@@ -1,6 +1,6 @@
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { BookOpen } from 'lucide-react';
+import BrandLogo from './BrandLogo';
 
 export default function Footer() {
   return (
@@ -9,11 +9,8 @@ export default function Footer() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8">
           {/* Brand */}
           <div>
-            <div className="flex items-center gap-2 mb-4">
-              <div className="bg-blue-600 p-2 rounded-lg">
-                <BookOpen className="w-5 h-5 text-white" />
-              </div>
-              <span className="text-xl font-bold text-white tracking-tight">EduMan</span>
+            <div className="mb-4 inline-flex rounded-lg bg-white px-4 py-2.5">
+              <BrandLogo className="h-12 w-auto" />
             </div>
             <p className="text-sm leading-relaxed">
               Offline-first school management and learning platform designed for schools with limited internet connectivity.

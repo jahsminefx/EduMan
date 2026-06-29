@@ -1,6 +1,18 @@
 const { getDB } = require('../config/database');
 const bcrypt = require('bcryptjs');
 
+function cleanString(value) {
+    if (value === undefined || value === null) return null;
+    const trimmed = String(value).trim();
+    return trimmed || null;
+}
+
+function cleanId(value) {
+    if (value === undefined || value === null || value === '') return null;
+    const number = Number(value);
+    return Number.isInteger(number) && number > 0 ? number : null;
+}
+
 // SuperAdmin: Get all schools
 exports.getAllSchools = async (req, res) => {
     try {
@@ -68,7 +80,16 @@ exports.getMySchool = async (req, res) => {
 
         if (!school_id) return res.status(400).json({ error: 'Bad Request', message: 'User has no associated school' });
 
-        const profile = await db.get("SELECT * FROM schools WHERE id = $1", [school_id]);
+        const profile = await db.get(`
+            SELECT
+                s.*,
+                acs.name as current_session_name,
+                at.name as current_term_name
+            FROM schools s
+            LEFT JOIN academic_sessions acs ON s.current_session_id = acs.id
+            LEFT JOIN academic_terms at ON s.current_term_id = at.id
+            WHERE s.id = $1
+        `, [school_id]);
         if (!profile) return res.status(404).json({ error: 'Not Found', message: 'School not found' });
         
         res.json({ profile });
@@ -79,15 +100,85 @@ exports.getMySchool = async (req, res) => {
 
 // SchoolAdmin: Update their own school profile
 exports.updateMySchool = async (req, res) => {
-    const { name, address, phone, email, current_session_id, current_term_id } = req.body;
+    const {
+        name,
+        address,
+        phone,
+        email,
+        motto,
+        website,
+        principal_name,
+        school_type,
+        city,
+        state,
+        country,
+        current_session_id,
+        current_term_id
+    } = req.body;
     try {
         const db = getDB();
         const school_id = req.user.school_id;
-        
-        await db.run(
-            'UPDATE schools SET name=$1, address=$2, phone=$3, email=$4, current_session_id=$5, current_term_id=$6 WHERE id=$7',
-            [name, address, phone, email, current_session_id, current_term_id, school_id]
-        );
+
+        const sessionId = cleanId(current_session_id);
+        const termId = cleanId(current_term_id);
+        const schoolName = cleanString(name);
+
+        if (!schoolName) {
+            return res.status(400).json({ error: 'Validation Error', message: 'School name is required.' });
+        }
+
+        if (sessionId) {
+            const session = await db.get('SELECT id FROM academic_sessions WHERE id = $1 AND school_id = $2', [sessionId, school_id]);
+            if (!session) {
+                return res.status(400).json({ error: 'Validation Error', message: 'Selected academic session does not belong to your school.' });
+            }
+        }
+
+        if (termId) {
+            const term = await db.get(
+                'SELECT id, session_id FROM academic_terms WHERE id = $1 AND school_id = $2',
+                [termId, school_id]
+            );
+            if (!term) {
+                return res.status(400).json({ error: 'Validation Error', message: 'Selected academic term does not belong to your school.' });
+            }
+            if (sessionId && Number(term.session_id) !== Number(sessionId)) {
+                return res.status(400).json({ error: 'Validation Error', message: 'Selected term must belong to the selected academic session.' });
+            }
+        }
+
+        const existing = await db.get('SELECT logo_url FROM schools WHERE id = $1', [school_id]);
+        const logoUrl = req.file ? `/uploads/${req.file.filename}` : (cleanString(req.body.logo_url) || existing?.logo_url || null);
+
+        await db.transaction(async (client) => {
+            await client.run(
+                `UPDATE schools
+                 SET name=$1, address=$2, phone=$3, email=$4, logo_url=$5, motto=$6, website=$7,
+                     principal_name=$8, school_type=$9, city=$10, state=$11, country=$12,
+                     current_session_id=$13, current_term_id=$14
+                 WHERE id=$15`,
+                [
+                    schoolName,
+                    cleanString(address),
+                    cleanString(phone),
+                    cleanString(email),
+                    logoUrl,
+                    cleanString(motto),
+                    cleanString(website),
+                    cleanString(principal_name),
+                    cleanString(school_type),
+                    cleanString(city),
+                    cleanString(state),
+                    cleanString(country),
+                    sessionId,
+                    termId,
+                    school_id
+                ]
+            );
+
+            await client.run('UPDATE academic_sessions SET is_active = CASE WHEN id = $1 THEN 1 ELSE 0 END WHERE school_id = $2', [sessionId, school_id]);
+            await client.run('UPDATE academic_terms SET is_active = CASE WHEN id = $1 THEN 1 ELSE 0 END WHERE school_id = $2', [termId, school_id]);
+        });
         
         res.json({ message: 'School profile updated successfully' });
     } catch (err) {
@@ -149,10 +240,18 @@ exports.getTerms = async (req, res) => {
 
 exports.createTerm = async (req, res) => {
     const { session_id, name } = req.body;
+    const sessionId = cleanId(session_id);
+    if (!sessionId || !name || !name.trim()) {
+        return res.status(400).json({ error: 'Validation Error', message: 'Session and term name are required.' });
+    }
     try {
         const db = getDB();
         const school_id = req.user.school_id;
-        const result = await db.run('INSERT INTO academic_terms (school_id, session_id, name) VALUES ($1, $2, $3) RETURNING id', [school_id, session_id, name]);
+        const session = await db.get('SELECT id FROM academic_sessions WHERE id = $1 AND school_id = $2', [sessionId, school_id]);
+        if (!session) {
+            return res.status(400).json({ error: 'Validation Error', message: 'Selected academic session does not belong to your school.' });
+        }
+        const result = await db.run('INSERT INTO academic_terms (school_id, session_id, name) VALUES ($1, $2, $3) RETURNING id', [school_id, sessionId, name.trim()]);
         res.json({ message: 'Term created', id: result.lastID });
     } catch (err) {
         res.status(500).json({ error: 'Server Error', message: err.message });

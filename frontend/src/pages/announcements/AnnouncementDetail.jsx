@@ -1,8 +1,13 @@
 import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import axios from 'axios';
-import { ArrowLeft, CalendarDays, Pencil, UserCircle } from 'lucide-react';
-import API_URL from '../../config/api';
+import { ArrowLeft, CalendarDays, FileText, Pencil, UserCircle } from 'lucide-react';
+import API_URL, { API_BASE_URL } from '../../config/api';
+
+function mediaUrl(value) {
+  if (!value) return '';
+  return value.startsWith('/uploads/') ? `${API_BASE_URL}${value}` : value;
+}
 
 function formatDate(value) {
   if (!value) return 'Draft';
@@ -79,9 +84,9 @@ export default function AnnouncementDetail() {
         )}
       </div>
 
-      {announcement.featured_image && (
+      {(announcement.featured_image || announcement.attachment_type === 'image') && (
         <div className="w-full aspect-[16/7] rounded-xl overflow-hidden bg-gray-100 border border-gray-100">
-          <img src={announcement.featured_image} alt="" className="w-full h-full object-cover" />
+          <img src={mediaUrl(announcement.featured_image || announcement.attachment_path)} alt="" className="w-full h-full object-cover" />
         </div>
       )}
 
@@ -100,6 +105,19 @@ export default function AnnouncementDetail() {
         <div className="mt-6 text-gray-700 leading-7 whitespace-pre-wrap">
           {announcement.content}
         </div>
+        {announcement.attachment_path && (
+          <div className="mt-8 rounded-lg border border-blue-100 bg-blue-50 p-4">
+            <a
+              href={mediaUrl(announcement.attachment_path)}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex max-w-full items-center text-sm font-bold text-blue-700 hover:text-blue-900 hover:underline"
+            >
+              <FileText className="w-5 h-5 mr-2 flex-shrink-0" />
+              <span className="truncate">{announcement.attachment_name || 'Open attachment'}</span>
+            </a>
+          </div>
+        )}
       </div>
     </article>
   );

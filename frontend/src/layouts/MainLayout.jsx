@@ -7,6 +7,7 @@ import {
   BookOpen, 
   GraduationCap, 
   Calendar,
+  Clock,
   LogOut,
   FolderOpen,
   HelpCircle,
@@ -15,8 +16,15 @@ import {
   Megaphone,
   X,
   Settings,
-  UserCog
+  UserCog,
+  Info,
+  Sparkles,
+  History,
+  Bot
 } from 'lucide-react';
+import BrandLogo from '../components/BrandLogo';
+
+const ANNOUNCEMENT_ROLES = ['SchoolAdmin', 'Teacher', 'Student', 'Parent'];
 
 export default function MainLayout() {
   const { user, logout } = useAuth();
@@ -26,8 +34,11 @@ export default function MainLayout() {
   const getLinks = () => {
     const base = [
       { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
-      { name: 'Announcements', path: '/announcements', icon: Megaphone },
     ];
+
+    if (ANNOUNCEMENT_ROLES.includes(user.role)) {
+      base.push({ name: 'Announcements', path: '/announcements', icon: Megaphone });
+    }
 
     switch(user.role) {
       case 'SuperAdmin':
@@ -44,7 +55,10 @@ export default function MainLayout() {
           { name: 'Teachers', path: '/dashboard/admin/teachers', icon: Users },
           { name: 'Students', path: '/dashboard/admin/students', icon: GraduationCap },
           { name: 'Report Cards', path: '/dashboard/reports/card', icon: FolderOpen },
-          { name: 'Settings', path: '/dashboard/admin/settings', icon: Settings }
+          { name: 'EduMan AI', path: '/dashboard/admin/ai', icon: Bot },
+          { name: 'EduMan AI Logs', path: '/dashboard/admin/ai/usage', icon: History },
+          { name: 'EduMan AI Settings', path: '/dashboard/admin/ai/settings', icon: Sparkles },
+          { name: 'Academic Settings', path: '/dashboard/admin/settings', icon: Settings }
         );
         break;
 
@@ -52,7 +66,11 @@ export default function MainLayout() {
         base.push(
           { name: 'Attendance', path: '/dashboard/teacher/attendance', icon: Calendar },
           { name: 'Gradebook', path: '/dashboard/teacher/grades', icon: BookOpen },
+          { name: 'Timetable', path: '/dashboard/teacher/timetable', icon: Clock },
           { name: 'Homework', path: '/dashboard/teacher/homework', icon: FolderOpen },
+          { name: 'EduMan AI', path: '/dashboard/teacher/ai', icon: Sparkles },
+          { name: 'EduMan AI Drafts', path: '/dashboard/teacher/ai/drafts', icon: History },
+          { name: 'Published EduMan AI', path: '/dashboard/teacher/ai/published', icon: Library },
           { name: 'Quizzes', path: '/dashboard/quiz', icon: HelpCircle },
           { name: 'Library', path: '/dashboard/content/library', icon: Library },
           { name: 'Report Cards', path: '/dashboard/reports/card', icon: GraduationCap },
@@ -62,6 +80,7 @@ export default function MainLayout() {
       case 'Student':
         base.push(
           { name: 'My Homework', path: '/dashboard/teacher/homework', icon: FolderOpen },
+          { name: 'Class Info', path: '/dashboard/student/class-info', icon: Info },
           { name: 'Quizzes', path: '/dashboard/quiz', icon: HelpCircle },
           { name: 'My Report Card', path: '/dashboard/reports/card', icon: BookOpen },
           { name: 'Library', path: '/dashboard/content/library', icon: Library },
@@ -120,10 +139,9 @@ export default function MainLayout() {
         ${isSidebarOpen ? 'translate-x-0' : '-translate-x-full'}
       `}>
         <div className="flex items-center justify-between h-16 border-b border-gray-200 px-6">
-          <div className="flex items-center">
-            <BookOpen className="w-8 h-8 text-blue-600 mr-2" />
-            <span className="text-xl font-bold text-gray-900 tracking-tight">EduMan</span>
-          </div>
+          <Link to="/dashboard" className="flex items-center">
+            <BrandLogo className="h-12 w-auto" />
+          </Link>
           <button 
             className="p-2 rounded-lg lg:hidden hover:bg-gray-100 text-gray-500"
             onClick={() => setIsSidebarOpen(false)}
@@ -136,7 +154,8 @@ export default function MainLayout() {
           <nav className="px-3 space-y-1">
             {links.map((link) => {
               const Icon = link.icon;
-              const isActive = link.path === '/dashboard'
+              const exactOnly = ['/dashboard', '/dashboard/teacher/ai', '/dashboard/admin/ai'].includes(link.path);
+              const isActive = exactOnly
                 ? location.pathname === link.path
                 : location.pathname === link.path || location.pathname.startsWith(`${link.path}/`);
               return (

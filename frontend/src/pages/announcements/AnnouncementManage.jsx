@@ -1,16 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
-import { ArrowLeft, Image as ImageIcon, Pencil, Plus, Save, Trash2 } from 'lucide-react';
+import { ArrowLeft, FileText, Image as ImageIcon, Pencil, Plus, Save, Trash2, Upload, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import API_URL from '../../config/api';
+import API_URL, { API_BASE_URL } from '../../config/api';
 
 const EMPTY_FORM = {
   title: '',
   content: '',
   featured_image: '',
+  attachment_path: '',
+  attachment_name: '',
+  attachment_type: '',
   status: 'Draft'
 };
+
+function mediaUrl(value) {
+  if (!value) return '';
+  return value.startsWith('/uploads/') ? `${API_BASE_URL}${value}` : value;
+}
 
 function formatDate(value) {
   if (!value) return 'Draft';
@@ -25,7 +33,12 @@ export default function AnnouncementManage() {
   const { user } = useAuth();
   const [announcements, setAnnouncements] = useState([]);
   const [form, setForm] = useState(EMPTY_FORM);
+  const [featuredImageFile, setFeaturedImageFile] = useState(null);
+  const [attachmentFile, setAttachmentFile] = useState(null);
+  const [removeFeaturedImage, setRemoveFeaturedImage] = useState(false);
+  const [removeAttachment, setRemoveAttachment] = useState(false);
   const [editingId, setEditingId] = useState(null);
+  const [fileInputKey, setFileInputKey] = useState(0);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
@@ -57,17 +70,34 @@ export default function AnnouncementManage() {
 
   const resetForm = () => {
     setForm(EMPTY_FORM);
+    setFeaturedImageFile(null);
+    setAttachmentFile(null);
+    setRemoveFeaturedImage(false);
+    setRemoveAttachment(false);
+    setFileInputKey(key => key + 1);
     setEditingId(null);
+    setMessage('');
+    setError('');
   };
 
   const handleEdit = (announcement) => {
     setEditingId(announcement.id);
+    setMessage('');
+    setError('');
     setForm({
       title: announcement.title || '',
       content: announcement.content || '',
       featured_image: announcement.featured_image || '',
+      attachment_path: announcement.attachment_path || '',
+      attachment_name: announcement.attachment_name || '',
+      attachment_type: announcement.attachment_type || '',
       status: announcement.status || 'Draft'
     });
+    setFeaturedImageFile(null);
+    setAttachmentFile(null);
+    setRemoveFeaturedImage(false);
+    setRemoveAttachment(false);
+    setFileInputKey(key => key + 1);
   };
 
   const handleSubmit = async (event) => {
@@ -77,11 +107,21 @@ export default function AnnouncementManage() {
     setError('');
 
     try {
+      const payload = new FormData();
+      payload.append('title', form.title);
+      payload.append('content', form.content);
+      payload.append('status', form.status);
+      payload.append('featured_image', form.featured_image || '');
+      payload.append('remove_featured_image', removeFeaturedImage ? 'true' : 'false');
+      payload.append('remove_attachment', removeAttachment ? 'true' : 'false');
+      if (featuredImageFile) payload.append('featured_image_file', featuredImageFile);
+      if (attachmentFile) payload.append('attachment_file', attachmentFile);
+
       if (editingId) {
-        await axios.put(`${API_URL}/announcements/${editingId}`, form);
+        await axios.put(`${API_URL}/announcements/${editingId}`, payload);
         setMessage('Announcement updated successfully.');
       } else {
-        await axios.post(`${API_URL}/announcements`, form);
+        await axios.post(`${API_URL}/announcements`, payload);
         setMessage('Announcement created successfully.');
       }
       resetForm();
@@ -154,17 +194,76 @@ export default function AnnouncementManage() {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-bold text-gray-700 mb-1">Featured Image URL</label>
-            <div className="relative">
-              <ImageIcon className="absolute left-3 top-3 w-4 h-4 text-gray-400" />
-              <input
-                type="url"
-                value={form.featured_image}
-                onChange={(event) => handleChange('featured_image', event.target.value)}
-                className="w-full rounded-md border border-gray-300 p-2.5 pl-10 text-gray-900 focus:border-blue-500 focus:ring-blue-500"
-                placeholder="https://"
-              />
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">Featured Image</label>
+              <label className="flex min-h-[112px] cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-center hover:border-blue-300 hover:bg-blue-50">
+                <ImageIcon className="w-6 h-6 text-blue-600 mb-2" />
+                <span className="text-sm font-bold text-gray-800">{featuredImageFile ? featuredImageFile.name : 'Upload picture or image'}</span>
+                <span className="text-xs text-gray-500 mt-1">JPG, PNG, GIF, or WEBP</span>
+                <input
+                  key={`featured-${fileInputKey}`}
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp"
+                  onChange={(event) => {
+                    setFeaturedImageFile(event.target.files?.[0] || null);
+                    setRemoveFeaturedImage(false);
+                  }}
+                  className="sr-only"
+                />
+              </label>
+              {editingId && form.featured_image && !removeFeaturedImage && !featuredImageFile && (
+                <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-white p-3">
+                  <a href={mediaUrl(form.featured_image)} target="_blank" rel="noreferrer" className="text-xs font-bold text-blue-700 hover:underline truncate">
+                    Current featured image
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setRemoveFeaturedImage(true)}
+                    className="text-red-600 hover:text-red-800"
+                    aria-label="Remove current featured image"
+                    title="Remove current featured image"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div>
+              <label className="block text-sm font-bold text-gray-700 mb-1">Attachment</label>
+              <label className="flex min-h-[112px] cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-center hover:border-blue-300 hover:bg-blue-50">
+                <Upload className="w-6 h-6 text-blue-600 mb-2" />
+                <span className="text-sm font-bold text-gray-800">{attachmentFile ? attachmentFile.name : 'Upload image or document'}</span>
+                <span className="text-xs text-gray-500 mt-1">Images, PDF, Word, Excel, PowerPoint, TXT</span>
+                <input
+                  key={`attachment-${fileInputKey}`}
+                  type="file"
+                  accept="image/png,image/jpeg,image/gif,image/webp,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.rtf"
+                  onChange={(event) => {
+                    setAttachmentFile(event.target.files?.[0] || null);
+                    setRemoveAttachment(false);
+                  }}
+                  className="sr-only"
+                />
+              </label>
+              {editingId && form.attachment_path && !removeAttachment && !attachmentFile && (
+                <div className="mt-3 flex items-center justify-between gap-3 rounded-lg border border-gray-100 bg-white p-3">
+                  <a href={mediaUrl(form.attachment_path)} target="_blank" rel="noreferrer" className="inline-flex min-w-0 items-center text-xs font-bold text-blue-700 hover:underline">
+                    <FileText className="w-4 h-4 mr-2 flex-shrink-0" />
+                    <span className="truncate">{form.attachment_name || 'Current attachment'}</span>
+                  </a>
+                  <button
+                    type="button"
+                    onClick={() => setRemoveAttachment(true)}
+                    className="text-red-600 hover:text-red-800"
+                    aria-label="Remove current attachment"
+                    title="Remove current attachment"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
             </div>
           </div>
 
@@ -254,6 +353,17 @@ export default function AnnouncementManage() {
                       Delete
                     </button>
                   </div>
+                  {announcement.attachment_path && (
+                    <a
+                      href={mediaUrl(announcement.attachment_path)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="mt-3 inline-flex max-w-full items-center text-xs font-bold text-blue-700 hover:underline"
+                    >
+                      <FileText className="w-3 h-3 mr-1 flex-shrink-0" />
+                      <span className="truncate">{announcement.attachment_name || 'Attachment'}</span>
+                    </a>
+                  )}
                 </div>
               ))}
             </div>

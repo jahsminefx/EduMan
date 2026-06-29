@@ -3,7 +3,12 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { Megaphone, ArrowRight, Plus, Image as ImageIcon } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import API_URL from '../../config/api';
+import API_URL, { API_BASE_URL } from '../../config/api';
+
+function mediaUrl(value) {
+  if (!value) return '';
+  return value.startsWith('/uploads/') ? `${API_BASE_URL}${value}` : value;
+}
 
 function formatDate(value) {
   if (!value) return 'Unpublished';
@@ -91,9 +96,9 @@ export default function AnnouncementList() {
           {announcements.map((announcement) => (
             <article key={announcement.id} className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden flex flex-col">
               <div className="h-40 bg-gray-100">
-                {announcement.featured_image ? (
+                {announcement.featured_image || announcement.attachment_type === 'image' ? (
                   <img
-                    src={announcement.featured_image}
+                    src={mediaUrl(announcement.featured_image || announcement.attachment_path)}
                     alt=""
                     className="w-full h-full object-cover"
                   />

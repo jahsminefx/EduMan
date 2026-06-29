@@ -94,6 +94,13 @@ exports.saveGrades = async (req, res) => {
             });
         }
 
+        const termInfo = await db.get(`
+            SELECT at.id as term_id, at.name as term_name, acs.id as session_id, acs.name as session_name
+            FROM academic_terms at
+            JOIN academic_sessions acs ON at.session_id = acs.id
+            WHERE at.id = $1 AND at.school_id = $2
+        `, [term_id, school_id]);
+
         await db.transaction(async (client) => {
             for (const record of records) {
                 const existing = await client.get(
@@ -104,14 +111,26 @@ exports.saveGrades = async (req, res) => {
 
                 if (existing) {
                     await client.run(
-                        'UPDATE assessments SET score = $1, max_score = $2, recorded_by = $3 WHERE id = $4',
-                        [record.score, max_score, req.user.id, existing.id]
+                        'UPDATE assessments SET score = $1, max_score = $2, recorded_by = $3, session_id = $4, academic_session = $5, term = $6 WHERE id = $7',
+                        [record.score, max_score, req.user.id, termInfo.session_id, termInfo.session_name, termInfo.term_name, existing.id]
                     );
                 } else {
                     await client.run(
-                        `INSERT INTO assessments (student_id, class_id, subject_id, term_id, type, score, max_score, recorded_by) 
-                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
-                        [record.student_id, class_id, subject_id, term_id, type, record.score, max_score, req.user.id]
+                        `INSERT INTO assessments (student_id, class_id, subject_id, term_id, session_id, academic_session, term, type, score, max_score, recorded_by) 
+                         VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)`,
+                        [
+                            record.student_id,
+                            class_id,
+                            subject_id,
+                            term_id,
+                            termInfo.session_id,
+                            termInfo.session_name,
+                            termInfo.term_name,
+                            type,
+                            record.score,
+                            max_score,
+                            req.user.id
+                        ]
                     );
                 }
             }
@@ -165,6 +184,17 @@ exports.getStudentReport = async (req, res) => {
         const school_id = req.user.school_id;
         let studentInfo = null;
 
+        const termInfo = await db.get(`
+            SELECT at.id as term_id, at.name as term_name, acs.id as session_id, acs.name as session_name
+            FROM academic_terms at
+            JOIN academic_sessions acs ON at.session_id = acs.id
+            WHERE at.id = $1 AND at.school_id = $2
+        `, [termId, school_id]);
+
+        if (!termInfo) {
+            return res.status(404).json({ error: 'Not Found', message: 'Academic term not found for your school.' });
+        }
+
         if (req.user.role === 'Parent') {
             const link = await db.get(
                 'SELECT id FROM parent_student_links WHERE parent_user_id = $1 AND student_id = $2',
@@ -205,15 +235,54 @@ exports.getStudentReport = async (req, res) => {
         }
 
         const records = await db.all(`
-            SELECT a.type, a.score, a.max_score, sub.name as subject_name
+            SELECT
+                a.type,
+                a.score,
+                a.max_score,
+                COALESCE(a.academic_session, $4) as academic_session,
+                COALESCE(a.term, $5) as term,
+                sub.name as subject_name
             FROM assessments a
             JOIN subjects sub ON a.subject_id = sub.id
             JOIN academic_terms at ON a.term_id = at.id
             WHERE a.student_id = $1 AND a.term_id = $2 AND at.school_id = $3
             ORDER BY sub.name ASC
-        `, [studentId, termId, school_id]);
+        `, [studentId, termId, school_id, termInfo.session_name, termInfo.term_name]);
 
-        res.json({ report: records, student: studentInfo });
+        const school = await db.get(`
+            SELECT
+                s.id,
+                s.name,
+                s.address,
+                s.phone,
+                s.email,
+                s.logo_url,
+                s.motto,
+                s.website,
+                s.principal_name,
+                s.school_type,
+                s.city,
+                s.state,
+                s.country,
+                acs.name as current_session_name,
+                at.name as current_term_name
+            FROM schools s
+            LEFT JOIN academic_sessions acs ON s.current_session_id = acs.id
+            LEFT JOIN academic_terms at ON s.current_term_id = at.id
+            WHERE s.id = $1
+        `, [school_id]);
+
+        res.json({
+            report: records,
+            student: studentInfo,
+            school,
+            academic: {
+                session_id: termInfo.session_id,
+                session_name: termInfo.session_name,
+                term_id: termInfo.term_id,
+                term_name: termInfo.term_name
+            }
+        });
     } catch (err) {
         res.status(500).json({ error: 'Server Error', message: err.message });
     }

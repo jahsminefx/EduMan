@@ -31,6 +31,6 @@ const upload = multer({
 
 router.get('/', protect, contentController.getContents);
 router.post('/', protect, authorize('ContentManager', 'Teacher', 'SchoolAdmin'), upload.single('file'), contentController.uploadContent);
-router.delete('/:id', protect, authorize('ContentManager', 'SchoolAdmin'), contentController.deleteContent);
+router.delete('/:id', protect, authorize('ContentManager', 'Teacher', 'SchoolAdmin'), contentController.deleteContent);
 
 module.exports = router;
