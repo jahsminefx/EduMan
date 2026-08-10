@@ -2,7 +2,8 @@ import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { BookOpen, Plus, Trash2, Upload, Calendar, Send, FileCheck, Eye, X, CheckCircle as CheckCircleIcon } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { API_URL, API_BASE_URL } from '../../config/api';
+import { API_URL } from '../../config/api';
+import { mediaUrl } from '../../utils/media';
 import AssignmentSubmit from '../../components/AssignmentSubmit';
 
 export default function HomeworkPage() {
@@ -178,7 +179,7 @@ export default function HomeworkPage() {
                   </div>
 
                   {hw.file_path && (
-                    <a href={`${API_BASE_URL}${hw.file_path}`} target="_blank" rel="noreferrer" className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg text-xs text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-all font-medium">
+                    <a href={mediaUrl(hw.file_path)} target="_blank" rel="noreferrer" className="flex items-center gap-2 p-2 bg-gray-50 rounded-lg text-xs text-blue-600 hover:bg-blue-50 border border-transparent hover:border-blue-100 transition-all font-medium">
                       <Plus className="w-3.5 h-3.5 rotate-45" /> View Reference Material
                     </a>
                   )}
@@ -281,7 +282,7 @@ export default function HomeworkPage() {
                           {new Date(sub.submitted_at).toLocaleDateString()} at {new Date(sub.submitted_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </span>
                         <a 
-                          href={`${API_BASE_URL}${sub.file_path}`} 
+                          href={mediaUrl(sub.file_path)}
                           target="_blank" 
                           rel="noreferrer"
                           className="flex items-center gap-1.5 px-4 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-bold text-[10px]"

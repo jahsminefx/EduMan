@@ -1,11 +1,79 @@
 const { getDB } = require('../config/database');
 const path = require('path');
+const { browserSafeVideoUrl, deleteStoredMedia, deleteTempFile, uploadImage, uploadVideo } = require('../utils/cloudinaryImage');
+
+const videoExtensions = new Set(['.mp4', '.mov', '.webm', '.m4v']);
+
+function localUploadPath(file) {
+    return file ? `/uploads/${file.filename}` : null;
+}
+
+async function storeHomeworkFile(file, req, folder) {
+    if (!file) return { filePath: null, filePublicId: null };
+
+    if (file.mimetype?.startsWith('image/')) {
+        const image = await uploadImage(file, {
+            imageType: 'content',
+            folder,
+            context: {
+                school_id: String(req.user.school_id),
+                uploaded_by: String(req.user.id),
+                upload_type: 'homework'
+            }
+        });
+
+        return {
+            filePath: image.url,
+            filePublicId: image.publicId
+        };
+    }
+
+    if (file.mimetype?.startsWith('video/')) {
+        const video = await uploadVideo(file, {
+            folder,
+            context: {
+                school_id: String(req.user.school_id),
+                uploaded_by: String(req.user.id),
+                upload_type: 'homework_video'
+            }
+        });
+
+        return {
+            filePath: video.url,
+            filePublicId: video.publicId,
+            resourceType: video.resourceType
+        };
+    }
+
+    return {
+        filePath: localUploadPath(file),
+        filePublicId: null
+    };
+}
+
+function looksLikeCloudinaryVideo(row) {
+    if (!row?.file_public_id || !row?.file_path) return false;
+    if (String(row.file_path).includes('/video/upload/')) return true;
+
+    const ext = path.extname(String(row.file_path).split('?')[0]).toLowerCase();
+    return videoExtensions.has(ext);
+}
+
+function withBrowserSafeVideoUrl(row) {
+    if (!looksLikeCloudinaryVideo(row)) return row;
+    return {
+        ...row,
+        file_path: browserSafeVideoUrl(row.file_public_id) || row.file_path
+    };
+}
 
 // Teacher: Create homework for assigned class/subject
 exports.createHomework = async (req, res) => {
     const { class_id, subject_id, title, description, due_date } = req.body;
+    let storedFile = { filePath: null, filePublicId: null };
 
     if (!class_id || !subject_id || !title) {
+        deleteTempFile(req.file);
         return res.status(400).json({ error: 'Validation Error', message: 'class_id, subject_id, and title are required.' });
     }
 
@@ -24,16 +92,25 @@ exports.createHomework = async (req, res) => {
         );
         if (!assignment) return res.status(403).json({ error: 'Forbidden', message: 'You are not assigned to this class/subject.' });
 
-        const file_path = req.file ? `/uploads/${req.file.filename}` : null;
+        storedFile = await storeHomeworkFile(req.file, req, `schools/${school_id}/homework`);
 
         const result = await db.run(
-            'INSERT INTO homework (school_id, class_id, subject_id, teacher_id, title, description, due_date, file_path) VALUES ($1, $2, $3, $4, $5, $6, $7, $8) RETURNING id',
-            [school_id, class_id, subject_id, teacher.id, title, description, due_date, file_path]
+            'INSERT INTO homework (school_id, class_id, subject_id, teacher_id, title, description, due_date, file_path, file_public_id) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9) RETURNING id',
+            [school_id, class_id, subject_id, teacher.id, title, description, due_date, storedFile.filePath, storedFile.filePublicId]
         );
 
         res.json({ message: 'Homework created successfully', id: result.lastID || result.rows?.[0]?.id });
     } catch (err) {
-        res.status(500).json({ error: 'Server Error', message: err.message });
+        await deleteStoredMedia({
+            url: storedFile.filePath,
+            publicId: storedFile.filePublicId,
+            resourceType: storedFile.resourceType
+        });
+        deleteTempFile(req.file);
+        res.status(err.statusCode || 500).json({
+            error: err.statusCode ? 'Validation Error' : 'Server Error',
+            message: err.message
+        });
     }
 };
 
@@ -63,7 +140,7 @@ exports.getHomework = async (req, res) => {
         query += ' ORDER BY h.due_date DESC';
         const homework = await db.all(query, params);
 
-        res.json({ homework });
+        res.json({ homework: homework.map(withBrowserSafeVideoUrl) });
     } catch (err) {
         res.status(500).json({ error: 'Server Error', message: err.message });
     }
@@ -88,6 +165,7 @@ exports.deleteHomework = async (req, res) => {
 // Student: Submit homework
 exports.submitHomework = async (req, res) => {
     const { homework_id, text_answer } = req.body;
+    let storedFile = { filePath: null, filePublicId: null };
 
     try {
         const db = getDB();
@@ -100,16 +178,25 @@ exports.submitHomework = async (req, res) => {
             [req.user.id, hw.school_id, hw.class_id]);
         if (!student) return res.status(403).json({ error: 'Forbidden', message: 'You are not enrolled in this class.' });
 
-        const file_path = req.file ? `/uploads/${req.file.filename}` : null;
+        storedFile = await storeHomeworkFile(req.file, req, `schools/${hw.school_id}/homework-submissions`);
 
         const result = await db.run(
-            'INSERT INTO homework_submissions (homework_id, student_id, text_answer, file_path) VALUES ($1, $2, $3, $4) RETURNING id',
-            [homework_id, student.id, text_answer, file_path]
+            'INSERT INTO homework_submissions (homework_id, student_id, text_answer, file_path, file_public_id) VALUES ($1, $2, $3, $4, $5) RETURNING id',
+            [homework_id, student.id, text_answer, storedFile.filePath, storedFile.filePublicId]
         );
 
         res.json({ message: 'Submission received', id: result.lastID || result.rows?.[0]?.id });
     } catch (err) {
-        res.status(500).json({ error: 'Server Error', message: err.message });
+        await deleteStoredMedia({
+            url: storedFile.filePath,
+            publicId: storedFile.filePublicId,
+            resourceType: storedFile.resourceType
+        });
+        deleteTempFile(req.file);
+        res.status(err.statusCode || 500).json({
+            error: err.statusCode ? 'Validation Error' : 'Server Error',
+            message: err.message
+        });
     }
 };
 
@@ -132,7 +219,7 @@ exports.getSubmissions = async (req, res) => {
             ORDER BY s.last_name ASC
         `, [homeworkId]);
 
-        res.json({ submissions });
+        res.json({ submissions: submissions.map(withBrowserSafeVideoUrl) });
     } catch (err) {
         res.status(500).json({ error: 'Server Error', message: err.message });
     }

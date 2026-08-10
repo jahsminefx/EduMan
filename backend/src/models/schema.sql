@@ -16,6 +16,7 @@ CREATE TABLE IF NOT EXISTS schools (
     phone TEXT,
     email TEXT,
     logo_url TEXT,
+    logo_public_id TEXT,
     motto TEXT,
     website TEXT,
     principal_name TEXT,
@@ -246,7 +247,9 @@ CREATE TABLE IF NOT EXISTS announcements (
     title VARCHAR(255) NOT NULL,
     content TEXT NOT NULL,
     featured_image VARCHAR(500),
+    featured_image_public_id TEXT,
     attachment_path VARCHAR(500),
+    attachment_public_id TEXT,
     attachment_name VARCHAR(255),
     attachment_type VARCHAR(30),
     attachment_mime VARCHAR(120),
@@ -275,6 +278,7 @@ CREATE TABLE IF NOT EXISTS homework (
     description TEXT,
     due_date DATE,
     file_path TEXT,
+    file_public_id TEXT,
     FOREIGN KEY(school_id) REFERENCES schools(id) ON DELETE CASCADE,
     FOREIGN KEY(class_id) REFERENCES classes(id) ON DELETE CASCADE,
     FOREIGN KEY(subject_id) REFERENCES subjects(id) ON DELETE CASCADE,
@@ -288,6 +292,7 @@ CREATE TABLE IF NOT EXISTS homework_submissions (
     student_id INTEGER NOT NULL,
     text_answer TEXT,
     file_path TEXT,
+    file_public_id TEXT,
     status TEXT DEFAULT 'pending',
     grade REAL,
     FOREIGN KEY(homework_id) REFERENCES homework(id) ON DELETE CASCADE,
@@ -304,6 +309,7 @@ CREATE TABLE IF NOT EXISTS learning_contents (
     description TEXT,
     type TEXT NOT NULL, -- 'image', 'video', 'document' ('pdf' kept for older records)
     file_path TEXT NOT NULL,
+    file_public_id TEXT,
     thumbnail_path TEXT,
     uploaded_by INTEGER,
     FOREIGN KEY(school_id) REFERENCES schools(id) ON DELETE CASCADE,
@@ -430,6 +436,7 @@ CREATE TABLE IF NOT EXISTS assignment_submissions (
     assignment_id INTEGER NOT NULL,
     student_id INTEGER NOT NULL,
     file_path TEXT NOT NULL,
+    file_public_id TEXT,
     file_type TEXT,
     submitted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY(assignment_id) REFERENCES homework(id) ON DELETE CASCADE,
@@ -466,3 +473,148 @@ CREATE INDEX IF NOT EXISTS idx_ai_generations_school_created
 
 CREATE INDEX IF NOT EXISTS idx_library_resources_status_class
     ON library_resources (status, class_id);
+
+-- ── SUPPORT CENTER TABLES ──
+
+CREATE TABLE IF NOT EXISTS support_threads (
+    id SERIAL PRIMARY KEY,
+    ticket_number TEXT UNIQUE NOT NULL,
+    school_id INTEGER REFERENCES schools(id) ON DELETE CASCADE,
+    created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    subject TEXT NOT NULL,
+    category TEXT NOT NULL,
+    priority TEXT NOT NULL DEFAULT 'MEDIUM',
+    status TEXT NOT NULL DEFAULT 'OPEN',
+    assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    last_reply_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    first_response_at TIMESTAMP,
+    closed_at TIMESTAMP,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ai_summary TEXT,
+    ai_suggested_reply TEXT,
+    ai_sentiment TEXT,
+    ai_priority_score REAL,
+    ai_category_score REAL,
+    ai_resolution TEXT,
+    ai_duplicate_id INTEGER,
+    ai_metadata TEXT
+);
+
+CREATE TABLE IF NOT EXISTS support_messages (
+    id SERIAL PRIMARY KEY,
+    thread_id INTEGER NOT NULL REFERENCES support_threads(id) ON DELETE CASCADE,
+    sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    message TEXT NOT NULL,
+    is_internal INTEGER DEFAULT 0,
+    mentions TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS support_attachments (
+    id SERIAL PRIMARY KEY,
+    message_id INTEGER NOT NULL REFERENCES support_messages(id) ON DELETE CASCADE,
+    file_name TEXT NOT NULL,
+    file_url TEXT NOT NULL,
+    file_type TEXT NOT NULL,
+    file_size INTEGER NOT NULL,
+    public_id TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS support_assignments (
+    id SERIAL PRIMARY KEY,
+    thread_id INTEGER NOT NULL REFERENCES support_threads(id) ON DELETE CASCADE,
+    assigned_from INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    reason TEXT,
+    assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS support_tags (
+    id SERIAL PRIMARY KEY,
+    name TEXT UNIQUE NOT NULL,
+    color TEXT DEFAULT '#3B82F6'
+);
+
+CREATE TABLE IF NOT EXISTS support_thread_tags (
+    thread_id INTEGER NOT NULL REFERENCES support_threads(id) ON DELETE CASCADE,
+    tag_id INTEGER NOT NULL REFERENCES support_tags(id) ON DELETE CASCADE,
+    PRIMARY KEY(thread_id, tag_id)
+);
+
+CREATE TABLE IF NOT EXISTS support_canned_responses (
+    id SERIAL PRIMARY KEY,
+    title TEXT NOT NULL,
+    category TEXT,
+    content TEXT NOT NULL,
+    created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS support_feedback (
+    id SERIAL PRIMARY KEY,
+    thread_id INTEGER UNIQUE NOT NULL REFERENCES support_threads(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    rating INTEGER NOT NULL,
+    comment TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS support_watchers (
+    id SERIAL PRIMARY KEY,
+    thread_id INTEGER NOT NULL REFERENCES support_threads(id) ON DELETE CASCADE,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(thread_id, user_id)
+);
+
+CREATE TABLE IF NOT EXISTS knowledge_base_articles (
+    id SERIAL PRIMARY KEY,
+    title TEXT NOT NULL,
+    slug TEXT UNIQUE NOT NULL,
+    category TEXT NOT NULL,
+    content TEXT NOT NULL,
+    featured_image TEXT,
+    published INTEGER DEFAULT 0,
+    author_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    views INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS support_activity_logs (
+    id SERIAL PRIMARY KEY,
+    thread_id INTEGER NOT NULL REFERENCES support_threads(id) ON DELETE CASCADE,
+    user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    action TEXT NOT NULL,
+    details TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS support_bookmarks (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    article_id INTEGER NOT NULL REFERENCES knowledge_base_articles(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, article_id)
+);
+
+CREATE TABLE IF NOT EXISTS notifications (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+    title TEXT NOT NULL,
+    message TEXT NOT NULL,
+    type TEXT NOT NULL DEFAULT 'support',
+    link TEXT,
+    is_read INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_support_threads_school ON support_threads(school_id);
+CREATE INDEX IF NOT EXISTS idx_support_threads_status ON support_threads(status);
+CREATE INDEX IF NOT EXISTS idx_support_threads_created_by ON support_threads(created_by);
+CREATE INDEX IF NOT EXISTS idx_support_messages_thread ON support_messages(thread_id);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read);
+

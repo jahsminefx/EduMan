@@ -155,76 +155,87 @@ export default function SubjectsList() {
     }));
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape') {
+        if (showModal) setShowModal(false);
+        if (showAssignModal) setShowAssignModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showModal, showAssignModal]);
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 sm:p-6 rounded-2xl shadow-xs border border-gray-100">
         <div>
-          <h2 className="text-xl font-semibold text-gray-800">Subjects Management</h2>
-          <p className="text-sm text-gray-500">Define curriculum subjects and link them to classes</p>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900">Subjects Management</h2>
+          <p className="text-xs sm:text-sm text-gray-500">Define curriculum subjects and link them to classes</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
           <input 
             type="text" 
             placeholder="Search subjects..." 
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+            className="w-full sm:w-64 border border-gray-300 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
           <button 
             onClick={() => handleOpenModal()}
-            className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition"
+            className="flex items-center justify-center px-4 py-2.5 bg-blue-600 text-white font-semibold text-sm rounded-xl hover:bg-blue-700 transition shadow-xs w-full sm:w-auto"
           >
-            <Plus className="w-4 h-4 mr-2" /> Add Subject
+            <Plus className="w-4 h-4 mr-1.5" /> Add Subject
           </button>
         </div>
       </div>
 
-      <div className="bg-white shadow-sm border border-gray-100 rounded-xl overflow-hidden">
+      <div className="bg-white shadow-xs border border-gray-100 rounded-2xl overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-gray-500">Loading subjects...</div>
+          <div className="p-8 text-center text-gray-500 text-sm">Loading subjects...</div>
         ) : filteredSubjects.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No subjects match your search.</div>
+          <div className="p-8 text-center text-gray-500 text-sm">No subjects match your search.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Subject Name</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Assigned Classes</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Teachers</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Subject Name</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Code</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Assigned Classes</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Teachers</th>
+                  <th className="px-4 sm:px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredSubjects.map((sub) => (
                   <tr key={sub.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <BookMarked className="w-4 h-4 text-blue-500 mr-2" />
-                        <span className="text-sm font-medium text-gray-900">{sub.name}</span>
+                        <BookMarked className="w-4 h-4 text-blue-500 mr-2 flex-shrink-0" />
+                        <span className="text-xs sm:text-sm font-semibold text-gray-900">{sub.name}</span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{sub.code || 'N/A'}</td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600 font-mono">{sub.code || 'N/A'}</td>
+                    <td className="px-4 sm:px-6 py-4">
                       <div className="flex flex-wrap gap-1">
                         {sub.classes.length > 0 ? (
                           sub.classes.map(c => (
-                            <span key={c.id} className="px-2 py-0.5 bg-blue-50 text-blue-700 text-xs rounded-full border border-blue-100">
+                            <span key={c.id} className="px-2 py-0.5 bg-blue-50 text-blue-700 text-[10px] sm:text-xs font-medium rounded-full border border-blue-100">
                               {c.name}
                             </span>
                           ))
                         ) : (
-                          <span className="text-xs text-gray-400">None assigned</span>
+                          <span className="text-xs text-gray-400 italic">None assigned</span>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 sm:px-6 py-4">
                       <div className="flex flex-wrap gap-1">
                         {sub.teachers && sub.teachers.length > 0 ? (
                           sub.teachers.map((t, i) => (
-                            <span key={i} className="px-2 py-0.5 bg-green-50 text-green-700 text-[10px] rounded-full border border-green-100 flex items-center">
-                              <Users className="w-2 h-2 mr-1" /> {t.first_name} {t.last_name.charAt(0)}.
+                            <span key={i} className="px-2 py-0.5 bg-green-50 text-green-700 text-[10px] rounded-full border border-green-100 flex items-center font-medium">
+                              <Users className="w-2.5 h-2.5 mr-1" /> {t.first_name} {t.last_name.charAt(0)}.
                             </span>
                           ))
                         ) : (
@@ -232,21 +243,21 @@ export default function SubjectsList() {
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-xs sm:text-sm font-medium">
                       <button 
                         onClick={() => {
                           setAssignData({ subject_id: sub.id, teacher_id: '', class_ids: [] });
                           setShowAssignModal(true);
                         }} 
-                        className="text-green-600 hover:text-green-900 mr-4"
+                        className="p-1.5 text-green-600 hover:text-green-900 hover:bg-green-50 rounded-lg transition-colors mr-2"
                         title="Assign Teacher"
                       >
                         <UserPlus className="w-4 h-4 inline" />
                       </button>
-                      <button onClick={() => handleOpenModal(sub)} className="text-blue-600 hover:text-blue-900 mr-4">
+                      <button onClick={() => handleOpenModal(sub)} className="p-1.5 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-lg transition-colors mr-2" title="Edit Subject">
                         <Edit2 className="w-4 h-4 inline" />
                       </button>
-                      <button onClick={() => handleDelete(sub.id)} className="text-red-600 hover:text-red-900">
+                      <button onClick={() => handleDelete(sub.id)} className="p-1.5 text-red-600 hover:text-red-900 hover:bg-red-50 rounded-lg transition-colors" title="Delete Subject">
                         <Trash2 className="w-4 h-4 inline" />
                       </button>
                     </td>
@@ -259,29 +270,29 @@ export default function SubjectsList() {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-bold mb-4">{editingId ? 'Edit Subject' : 'Add New Subject'}</h3>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-xl w-full max-w-2xl my-auto max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4">{editingId ? 'Edit Subject' : 'Add New Subject'}</h3>
             <form onSubmit={handleSubmit}>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Subject Name *</label>
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Subject Name *</label>
                     <input 
                       type="text" 
                       required 
                       placeholder="e.g. Mathematics"
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900" 
+                      className="w-full rounded-xl border-gray-300 shadow-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent p-2.5 border text-sm text-gray-900" 
                       value={formData.name} 
                       onChange={(e) => setFormData({...formData, name: e.target.value})} 
                     />
                   </div>
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Subject Code (Optional)</label>
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Subject Code (Optional)</label>
                     <input 
                       type="text" 
                       placeholder="e.g. MATH-101"
-                      className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900" 
+                      className="w-full rounded-xl border-gray-300 shadow-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent p-2.5 border text-sm text-gray-900" 
                       value={formData.code} 
                       onChange={(e) => setFormData({...formData, code: e.target.value})} 
                     />
@@ -289,19 +300,19 @@ export default function SubjectsList() {
                 </div>
 
                 <div>
-                  <div className="flex justify-between items-center mb-2">
-                    <label className="block text-sm font-medium text-gray-700">Assign to Classes</label>
+                  <div className="flex justify-between items-center mb-1.5">
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700">Assign to Classes</label>
                     {classes.length > 0 && (
                       <button 
                         type="button" 
                         onClick={toggleAllClasses}
-                        className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                        className="text-xs text-blue-600 hover:text-blue-800 font-semibold"
                       >
                         {formData.class_ids.length === classes.length ? 'Deselect All' : 'Select All'}
                       </button>
                     )}
                   </div>
-                  <div className="border border-gray-200 rounded-lg p-3 max-h-48 overflow-y-auto space-y-2 bg-gray-50">
+                  <div className="border border-gray-200 rounded-xl p-3 max-h-48 overflow-y-auto space-y-2 bg-gray-50">
                     {classes.length === 0 ? (
                       <p className="text-xs text-gray-500 italic">No classes found. Please create classes first.</p>
                     ) : (
@@ -309,14 +320,14 @@ export default function SubjectsList() {
                         <div 
                           key={cls.id} 
                           onClick={() => toggleClass(cls.id)}
-                          className={`flex items-center justify-between p-2 rounded-md cursor-pointer transition-colors ${
+                          className={`flex items-center justify-between p-2.5 rounded-lg cursor-pointer transition-colors ${
                             formData.class_ids.includes(cls.id) 
-                              ? 'bg-blue-100 border border-blue-200' 
+                              ? 'bg-blue-100 border border-blue-200 font-semibold' 
                               : 'bg-white border border-gray-200 hover:bg-gray-100'
                           }`}
                         >
-                          <span className="text-sm text-gray-700 font-medium">{cls.name}</span>
-                          {formData.class_ids.includes(cls.id) && <Check className="w-4 h-4 text-blue-600" />}
+                          <span className="text-xs sm:text-sm text-gray-700">{cls.name}</span>
+                          {formData.class_ids.includes(cls.id) && <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />}
                         </div>
                       ))
                     )}
@@ -325,12 +336,12 @@ export default function SubjectsList() {
                 </div>
               </div>
 
-              {error && <p className="text-red-500 text-sm mt-4 p-2 bg-red-50 rounded border border-red-100">{error}</p>}
-              {success && <p className="text-green-500 text-sm mt-4 p-2 bg-green-50 rounded border border-green-100">{success}</p>}
+              {error && <p className="text-red-500 text-xs sm:text-sm mt-4 p-2 bg-red-50 rounded-xl border border-red-100 font-medium">{error}</p>}
+              {success && <p className="text-green-500 text-xs sm:text-sm mt-4 p-2 bg-green-50 rounded-xl border border-green-100 font-medium">{success}</p>}
 
-              <div className="mt-8 flex justify-end gap-3 border-t pt-4">
-                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg">Cancel</button>
-                <button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+              <div className="mt-6 flex flex-col sm:flex-row justify-end gap-2.5 border-t pt-4">
+                <button type="button" onClick={() => setShowModal(false)} className="w-full sm:w-auto px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-xl transition-colors">Cancel</button>
+                <button type="submit" className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 text-white font-semibold text-sm rounded-xl hover:bg-blue-700 transition shadow-xs">
                   {editingId ? 'Update Subject' : 'Save Subject'}
                 </button>
               </div>
@@ -338,16 +349,17 @@ export default function SubjectsList() {
           </div>
         </div>
       )}
+      
       {showAssignModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-md">
-            <h3 className="text-lg font-bold mb-4">Assign Teacher to Subject</h3>
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-xl w-full max-w-md my-auto max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4">Assign Teacher to Subject</h3>
             <form onSubmit={handleAssignTeacher} className="space-y-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700">Select Teacher *</label>
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Select Teacher *</label>
                 <select 
                   required 
-                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900"
+                  className="w-full rounded-xl border-gray-300 shadow-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent p-2.5 border text-sm text-gray-900 bg-white"
                   value={assignData.teacher_id}
                   onChange={(e) => setAssignData({...assignData, teacher_id: e.target.value})}
                 >
@@ -357,43 +369,43 @@ export default function SubjectsList() {
               </div>
               <div>
                 <div className="flex justify-between items-center mb-1">
-                  <label className="block text-sm font-medium text-gray-700">Select Classes *</label>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700">Select Classes *</label>
                   {subjects.find(s => s.id === assignData.subject_id)?.classes.length > 0 && (
                     <button 
                       type="button" 
                       onClick={() => toggleAllAssignClasses(subjects.find(s => s.id === assignData.subject_id)?.classes || [])}
-                      className="text-xs text-blue-600 hover:text-blue-800 font-medium"
+                      className="text-xs text-blue-600 hover:text-blue-800 font-semibold"
                     >
                       {assignData.class_ids.length === (subjects.find(s => s.id === assignData.subject_id)?.classes || []).length ? 'Deselect All' : 'Select All'}
                     </button>
                   )}
                 </div>
-                <div className="mt-1 border border-gray-200 rounded-lg p-3 max-h-40 overflow-y-auto space-y-2 bg-gray-50">
+                <div className="border border-gray-200 rounded-xl p-3 max-h-40 overflow-y-auto space-y-2 bg-gray-50">
                   {subjects.find(s => s.id === assignData.subject_id)?.classes.length === 0 ? (
-                    <p className="text-sm text-gray-500 italic">No classes available for this subject.</p>
+                    <p className="text-xs text-gray-500 italic">No classes available for this subject.</p>
                   ) : (
                     subjects.find(s => s.id === assignData.subject_id)?.classes.map(c => (
                       <div 
                         key={c.id} 
                         onClick={() => toggleAssignClass(c.id)}
-                        className={`flex items-center justify-between p-2 rounded-md cursor-pointer transition-colors ${
+                        className={`flex items-center justify-between p-2.5 rounded-lg cursor-pointer transition-colors ${
                           assignData.class_ids.includes(c.id) 
-                            ? 'bg-blue-100 border border-blue-200' 
+                            ? 'bg-blue-100 border border-blue-200 font-semibold' 
                             : 'bg-white border border-gray-200 hover:bg-gray-100'
                         }`}
                       >
-                        <span className="text-sm text-gray-700">{c.name}</span>
-                        {assignData.class_ids.includes(c.id) && <Check className="w-4 h-4 text-blue-600" />}
+                        <span className="text-xs sm:text-sm text-gray-700">{c.name}</span>
+                        {assignData.class_ids.includes(c.id) && <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />}
                       </div>
                     ))
                   )}
                 </div>
               </div>
-              {error && <p className="text-red-500 text-sm">{error}</p>}
-              {success && <p className="text-green-500 text-sm">{success}</p>}
-              <div className="mt-6 flex justify-end gap-3 border-t pt-4">
-                <button type="button" onClick={() => setShowAssignModal(false)} className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg">Cancel</button>
-                <button type="submit" className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Confirm Assignment</button>
+              {error && <p className="text-red-500 text-xs sm:text-sm font-medium">{error}</p>}
+              {success && <p className="text-green-500 text-xs sm:text-sm font-medium">{success}</p>}
+              <div className="mt-6 flex flex-col sm:flex-row justify-end gap-2.5 border-t pt-4">
+                <button type="button" onClick={() => setShowAssignModal(false)} className="w-full sm:w-auto px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-xl transition-colors">Cancel</button>
+                <button type="submit" className="w-full sm:w-auto px-5 py-2.5 bg-green-600 text-white font-semibold text-sm rounded-xl hover:bg-green-700 transition shadow-xs">Confirm Assignment</button>
               </div>
             </form>
           </div>

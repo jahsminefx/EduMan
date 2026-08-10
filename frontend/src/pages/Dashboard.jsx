@@ -71,45 +71,45 @@ export default function Dashboard() {
   }
 
   const renderSuperAdmin = () => (
-    <div className="space-y-8">
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
+    <div className="space-y-6 sm:space-y-8">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-3">
         <StatCard name="Total Schools" stat={stats?.schools || 0} icon={BookOpen} color="bg-indigo-500" />
         <StatCard name="Active Schools" stat={stats?.subscriptions || 0} icon={TrendingUp} color="bg-green-500" />
         <StatCard name="Total System Users" stat={stats?.users || 0} icon={Users} color="bg-blue-500" />
       </div>
       
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <Link to="/dashboard/admin/schools" className="block bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-indigo-200 transition-all group">
-          <h3 className="text-lg font-bold text-gray-900 mb-2 flex items-center">
-            <BookOpen className="w-5 h-5 mr-2 text-indigo-500" />
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
+        <Link to="/dashboard/admin/schools" className="block bg-white p-5 sm:p-6 rounded-2xl border border-gray-100 shadow-xs hover:shadow-md hover:border-indigo-200 transition-all group">
+          <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-2 flex items-center">
+            <BookOpen className="w-5 h-5 mr-2 text-indigo-500 flex-shrink-0" />
             Manage Schools
           </h3>
-          <p className="text-sm text-gray-500">View, create, edit, and manage all registered schools on the platform.</p>
-          <span className="mt-3 inline-block text-sm font-bold text-indigo-600 group-hover:underline">Go to Schools →</span>
+          <p className="text-xs sm:text-sm text-gray-500">View, create, edit, and manage all registered schools on the platform.</p>
+          <span className="mt-3 inline-block text-xs sm:text-sm font-bold text-indigo-600 group-hover:underline">Go to Schools →</span>
         </Link>
-        <Link to="/dashboard/admin/school-admins" className="block bg-white p-6 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md hover:border-emerald-200 transition-all group">
-          <h3 className="text-lg font-bold text-gray-900 mb-2 flex items-center">
-            <Users className="w-5 h-5 mr-2 text-emerald-500" />
+        <Link to="/dashboard/admin/school-admins" className="block bg-white p-5 sm:p-6 rounded-2xl border border-gray-100 shadow-xs hover:shadow-md hover:border-emerald-200 transition-all group">
+          <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-2 flex items-center">
+            <Users className="w-5 h-5 mr-2 text-emerald-500 flex-shrink-0" />
             Manage School Admins
           </h3>
-          <p className="text-sm text-gray-500">Create, assign, edit, and manage School Administrator accounts.</p>
-          <span className="mt-3 inline-block text-sm font-bold text-emerald-600 group-hover:underline">Go to Admins →</span>
+          <p className="text-xs sm:text-sm text-gray-500">Create, assign, edit, and manage School Administrator accounts.</p>
+          <span className="mt-3 inline-block text-xs sm:text-sm font-bold text-emerald-600 group-hover:underline">Go to Admins →</span>
         </Link>
       </div>
 
-      <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm">
-        <h3 className="text-xl font-bold text-gray-900 mb-4 flex items-center">
-          <BarChart3 className="w-6 h-6 mr-2 text-indigo-500" />
+      <div className="bg-white p-5 sm:p-8 rounded-2xl border border-gray-100 shadow-xs">
+        <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-3 flex items-center">
+          <BarChart3 className="w-5 h-5 sm:w-6 sm:h-6 mr-2 text-indigo-500 flex-shrink-0" />
           Global Platform Overview
         </h3>
-        <p className="text-gray-600">You are in Super Admin mode. You have visibility across all institutions on the platform.</p>
+        <p className="text-xs sm:text-sm text-gray-600">You are in Super Admin mode. You have visibility across all institutions on the platform.</p>
       </div>
     </div>
   );
 
   const renderSchoolAdmin = () => (
-    <div className="space-y-8">
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="space-y-6 sm:space-y-8">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard name="Total Students" stat={stats?.students || 0} icon={GraduationCap} color="bg-blue-500" />
         <StatCard name="Teachers" stat={stats?.teachers || 0} icon={Users} color="bg-green-500" />
         <StatCard name="Classes" stat={stats?.classes || 0} icon={BookOpen} color="bg-purple-500" />
@@ -117,56 +117,58 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
-            <TrendingUp className="w-5 h-5 mr-2 text-green-500" />
+        <div className="lg:col-span-2 bg-white p-4 sm:p-6 rounded-2xl border border-gray-100 shadow-xs">
+          <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 sm:mb-6 flex items-center">
+            <TrendingUp className="w-5 h-5 mr-2 text-green-500 flex-shrink-0" />
             Attendance Trends (Last 7 Days)
           </h3>
-          <div className="flex items-end justify-between h-48 px-4">
-            {performance?.attendanceTrend?.map((item, i) => (
-              <div key={i} className="flex flex-col items-center w-full">
-                <div 
-                  className="w-8 bg-blue-500 rounded-t-lg transition-all duration-500 hover:bg-blue-600"
-                  style={{ height: `${item.percentage}%` }}
-                  title={`${item.date}: ${item.percentage}%`}
-                ></div>
-                <span className="text-[10px] text-gray-400 mt-2 transform -rotate-45 origin-top-left">{item.date.split('-').slice(1).join('/')}</span>
-              </div>
-            ))}
+          <div className="overflow-x-auto pb-2">
+            <div className="flex items-end justify-between h-44 sm:h-48 min-w-[280px] px-2 sm:px-4">
+              {performance?.attendanceTrend?.map((item, i) => (
+                <div key={i} className="flex flex-col items-center w-full px-1">
+                  <div 
+                    className="w-6 sm:w-8 bg-blue-500 rounded-t-lg transition-all duration-500 hover:bg-blue-600 max-h-36"
+                    style={{ height: `${item.percentage}%` }}
+                    title={`${item.date}: ${item.percentage}%`}
+                  ></div>
+                  <span className="text-[9px] sm:text-[10px] text-gray-400 mt-2 font-medium">{item.date.split('-').slice(1).join('/')}</span>
+                </div>
+              ))}
+            </div>
           </div>
         </div>
 
         <div className="space-y-6">
-          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
-              <Award className="w-5 h-5 mr-2 text-yellow-500" />
+          <div className="bg-white p-4 sm:p-6 rounded-2xl border border-gray-100 shadow-xs">
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 sm:mb-6 flex items-center">
+              <Award className="w-5 h-5 mr-2 text-yellow-500 flex-shrink-0" />
               Performance Snapshot
             </h3>
-            <div className="space-y-6">
+            <div className="space-y-4 sm:space-y-6">
               <div className="p-4 bg-yellow-50 rounded-xl border border-yellow-100">
-                <span className="text-sm text-yellow-700 font-medium block">Best Performing Class</span>
-                <span className="text-2xl font-bold text-yellow-900">{performance?.bestClass?.name || 'N/A'}</span>
-                <span className="text-sm text-yellow-600 block mt-1">Average: {performance?.bestClass?.score || 0}%</span>
+                <span className="text-xs sm:text-sm text-yellow-700 font-medium block">Best Performing Class</span>
+                <span className="text-xl sm:text-2xl font-bold text-yellow-900">{performance?.bestClass?.name || 'N/A'}</span>
+                <span className="text-xs sm:text-sm text-yellow-600 block mt-1">Average: {performance?.bestClass?.score || 0}%</span>
               </div>
               <div className="p-4 bg-blue-50 rounded-xl border border-blue-100">
-                <span className="text-sm text-blue-700 font-medium block">Today's Attendance</span>
-                <span className="text-2xl font-bold text-blue-900">{stats?.todayAttendance || '0%'}</span>
+                <span className="text-xs sm:text-sm text-blue-700 font-medium block">Today's Attendance</span>
+                <span className="text-xl sm:text-2xl font-bold text-blue-900">{stats?.todayAttendance || '0%'}</span>
               </div>
             </div>
           </div>
 
-          <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-            <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
-              <CheckCircle className="w-5 h-5 mr-2 text-red-500" />
+          <div className="bg-white p-4 sm:p-6 rounded-2xl border border-gray-100 shadow-xs">
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 sm:mb-6 flex items-center">
+              <CheckCircle className="w-5 h-5 mr-2 text-red-500 flex-shrink-0" />
               Pending Tasks
             </h3>
-            <div className="space-y-4">
+            <div className="space-y-3">
               {pending.length > 0 ? (
                 pending.map((task, i) => (
                   <PendingTask key={i} {...task} color={task.label.includes('Subjects') ? 'yellow' : 'blue'} />
                 ))
               ) : (
-                <p className="text-sm text-gray-500 text-center py-4 italic">No pending tasks!</p>
+                <p className="text-xs sm:text-sm text-gray-500 text-center py-4 italic">No pending tasks!</p>
               )}
             </div>
           </div>
@@ -176,8 +178,8 @@ export default function Dashboard() {
   );
 
   const renderTeacher = () => (
-    <div className="space-y-8">
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+    <div className="space-y-6 sm:space-y-8">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard name="Total Students" stat={stats?.totalStudents || 0} icon={Users} color="bg-blue-500" />
         <StatCard name="Form Classes" stat={stats?.classesAssigned || 0} icon={Award} color="bg-purple-500" />
         <StatCard name="Pending Homework" stat={stats?.pendingHomework || 0} icon={AlertCircle} color="bg-red-500" />
@@ -185,20 +187,20 @@ export default function Dashboard() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
-            <Target className="w-5 h-5 mr-2 text-blue-500" />
+        <div className="lg:col-span-2 bg-white p-4 sm:p-6 rounded-2xl border border-gray-100 shadow-xs">
+          <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 sm:mb-6 flex items-center">
+            <Target className="w-5 h-5 mr-2 text-blue-500 flex-shrink-0" />
             Performance Snapshot
           </h3>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-4">
-              <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Class Averages</h4>
+              <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Class Averages</h4>
               <div className="space-y-3">
                 {performance?.classAverages?.map((c, i) => (
-                  <div key={i} className="flex items-center justify-between">
-                    <span className="text-sm text-gray-700">{c.name}</span>
-                    <div className="flex items-center space-x-2">
-                      <div className="w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
+                  <div key={i} className="flex items-center justify-between gap-2">
+                    <span className="text-xs sm:text-sm text-gray-700 truncate">{c.name}</span>
+                    <div className="flex items-center space-x-2 flex-shrink-0">
+                      <div className="w-16 sm:w-24 h-2 bg-gray-100 rounded-full overflow-hidden">
                         <div className="h-full bg-blue-500" style={{ width: `${c.score}%` }}></div>
                       </div>
                       <span className="text-xs font-bold">{c.score}%</span>
@@ -208,17 +210,17 @@ export default function Dashboard() {
               </div>
             </div>
             <div className="space-y-4">
-              <h4 className="text-sm font-medium text-gray-500 uppercase tracking-wider">Insights</h4>
+              <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Insights</h4>
               <div className="p-4 bg-green-50 rounded-xl border border-green-100 flex items-center justify-between">
                 <div>
                   <span className="text-xs text-green-600 font-bold block">TOP STUDENT</span>
-                  <span className="text-sm text-green-900 font-bold">{performance?.topStudent}</span>
+                  <span className="text-xs sm:text-sm text-green-900 font-bold">{performance?.topStudent}</span>
                 </div>
-                <Award className="w-8 h-8 text-green-500 opacity-50" />
+                <Award className="w-7 h-7 text-green-500 opacity-50 flex-shrink-0" />
               </div>
               <div className="p-4 bg-red-50 rounded-xl border border-red-100 text-center">
                  <span className="text-xs text-red-600 font-bold block mb-2">WEAK AREAS</span>
-                 <div className="flex flex-wrap gap-2 justify-center">
+                 <div className="flex flex-wrap gap-1.5 justify-center">
                    {performance?.weakSubjects?.map((s, i) => (
                      <span key={i} className="px-2 py-1 bg-white text-red-700 text-[10px] font-bold rounded-lg border border-red-100">{s.name} ({s.score}%)</span>
                    ))}
@@ -228,18 +230,18 @@ export default function Dashboard() {
           </div>
         </div>
 
-        <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm">
-          <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
-            <CheckCircle className="w-5 h-5 mr-2 text-red-500" />
+        <div className="bg-white p-4 sm:p-6 rounded-2xl border border-gray-100 shadow-xs">
+          <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 sm:mb-6 flex items-center">
+            <CheckCircle className="w-5 h-5 mr-2 text-red-500 flex-shrink-0" />
             Pending Tasks
           </h3>
-          <div className="space-y-4">
+          <div className="space-y-3">
             {pending.length > 0 ? (
               pending.map((task, i) => (
                 <PendingTask key={i} {...task} color={task.label.includes('attendance') ? 'yellow' : 'blue'} />
               ))
             ) : (
-              <p className="text-sm text-gray-500 text-center py-4 italic">No pending tasks!</p>
+              <p className="text-xs sm:text-sm text-gray-500 text-center py-4 italic">No pending tasks!</p>
             )}
           </div>
         </div>
@@ -248,57 +250,57 @@ export default function Dashboard() {
   );
 
   const renderStudent = () => (
-    <div className="space-y-8">
-      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-8 rounded-3xl text-white shadow-xl shadow-blue-500/20 relative overflow-hidden">
+    <div className="space-y-6 sm:space-y-8">
+      <div className="bg-gradient-to-r from-blue-600 to-indigo-700 p-5 sm:p-8 rounded-3xl text-white shadow-xl shadow-blue-500/20 relative overflow-hidden">
         <div className="relative z-10">
-          <h2 className="text-3xl font-extrabold">Welcome back, {user.name.split(' ')[0]}!</h2>
-          <p className="mt-2 text-blue-100 text-lg">{user.class_name || 'Student'} — {user.school_name || 'EduMan'}</p>
+          <h2 className="text-xl sm:text-3xl font-extrabold tracking-tight">Welcome back, {user.name.split(' ')[0]}!</h2>
+          <p className="mt-1 sm:mt-2 text-blue-100 text-sm sm:text-lg">{user.class_name || 'Student'} — {user.school_name || 'EduMan'}</p>
         </div>
-        <GraduationCap className="absolute right-[-20px] bottom-[-20px] w-48 h-48 text-white/10" />
+        <GraduationCap className="absolute right-[-20px] bottom-[-20px] w-32 h-32 sm:w-48 sm:h-48 text-white/10" />
       </div>
 
-      <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:gap-6 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard name="Subjects Enrolled" stat={stats?.subjectsEnrolled || 0} icon={BookOpen} color="bg-blue-500" />
         <StatCard name="Completed Works" stat={stats?.assignmentsCompleted || 0} icon={CheckCircle} color="bg-green-500" />
         <StatCard name="Attendance Rate" stat={stats?.attendance || '0%'} icon={Calendar} color="bg-purple-500" />
         <StatCard name="Average Score" stat={`${stats?.averageScore || 0}%`} icon={TrendingUp} color="bg-yellow-500" />
       </div>
 
-      <div className="bg-white p-8 rounded-2xl border border-gray-100 shadow-sm">
-        <h3 className="text-lg font-bold text-gray-900 mb-6 flex items-center">
-          <Target className="w-5 h-5 mr-2 text-red-500" />
+      <div className="bg-white p-5 sm:p-8 rounded-2xl border border-gray-100 shadow-xs">
+        <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-4 sm:mb-6 flex items-center">
+          <Target className="w-5 h-5 mr-2 text-red-500 flex-shrink-0" />
           Academic Performance Snapshot
         </h3>
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-8 items-center">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6 sm:gap-8 items-center">
           <div className="flex flex-col items-center justify-center p-6 bg-blue-50 rounded-2xl border border-blue-100">
-             <span className="text-blue-600 font-bold uppercase text-xs tracking-widest mb-2">Overall Average</span>
+             <span className="text-blue-600 font-bold uppercase text-[10px] sm:text-xs tracking-widest mb-2">Overall Average</span>
              <div className="relative">
-                <svg className="w-32 h-32">
-                   <circle className="text-gray-200" strokeWidth="8" stroke="currentColor" fill="transparent" r="50" cx="64" cy="64" />
-                   <circle className="text-blue-600" strokeWidth="8" strokeDasharray={314} strokeDashoffset={314 - (314 * (stats?.averageScore || 0)) / 100} strokeLinecap="round" stroke="currentColor" fill="transparent" r="50" cx="64" cy="64" />
+                <svg className="w-28 h-28 sm:w-32 sm:h-32">
+                   <circle className="text-gray-200" strokeWidth="8" stroke="currentColor" fill="transparent" r="45" cx="56" cy="56" />
+                   <circle className="text-blue-600" strokeWidth="8" strokeDasharray={282} strokeDashoffset={282 - (282 * (stats?.averageScore || 0)) / 100} strokeLinecap="round" stroke="currentColor" fill="transparent" r="45" cx="56" cy="56" />
                 </svg>
-                <span className="absolute inset-0 flex items-center justify-center text-2xl font-black text-blue-900">{stats?.averageScore || 0}%</span>
+                <span className="absolute inset-0 flex items-center justify-center text-xl sm:text-2xl font-black text-blue-900">{stats?.averageScore || 0}%</span>
              </div>
           </div>
           
           <div className="md:col-span-2 space-y-4">
-             <div className="p-4 bg-green-50 rounded-xl border border-green-100 flex items-center justify-between">
+             <div className="p-4 bg-green-50 rounded-xl border border-green-100 flex items-center justify-between gap-4">
                 <div>
-                   <span className="text-green-600 font-bold text-xs uppercase block">BEST SUBJECT</span>
-                   <span className="text-lg font-bold text-green-900">{performance?.bestSubject?.name || 'N/A'}</span>
+                   <span className="text-green-600 font-bold text-[10px] sm:text-xs uppercase block">BEST SUBJECT</span>
+                   <span className="text-base sm:text-lg font-bold text-green-900">{performance?.bestSubject?.name || 'N/A'}</span>
                 </div>
-                <div className="text-right">
-                   <span className="text-2xl font-black text-green-600">{performance?.bestSubject?.score || 0}%</span>
+                <div className="text-right flex-shrink-0">
+                   <span className="text-xl sm:text-2xl font-black text-green-600">{performance?.bestSubject?.score || 0}%</span>
                 </div>
              </div>
              
-             <div className="p-4 bg-orange-50 rounded-xl border border-orange-100 flex items-center justify-between">
+             <div className="p-4 bg-orange-50 rounded-xl border border-orange-100 flex items-center justify-between gap-4">
                 <div>
-                   <span className="text-orange-600 font-bold text-xs uppercase block">NEEDS IMPROVEMENT</span>
-                   <span className="text-lg font-bold text-orange-900">{performance?.weakSubject?.name || 'N/A'}</span>
+                   <span className="text-orange-600 font-bold text-[10px] sm:text-xs uppercase block">NEEDS IMPROVEMENT</span>
+                   <span className="text-base sm:text-lg font-bold text-orange-900">{performance?.weakSubject?.name || 'N/A'}</span>
                 </div>
-                <div className="text-right">
-                   <span className="text-2xl font-black text-orange-600">{performance?.weakSubject?.score || 0}%</span>
+                <div className="text-right flex-shrink-0">
+                   <span className="text-xl sm:text-2xl font-black text-orange-600">{performance?.weakSubject?.score || 0}%</span>
                 </div>
              </div>
           </div>
@@ -308,17 +310,17 @@ export default function Dashboard() {
   );
 
   return (
-    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700">
-      <div className="mb-8 flex items-end justify-between">
+    <div className="animate-in fade-in slide-in-from-bottom-4 duration-700 space-y-6 sm:space-y-8">
+      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-2 sm:gap-4">
         <div>
-          <h2 className="text-2xl font-black text-gray-900 flex items-center">
+          <h2 className="text-xl sm:text-2xl lg:text-3xl font-black text-gray-900 tracking-tight flex items-center">
             {user.role === 'SuperAdmin' ? 'Global Command Center' : 'Dashboard Overview'}
           </h2>
-          {user.role !== 'Student' && <p className="mt-1 text-sm text-gray-500 uppercase tracking-widest font-bold">LIVE METRICS & ANALYTICS</p>}
+          {user.role !== 'Student' && <p className="mt-0.5 text-xs text-gray-500 uppercase tracking-widest font-bold">LIVE METRICS & ANALYTICS</p>}
         </div>
-        <div className="hidden sm:block text-right">
-          <span className="text-xs font-bold text-gray-400 block uppercase">CURRENT SESSION</span>
-          <span className="text-sm font-black text-blue-600">
+        <div className="text-left sm:text-right bg-white sm:bg-transparent p-3 sm:p-0 rounded-xl border sm:border-0 border-gray-100">
+          <span className="text-[10px] font-bold text-gray-400 block uppercase">CURRENT SESSION</span>
+          <span className="text-xs sm:text-sm font-black text-blue-600">
             {schoolProfile?.current_session_name || 'Not Set'}
             {schoolProfile?.current_term_name ? ` - ${schoolProfile.current_term_name}` : ''}
           </span>
@@ -330,17 +332,17 @@ export default function Dashboard() {
       {user.role === 'Teacher' && renderTeacher()}
       {user.role === 'Student' && renderStudent()}
       {user.role === 'Parent' && (
-        <div className="bg-white p-12 rounded-2xl border border-gray-100 shadow-sm text-center">
-          <Users className="h-16 w-16 text-green-500 mx-auto mb-6 opacity-20" />
-          <h3 className="text-xl font-bold text-gray-900">Parental Perspective</h3>
-          <p className="mt-2 text-gray-500 max-w-md mx-auto">Monitor your child's academic journey and attendance patterns here. Role-specific view coming soon.</p>
+        <div className="bg-white p-8 sm:p-12 rounded-2xl border border-gray-100 shadow-xs text-center">
+          <Users className="h-12 w-12 sm:h-16 sm:w-16 text-green-500 mx-auto mb-4 sm:mb-6 opacity-20" />
+          <h3 className="text-lg sm:text-xl font-bold text-gray-900">Parental Perspective</h3>
+          <p className="mt-2 text-xs sm:text-sm text-gray-500 max-w-md mx-auto">Monitor your child's academic journey and attendance patterns here. Role-specific view coming soon.</p>
         </div>
       )}
       {['ContentManager', 'Accountant', 'SupportOfficer'].includes(user.role) && (
-        <div className="bg-white p-12 border rounded-2xl shadow-sm border-gray-100 text-center">
-          <BarChart3 className="h-16 w-16 text-gray-400 mx-auto mb-6 opacity-20" />
-          <h3 className="text-xl font-bold text-gray-900">Module Dashboard</h3>
-          <p className="mt-2 text-gray-500">Your specialized tools are available in the left sidebar.</p>
+        <div className="bg-white p-8 sm:p-12 border rounded-2xl shadow-xs border-gray-100 text-center">
+          <BarChart3 className="h-12 w-12 sm:h-16 sm:w-16 text-gray-400 mx-auto mb-4 sm:mb-6 opacity-20" />
+          <h3 className="text-lg sm:text-xl font-bold text-gray-900">Module Dashboard</h3>
+          <p className="mt-2 text-xs sm:text-sm text-gray-500">Your specialized tools are available in the left sidebar.</p>
         </div>
       )}
     </div>

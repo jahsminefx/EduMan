@@ -144,7 +144,8 @@ async function callOpenRouter({
                     code: 'timeout'
                 });
             }
-            if (error instanceof OpenRouterError) throw error;
+            if (error instanceof OpenRouterError || error?.name === 'OpenRouterError') throw error;
+            console.error('OpenRouter fetch network error:', error);
             throw new OpenRouterError('Could not connect to the EduMan AI provider. Please try again.', {
                 status: 502,
                 code: 'network_error'

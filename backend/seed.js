@@ -67,8 +67,18 @@ async function seed(pool, options = {}) {
     // ──────────────────────────────────────
     // 3. USERS (all 8 roles)
     // ──────────────────────────────────────
+    const isProduction = process.env.NODE_ENV === 'production';
+    const superAdminEmail = process.env.SUPERADMIN_EMAIL || (isProduction ? null : 'admin@eduman.local');
+    const superAdminPassword = process.env.SUPERADMIN_PASSWORD || (isProduction ? null : 'password123');
+
+    if (isProduction && (!superAdminEmail || !superAdminPassword)) {
+        throw new Error('CRITICAL: SUPERADMIN_EMAIL and SUPERADMIN_PASSWORD environment variables are required to seed database in production.');
+    }
+
+    const superAdminHash = superAdminPassword ? await bcrypt.hash(superAdminPassword, 10) : hash;
+
     const users = [
-        { name: 'Default Admin', email: 'admin@eduman.local', role: 'SuperAdmin' },
+        { name: 'System Admin', email: superAdminEmail, role: 'SuperAdmin', customHash: superAdminHash },
         // SchoolAdmins
         { name: 'Mrs. Adebayo', email: 'adebayo@greenfield.edu.ng', role: 'SchoolAdmin', schoolIdx: 0 },
         { name: 'Mr. Okonkwo', email: 'okonkwo@sunrise.edu.ng', role: 'SchoolAdmin', schoolIdx: 1 },
@@ -90,22 +100,23 @@ async function seed(pool, options = {}) {
         { name: 'Mrs. Fashola', email: 'fashola@greenfield.edu.ng', role: 'Accountant', schoolIdx: 0 },
         // SupportOfficer
         { name: 'Emeka IT', email: 'emeka@eduman.local', role: 'SupportOfficer' },
-    ];
+    ].filter(u => Boolean(u.email));
 
     const userMap = {};
     for (const u of users) {
+        const userHash = u.customHash || hash;
         const existing = await get('SELECT id FROM users WHERE email = $1', [u.email]);
         if (existing) {
             userMap[u.email] = existing.id;
             if (resetPasswords) {
-                await run('UPDATE users SET name = $1, password_hash = $2, role = $3 WHERE id = $4', [u.name, hash, u.role, existing.id]);
+                await run('UPDATE users SET name = $1, password_hash = $2, role = $3 WHERE id = $4', [u.name, userHash, u.role, existing.id]);
             }
             continue;
         }
-        const r = await run('INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id', [u.name, u.email, hash, u.role]);
+        const r = await run('INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id', [u.name, u.email, userHash, u.role]);
         userMap[u.email] = r.lastID;
     }
-    console.log(`✅ ${Object.keys(userMap).length} users seeded (password: password123)`);
+    console.log(`✅ ${Object.keys(userMap).length} users seeded.`);
 
     // ──────────────────────────────────────
     // 4. SCHOOL ADMIN ASSIGNMENTS
@@ -284,6 +295,126 @@ async function seed(pool, options = {}) {
              'Essay: My Best Holiday', 'Write a 300-word essay about your best holiday experience.', '2026-03-28']);
     }
     console.log('✅ Sample homework seeded');
+
+    // ──────────────────────────────────────
+    // 12. KNOWLEDGE BASE ARTICLES & SUPPORT SEED DATA
+    // ──────────────────────────────────────
+    const adminUser = await get(`SELECT id FROM users WHERE role = 'SuperAdmin' LIMIT 1`);
+    const adminId = adminUser ? adminUser.id : userMap['admin@eduman.local'];
+
+    const articles = [
+        {
+            title: 'Getting Started with EDUMAN Support Center & Dashboard',
+            slug: 'getting-started-with-eduman',
+            category: 'Getting Started',
+            content: 'Welcome to EDUMAN! This guide explains how school admins, teachers, and staff can navigate the dashboard, set up academic sessions, manage student records, and utilize the Support Center to communicate directly with technical support.'
+        },
+        {
+            title: 'How to Add & Manage Student Records in Bulk',
+            slug: 'how-to-add-manage-students-in-bulk',
+            category: 'Managing Students',
+            content: 'To upload student records in bulk, navigate to Admin > Students > Bulk Upload. Download the CSV template, fill in student first name, last name, admission number, and gender, and click upload.'
+        },
+        {
+            title: 'Assigning Subjects & Classes to Teachers',
+            slug: 'assigning-subjects-and-classes-to-teachers',
+            category: 'Managing Teachers',
+            content: 'School Admins can assign teachers to specific subjects and classes via the Teachers page. Click Edit on any teacher record to assign their primary subjects.'
+        },
+        {
+            title: 'Recording Daily Attendance & Generating Attendance Reports',
+            slug: 'recording-daily-attendance-and-reports',
+            category: 'Attendance',
+            content: 'Teachers can mark daily student attendance by navigating to Teacher > Attendance Entry. Select the class, date, and mark students present or absent.'
+        },
+        {
+            title: 'Entering Exam Grades & Calculating Report Cards',
+            slug: 'entering-exam-grades-and-report-cards',
+            category: 'Results',
+            content: 'Enter continuous assessment and examination scores under Teacher > Gradebook. The system automatically computes term totals, averages, and report card grades.'
+        },
+        {
+            title: 'Setting Up Weekly Class Timetables',
+            slug: 'setting-up-weekly-class-timetables',
+            category: 'Timetable',
+            content: 'Configure class timetables by setting up period start times, end times, subject assignments, and assigned classroom locations.'
+        },
+        {
+            title: 'Formatting CSV Files for Seamless Student & Teacher Uploads',
+            slug: 'formatting-csv-files-for-uploads',
+            category: 'CSV Import',
+            content: 'Ensure all CSV files use UTF-8 encoding. Do not modify header column titles. Dates must be formatted as YYYY-MM-DD.'
+        },
+        {
+            title: 'Generating Quizzes & Lesson Content with EduMan AI',
+            slug: 'generating-quizzes-with-eduman-ai',
+            category: 'AI Assistant',
+            content: 'Use EduMan AI to automatically generate multiple-choice quizzes, lesson plans, and library reading materials tailored to your curriculum standard.'
+        },
+        {
+            title: 'Frequently Asked Questions About Subscriptions & Access Roles',
+            slug: 'frequently-asked-questions-roles-subscriptions',
+            category: 'Frequently Asked Questions',
+            content: 'Find answers to common questions regarding role permissions (SuperAdmin, SchoolAdmin, Teacher, Student), multi-tenant isolation, and school subscriptions.'
+        },
+        {
+            title: 'Troubleshooting Login, File Uploads, and Permission Errors',
+            slug: 'troubleshooting-login-and-file-uploads',
+            category: 'Troubleshooting',
+            content: 'If you encounter upload failures, check that file sizes do not exceed 10MB and file formats are JPG, PNG, PDF, DOCX, CSV, or TXT.'
+        }
+    ];
+
+    for (const art of articles) {
+        const existing = await get(`SELECT id FROM knowledge_base_articles WHERE slug = $1`, [art.slug]);
+        if (!existing) {
+            await run(
+                `INSERT INTO knowledge_base_articles (title, slug, category, content, published, author_id, views)
+                 VALUES ($1, $2, $3, $4, 1, $5, 12)`,
+                [art.title, art.slug, art.category, art.content, adminId]
+            );
+        }
+    }
+    console.log('✅ 10 Knowledge Base articles seeded');
+
+    // Seed tags
+    const tags = [
+        { name: 'Bug', color: '#EF4444' },
+        { name: 'CSV', color: '#10B981' },
+        { name: 'Urgent', color: '#F59E0B' },
+        { name: 'Attendance', color: '#3B82F6' },
+        { name: 'Results', color: '#8B5CF6' },
+        { name: 'AI', color: '#EC4899' }
+    ];
+    for (const tag of tags) {
+        const existing = await get(`SELECT id FROM support_tags WHERE name = $1`, [tag.name]);
+        if (!existing) {
+            await run(`INSERT INTO support_tags (name, color) VALUES ($1, $2)`, [tag.name, tag.color]);
+        }
+    }
+
+    // Seed canned responses
+    const canned = [
+        {
+            title: 'CSV Template & Formatting Help',
+            category: 'CSV Import',
+            content: 'Please download the latest CSV template from the bulk upload page. Ensure Student IDs are unique and dates are formatted as YYYY-MM-DD.'
+        },
+        {
+            title: 'Password Reset Procedure',
+            category: 'Account',
+            content: 'Please ask your School Administrator to update your email or reset your login credentials from the Admin Users management panel.'
+        }
+    ];
+    for (const c of canned) {
+        const existing = await get(`SELECT id FROM support_canned_responses WHERE title = $1`, [c.title]);
+        if (!existing) {
+            await run(`INSERT INTO support_canned_responses (title, category, content, created_by) VALUES ($1, $2, $3, $4)`,
+                [c.title, c.category, c.content, adminId]);
+        }
+    }
+    console.log('✅ Support Tags & Saved Replies seeded');
+
 
     console.log('\n🎉 Seeding complete! All test accounts use password: password123');
     console.log('\n📋 Test Accounts:');

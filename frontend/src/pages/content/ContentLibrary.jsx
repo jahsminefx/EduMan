@@ -2,8 +2,9 @@ import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
 import { Download, ExternalLink, Eye, FileText, Image as ImageIcon, Library, Sparkles, Trash2, Upload, Video, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { API_URL, API_BASE_URL } from '../../config/api';
+import { API_URL } from '../../config/api';
 import { displayLabel, downloadProtected } from '../ai/aiUtils';
+import { mediaUrl } from '../../utils/media';
 
 const emptyForm = { title: '', description: '', type: 'image', class_id: '', subject_id: '' };
 
@@ -12,7 +13,7 @@ const contentTypes = [
     value: 'image',
     label: 'Images',
     singular: 'Image',
-    accept: '.jpg,.jpeg,.png,.gif,.webp,image/jpeg,image/png,image/gif,image/webp',
+    accept: '.jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp',
     Icon: ImageIcon,
     iconClass: 'text-emerald-600',
     badgeClass: 'bg-emerald-50 text-emerald-700',
@@ -283,7 +284,7 @@ export default function ContentLibrary() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {contents.map(content => {
             const meta = getContentType(content.type);
-            const fileUrl = `${API_BASE_URL}${content.file_path}`;
+            const fileUrl = mediaUrl(content.file_path);
             const isImage = meta.value === 'image';
             const isVideo = meta.value === 'video';
 

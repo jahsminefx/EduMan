@@ -2,25 +2,16 @@ const express = require('express');
 const router = express.Router();
 const multer = require('multer');
 const path = require('path');
-const fs = require('fs');
 const schoolController = require('../controllers/schoolController');
 const { protect, authorize, requireSchoolScope } = require('../middleware/authMiddleware');
-
-const storage = multer.diskStorage({
-    destination: (req, file, cb) => {
-        const dir = path.join(__dirname, '../../uploads');
-        if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
-        cb(null, dir);
-    },
-    filename: (req, file, cb) => cb(null, `school_logo_${Date.now()}${path.extname(file.originalname)}`)
-});
+const { ALLOWED_IMAGE_EXTENSIONS } = require('../utils/cloudinaryImage');
 
 const logoUpload = multer({
-    storage,
-    limits: { fileSize: 2 * 1024 * 1024 },
+    storage: multer.memoryStorage(),
+    limits: { fileSize: 3 * 1024 * 1024 },
     fileFilter: (req, file, cb) => {
         const ext = path.extname(file.originalname).toLowerCase();
-        const isImage = file.mimetype?.startsWith('image/') && ['.jpg', '.jpeg', '.png', '.gif', '.webp'].includes(ext);
+        const isImage = file.mimetype?.startsWith('image/') && ALLOWED_IMAGE_EXTENSIONS.has(ext);
         cb(null, Boolean(isImage));
     }
 });

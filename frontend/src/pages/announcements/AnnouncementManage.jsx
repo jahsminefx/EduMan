@@ -3,7 +3,8 @@ import { Link } from 'react-router-dom';
 import axios from 'axios';
 import { ArrowLeft, FileText, Image as ImageIcon, Pencil, Plus, Save, Trash2, Upload, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import API_URL, { API_BASE_URL } from '../../config/api';
+import API_URL from '../../config/api';
+import { mediaUrl } from '../../utils/media';
 
 const EMPTY_FORM = {
   title: '',
@@ -14,11 +15,6 @@ const EMPTY_FORM = {
   attachment_type: '',
   status: 'Draft'
 };
-
-function mediaUrl(value) {
-  if (!value) return '';
-  return value.startsWith('/uploads/') ? `${API_BASE_URL}${value}` : value;
-}
 
 function formatDate(value) {
   if (!value) return 'Draft';
@@ -200,11 +196,11 @@ export default function AnnouncementManage() {
               <label className="flex min-h-[112px] cursor-pointer flex-col items-center justify-center rounded-lg border border-dashed border-gray-300 bg-gray-50 px-4 py-5 text-center hover:border-blue-300 hover:bg-blue-50">
                 <ImageIcon className="w-6 h-6 text-blue-600 mb-2" />
                 <span className="text-sm font-bold text-gray-800">{featuredImageFile ? featuredImageFile.name : 'Upload picture or image'}</span>
-                <span className="text-xs text-gray-500 mt-1">JPG, PNG, GIF, or WEBP</span>
+                <span className="text-xs text-gray-500 mt-1">JPG, PNG, or WEBP</span>
                 <input
                   key={`featured-${fileInputKey}`}
                   type="file"
-                  accept="image/png,image/jpeg,image/gif,image/webp"
+                  accept="image/png,image/jpeg,image/webp"
                   onChange={(event) => {
                     setFeaturedImageFile(event.target.files?.[0] || null);
                     setRemoveFeaturedImage(false);
@@ -239,7 +235,7 @@ export default function AnnouncementManage() {
                 <input
                   key={`attachment-${fileInputKey}`}
                   type="file"
-                  accept="image/png,image/jpeg,image/gif,image/webp,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.rtf"
+                  accept="image/png,image/jpeg,image/webp,.pdf,.doc,.docx,.ppt,.pptx,.xls,.xlsx,.txt,.rtf"
                   onChange={(event) => {
                     setAttachmentFile(event.target.files?.[0] || null);
                     setRemoveAttachment(false);

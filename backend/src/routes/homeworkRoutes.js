@@ -15,7 +15,7 @@ const storage = multer.diskStorage({
     },
     filename: (req, file, cb) => cb(null, `hw_${Date.now()}${path.extname(file.originalname)}`)
 });
-const upload = multer({ storage, limits: { fileSize: 10 * 1024 * 1024 } }); // 10MB
+const upload = multer({ storage, limits: { fileSize: 50 * 1024 * 1024 } }); // 50MB
 
 router.get('/', protect, authorize('SchoolAdmin', 'Teacher', 'Student', 'Parent'), requireSchoolScope, homeworkController.getHomework);
 router.post('/', protect, authorize('Teacher'), requireSchoolScope, upload.single('file'), homeworkController.createHomework);

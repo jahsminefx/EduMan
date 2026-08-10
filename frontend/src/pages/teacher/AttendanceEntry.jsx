@@ -109,28 +109,28 @@ export default function AttendanceEntry() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 sm:p-6 rounded-2xl shadow-xs border border-gray-100">
         <div>
-          <h2 className="text-xl font-semibold text-gray-800">Attendance Entry</h2>
-          <p className="text-sm text-gray-500">Mark daily student attendance</p>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900">Attendance Entry</h2>
+          <p className="text-xs sm:text-sm text-gray-500">Mark daily student attendance</p>
         </div>
       </div>
 
       {user.role === 'Teacher' && classes.length === 0 && (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-5 flex items-start gap-3">
+        <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4 sm:p-5 flex items-start gap-3">
           <ShieldAlert className="w-5 h-5 text-amber-600 mt-0.5 flex-shrink-0" />
           <div>
-            <h4 className="text-sm font-bold text-amber-800">No Classes Assigned</h4>
+            <h4 className="text-xs sm:text-sm font-bold text-amber-800">No Classes Assigned</h4>
             <p className="text-xs text-amber-700 mt-1">You are not assigned as a Form Teacher for any class. Only Form Teachers can record attendance. Please contact your School Admin.</p>
           </div>
         </div>
       )}
 
-      <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 flex gap-4 items-end flex-wrap">
-        <div className="flex-1 min-w-[200px]">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Select Class</label>
+      <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-xs border border-gray-100 flex flex-col sm:flex-row gap-4 items-stretch sm:items-end">
+        <div className="flex-1 min-w-0">
+          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Select Class</label>
           <select 
-            className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900"
+            className="block w-full rounded-xl border-gray-300 shadow-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent p-2.5 border text-sm text-gray-900 bg-white"
             value={selectedClass}
             onChange={(e) => setSelectedClass(e.target.value)}
           >
@@ -138,15 +138,15 @@ export default function AttendanceEntry() {
             {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
         </div>
-        <div className="flex-1 min-w-[200px]">
-          <label className="block text-sm font-medium text-gray-700 mb-1">Date</label>
+        <div className="flex-1 min-w-0">
+          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Date</label>
           <div className="relative">
-            <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+            <div className="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none">
               <Calendar className="h-4 w-4 text-gray-400" />
             </div>
             <input 
               type="date"
-              className="block w-full pl-10 rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900"
+              className="block w-full pl-10 pr-3 py-2.5 rounded-xl border-gray-300 shadow-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent border text-sm text-gray-900"
               value={selectedDate}
               onChange={(e) => setSelectedDate(e.target.value)}
             />
@@ -155,61 +155,63 @@ export default function AttendanceEntry() {
       </div>
 
       {message && (
-        <div className={`p-4 rounded-lg text-sm font-medium ${message.includes('success') ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+        <div className={`p-4 rounded-2xl text-xs sm:text-sm font-medium ${message.includes('success') ? 'bg-green-50 text-green-800 border border-green-100' : 'bg-red-50 text-red-800 border border-red-100'}`}>
           {message}
         </div>
       )}
 
       {loading ? (
-        <div className="p-8 text-center text-gray-500">Loading student list...</div>
+        <div className="p-8 text-center text-gray-500 bg-white rounded-2xl border border-gray-100">Loading student list...</div>
       ) : students.length > 0 ? (
-        <div className="bg-white shadow-sm border border-gray-100 rounded-xl overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Roll / ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student Name</th>
-                <th className="px-6 py-3 text-center text-xs font-medium text-gray-500 uppercase">Status</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {students.map((stu) => (
-                <tr key={stu.student_id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{stu.admission_number}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{stu.first_name} {stu.last_name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-center">
-                    <div className="flex justify-center gap-4">
-                      <button
-                        onClick={() => handleStatusChange(stu.student_id, 'present')}
-                        className={`flex items-center px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                          stu.status === 'present' 
-                            ? 'bg-green-100 text-green-800 border-2 border-green-500' 
-                            : 'bg-gray-100 text-gray-500 border border-transparent hover:bg-gray-200'
-                        }`}
-                      >
-                        <CheckCircle className="w-4 h-4 mr-1" /> Present
-                      </button>
-                      <button
-                        onClick={() => handleStatusChange(stu.student_id, 'absent')}
-                        className={`flex items-center px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${
-                          stu.status === 'absent' 
-                            ? 'bg-red-100 text-red-800 border-2 border-red-500' 
-                            : 'bg-gray-100 text-gray-500 border border-transparent hover:bg-gray-200'
-                        }`}
-                      >
-                        <XCircle className="w-4 h-4 mr-1" /> Absent
-                      </button>
-                    </div>
-                  </td>
+        <div className="bg-white shadow-xs border border-gray-100 rounded-2xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50/80">
+                <tr>
+                  <th className="px-4 sm:px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Roll / ID</th>
+                  <th className="px-4 sm:px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Student Name</th>
+                  <th className="px-4 sm:px-6 py-3.5 text-center text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end">
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {students.map((stu) => (
+                  <tr key={stu.student_id} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500 font-mono">{stu.admission_number}</td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-bold text-gray-900">{stu.first_name} {stu.last_name}</td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-center">
+                      <div className="flex justify-center items-center gap-2 sm:gap-4">
+                        <button
+                          onClick={() => handleStatusChange(stu.student_id, 'present')}
+                          className={`flex items-center justify-center min-h-[40px] px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
+                            stu.status === 'present' 
+                              ? 'bg-green-100 text-green-800 border-2 border-green-500 shadow-xs' 
+                              : 'bg-gray-100 text-gray-600 border border-transparent hover:bg-gray-200'
+                          }`}
+                        >
+                          <CheckCircle className="w-4 h-4 mr-1 flex-shrink-0" /> Present
+                        </button>
+                        <button
+                          onClick={() => handleStatusChange(stu.student_id, 'absent')}
+                          className={`flex items-center justify-center min-h-[40px] px-3.5 py-1.5 rounded-xl text-xs sm:text-sm font-semibold transition-all ${
+                            stu.status === 'absent' 
+                              ? 'bg-red-100 text-red-800 border-2 border-red-500 shadow-xs' 
+                              : 'bg-gray-100 text-gray-600 border border-transparent hover:bg-gray-200'
+                          }`}
+                        >
+                          <XCircle className="w-4 h-4 mr-1 flex-shrink-0" /> Absent
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="p-4 border-t border-gray-100 bg-gray-50/80 flex justify-end sticky bottom-0 z-10 backdrop-blur-xs">
             <button
               onClick={handleSave}
               disabled={saving}
-              className="flex items-center px-6 py-2 bg-blue-600 text-white font-medium rounded-lg shadow-sm hover:bg-blue-700 transition disabled:opacity-70"
+              className="w-full sm:w-auto flex items-center justify-center px-6 py-2.5 bg-blue-600 text-white text-xs sm:text-sm font-bold rounded-xl shadow-xs hover:bg-blue-700 transition disabled:opacity-70"
             >
               <Save className="w-4 h-4 mr-2" />
               {saving ? 'Saving...' : 'Save Attendance'}
@@ -217,10 +219,11 @@ export default function AttendanceEntry() {
           </div>
         </div>
       ) : selectedClass ? (
-        <div className="p-8 text-center text-gray-500 bg-white rounded-xl border border-gray-100 shadow-sm">
+        <div className="p-8 text-center text-xs sm:text-sm text-gray-500 bg-white rounded-2xl border border-gray-100 shadow-xs">
           No students found in this class. Please assign students first.
         </div>
       ) : null}
     </div>
   );
 }
+

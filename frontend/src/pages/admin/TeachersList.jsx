@@ -162,85 +162,97 @@ export default function TeachersList() {
     }));
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e) => {
+      if (e.key === 'Escape' && showModal) {
+        setShowModal(false);
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [showModal]);
+
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 sm:p-6 rounded-2xl shadow-xs border border-gray-100">
         <div>
-          <h2 className="text-xl font-semibold text-gray-800">Teachers Directory</h2>
-          <p className="text-sm text-gray-500">Manage teaching staff and their class assignments</p>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900">Teachers Directory</h2>
+          <p className="text-xs sm:text-sm text-gray-500">Manage teaching staff and their class assignments</p>
         </div>
-        <div className="flex items-center gap-3">
+        <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2.5 w-full sm:w-auto">
           <input 
             type="text" 
             placeholder="Search teachers..." 
-            className="border border-gray-300 rounded-lg px-3 py-2 text-sm focus:outline-none focus:border-blue-500"
+            className="w-full sm:w-64 border border-gray-300 rounded-xl px-3.5 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
-          <button 
-            onClick={handleExport}
-            className="flex items-center px-4 py-2 bg-green-600 text-white text-sm font-medium rounded-lg hover:bg-green-700 transition"
-          >
-            Export CSV
-          </button>
-          <button 
-            onClick={() => handleOpenModal()}
-            className="flex items-center px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-lg hover:bg-blue-700 transition"
-          >
-            <Plus className="w-4 h-4 mr-2" /> Add Teacher
-          </button>
+          <div className="flex items-center gap-2 w-full sm:w-auto">
+            <button 
+              onClick={handleExport}
+              className="flex-1 sm:flex-none flex items-center justify-center px-3.5 py-2 bg-green-600 text-white text-xs sm:text-sm font-semibold rounded-xl hover:bg-green-700 transition shadow-xs"
+            >
+              Export CSV
+            </button>
+            <button 
+              onClick={() => handleOpenModal()}
+              className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-blue-600 text-white text-xs sm:text-sm font-semibold rounded-xl hover:bg-blue-700 transition shadow-xs"
+            >
+              <Plus className="w-4 h-4 mr-1.5" /> Add Teacher
+            </button>
+          </div>
         </div>
       </div>
 
-      <div className="bg-white shadow-sm border border-gray-100 rounded-xl overflow-hidden">
+      <div className="bg-white shadow-xs border border-gray-100 rounded-2xl overflow-hidden">
         {loading ? (
-          <div className="p-8 text-center text-gray-500">Loading teachers...</div>
+          <div className="p-8 text-center text-gray-500 text-sm">Loading teachers...</div>
         ) : filteredTeachers.length === 0 ? (
-          <div className="p-8 text-center text-gray-500">No teachers match your search.</div>
+          <div className="p-8 text-center text-gray-500 text-sm">No teachers match your search.</div>
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
               <thead className="bg-gray-50">
                 <tr>
-                  <th onClick={() => handleSort('first_name')} className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase cursor-pointer hover:bg-gray-100">Teacher Name {sortConfig.key === 'first_name' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Gender</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Contact</th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Assigned Classes</th>
-                  <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Actions</th>
+                  <th onClick={() => handleSort('first_name')} className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">Teacher Name {sortConfig.key === 'first_name' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Gender</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Contact</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Assigned Classes</th>
+                  <th className="px-4 sm:px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
               </thead>
               <tbody className="bg-white divide-y divide-gray-200">
                 {filteredTeachers.map((teacher) => (
                   <tr key={teacher.id} className="hover:bg-gray-50 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{teacher.first_name} {teacher.last_name}</div>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                      <div className="text-xs sm:text-sm font-semibold text-gray-900">{teacher.first_name} {teacher.last_name}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{teacher.gender || 'N/A'}</td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600">{teacher.gender || 'N/A'}</td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                       <div className="flex flex-col gap-1">
-                        <span className="flex items-center text-sm text-gray-500"><Mail className="w-3 h-3 mr-1"/> {teacher.email}</span>
-                        {teacher.phone && <span className="flex items-center text-sm text-gray-500"><Phone className="w-3 h-3 mr-1"/> {teacher.phone}</span>}
+                        <span className="flex items-center text-xs sm:text-sm text-gray-600"><Mail className="w-3 h-3 mr-1 text-gray-400"/> {teacher.email}</span>
+                        {teacher.phone && <span className="flex items-center text-xs sm:text-sm text-gray-600"><Phone className="w-3 h-3 mr-1 text-gray-400"/> {teacher.phone}</span>}
                       </div>
                     </td>
-                    <td className="px-6 py-4">
+                    <td className="px-4 sm:px-6 py-4">
                       <div className="flex flex-wrap gap-1">
                         {teacher.classes && teacher.classes.length > 0 ? (
                           teacher.classes.map(c => (
-                            <span key={c.id} className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
+                            <span key={c.id} className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-medium bg-blue-100 text-blue-800 border border-blue-200">
                               <BookOpen className="w-2.5 h-2.5 mr-1" />
                               {c.name}
                             </span>
                           ))
                         ) : (
-                          <span className="text-xs text-gray-400">None</span>
+                          <span className="text-xs text-gray-400 italic">None</span>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                      <button onClick={() => handleOpenModal(teacher)} className="text-blue-600 hover:text-blue-900 mr-4">
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-xs sm:text-sm font-medium">
+                      <button onClick={() => handleOpenModal(teacher)} className="p-1.5 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-lg transition-colors mr-2" title="Edit Teacher">
                         <Edit2 className="w-4 h-4 inline" />
                       </button>
-                      <button onClick={() => handleDelete(teacher.id)} className="text-red-600 hover:text-red-900">
+                      <button onClick={() => handleDelete(teacher.id)} className="p-1.5 text-red-600 hover:text-red-900 hover:bg-red-50 rounded-lg transition-colors" title="Delete Teacher">
                         <Trash2 className="w-4 h-4 inline" />
                       </button>
                     </td>
@@ -253,44 +265,44 @@ export default function TeachersList() {
       </div>
 
       {showModal && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-          <div className="bg-white p-6 rounded-xl shadow-lg w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-            <h3 className="text-lg font-bold mb-4">{editingId ? 'Edit Teacher' : 'Add New Teacher'}</h3>
-            <p className="text-sm text-gray-500 mb-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-xs flex items-center justify-center p-4 z-50 overflow-y-auto">
+          <div className="bg-white p-5 sm:p-6 rounded-2xl shadow-xl w-full max-w-2xl my-auto max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-200">
+            <h3 className="text-base sm:text-lg font-bold text-gray-900 mb-1">{editingId ? 'Edit Teacher' : 'Add New Teacher'}</h3>
+            <p className="text-xs sm:text-sm text-gray-500 mb-4">
               {editingId ? 'Update teacher details and class assignments.' : 'This will generate a teacher account they can use to log in.'}
             </p>
             
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6">
                 <div className="space-y-4">
-                  <div className="grid grid-cols-2 gap-4">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">First Name *</label>
-                      <input type="text" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900" value={formData.first_name} onChange={(e) => setFormData({...formData, first_name: e.target.value})} />
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">First Name *</label>
+                      <input type="text" required className="w-full rounded-xl border-gray-300 shadow-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent p-2.5 border text-sm text-gray-900" value={formData.first_name} onChange={(e) => setFormData({...formData, first_name: e.target.value})} />
                     </div>
                     <div>
-                      <label className="block text-sm font-medium text-gray-700">Last Name *</label>
-                      <input type="text" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900" value={formData.last_name} onChange={(e) => setFormData({...formData, last_name: e.target.value})} />
+                      <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Last Name *</label>
+                      <input type="text" required className="w-full rounded-xl border-gray-300 shadow-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent p-2.5 border text-sm text-gray-900" value={formData.last_name} onChange={(e) => setFormData({...formData, last_name: e.target.value})} />
                     </div>
                   </div>
                   
                   {!editingId && (
                     <>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">Email Login *</label>
-                        <input type="email" required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
+                        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Email Login *</label>
+                        <input type="email" required className="w-full rounded-xl border-gray-300 shadow-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent p-2.5 border text-sm text-gray-900" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} />
                       </div>
                       
                       <div>
-                        <label className="block text-sm font-medium text-gray-700">Temporary Password *</label>
-                        <input type="password" required minLength="6" className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} />
+                        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Temporary Password *</label>
+                        <input type="password" required minLength="6" className="w-full rounded-xl border-gray-300 shadow-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent p-2.5 border text-sm text-gray-900" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} />
                       </div>
                     </>
                   )}
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Gender *</label>
-                    <select required className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900 bg-white" value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})}>
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Gender *</label>
+                    <select required className="w-full rounded-xl border-gray-300 shadow-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent p-2.5 border text-sm text-gray-900 bg-white" value={formData.gender} onChange={(e) => setFormData({...formData, gender: e.target.value})}>
                       <option value="">Select Gender</option>
                       <option value="Male">Male</option>
                       <option value="Female">Female</option>
@@ -299,38 +311,38 @@ export default function TeachersList() {
                   </div>
 
                   <div>
-                    <label className="block text-sm font-medium text-gray-700">Phone</label>
-                    <input type="tel" className="mt-1 block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
+                    <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Phone</label>
+                    <input type="tel" className="w-full rounded-xl border-gray-300 shadow-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent p-2.5 border text-sm text-gray-900" value={formData.phone} onChange={(e) => setFormData({...formData, phone: e.target.value})} />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Assign Classes</label>
-                  <div className="border border-gray-200 rounded-lg p-3 max-h-60 overflow-y-auto space-y-2 bg-gray-50">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-2">Assign Classes</label>
+                  <div className="border border-gray-200 rounded-xl p-3 max-h-60 overflow-y-auto space-y-2 bg-gray-50">
                     {classes.map(cls => (
                       <div 
                         key={cls.id} 
                         onClick={() => toggleClass(cls.id)}
-                        className={`flex items-center justify-between p-2 rounded-md cursor-pointer transition-colors ${
+                        className={`flex items-center justify-between p-2.5 rounded-lg cursor-pointer transition-colors ${
                           formData.class_ids.includes(cls.id) 
-                            ? 'bg-blue-100 border border-blue-200' 
+                            ? 'bg-blue-100 border border-blue-200 font-semibold' 
                             : 'bg-white border border-gray-200 hover:bg-gray-100'
                         }`}
                       >
-                        <span className="text-sm text-gray-700 font-medium">{cls.name}</span>
-                        {formData.class_ids.includes(cls.id) && <Check className="w-4 h-4 text-blue-600" />}
+                        <span className="text-xs sm:text-sm text-gray-700">{cls.name}</span>
+                        {formData.class_ids.includes(cls.id) && <Check className="w-4 h-4 text-blue-600 flex-shrink-0" />}
                       </div>
                     ))}
                   </div>
                 </div>
               </div>
 
-              {error && <p className="text-red-500 text-sm mt-2">{error}</p>}
-              {success && <p className="text-green-500 text-sm mt-2">{success}</p>}
+              {error && <p className="text-red-500 text-xs sm:text-sm mt-3 font-medium">{error}</p>}
+              {success && <p className="text-green-500 text-xs sm:text-sm mt-3 font-medium">{success}</p>}
 
-              <div className="mt-6 flex justify-end gap-3 pt-4 border-t">
-                <button type="button" onClick={() => setShowModal(false)} className="px-4 py-2 text-gray-700 hover:bg-gray-100 rounded-lg">Cancel</button>
-                <button type="submit" className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+              <div className="mt-6 flex flex-col sm:flex-row justify-end gap-2.5 pt-4 border-t">
+                <button type="button" onClick={() => setShowModal(false)} className="w-full sm:w-auto px-4 py-2.5 text-sm font-medium text-gray-700 hover:bg-gray-100 rounded-xl transition-colors">Cancel</button>
+                <button type="submit" className="w-full sm:w-auto px-6 py-2.5 bg-blue-600 text-white font-semibold text-sm rounded-xl hover:bg-blue-700 transition shadow-xs">
                   {editingId ? 'Update Profile' : 'Create Account'}
                 </button>
               </div>

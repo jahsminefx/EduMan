@@ -217,33 +217,33 @@ export default function GradesEntry() {
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 bg-white p-4 sm:p-6 rounded-2xl shadow-xs border border-gray-100">
         <div>
-          <h2 className="text-xl font-semibold text-gray-800">Grade Entry</h2>
-          <p className="text-sm text-gray-500">Record assessment scores for assigned courses</p>
+          <h2 className="text-lg sm:text-xl font-bold text-gray-900">Grade Entry</h2>
+          <p className="text-xs sm:text-sm text-gray-500">Record assessment scores for assigned courses</p>
         </div>
       </div>
 
       {optionsLoading ? (
-        <div className="p-8 text-center text-gray-500 bg-white rounded-xl border border-gray-100 shadow-sm">
+        <div className="p-8 text-center text-xs sm:text-sm text-gray-500 bg-white rounded-2xl border border-gray-100 shadow-xs">
           Loading grade options...
         </div>
       ) : showTeacherEmptyState ? (
-        <div className="bg-white border border-dashed border-blue-200 rounded-xl p-8 text-center shadow-sm">
-          <div className="mx-auto w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mb-4">
+        <div className="bg-white border border-dashed border-blue-200 rounded-2xl p-6 sm:p-8 text-center shadow-xs">
+          <div className="mx-auto w-12 h-12 rounded-2xl bg-blue-50 flex items-center justify-center mb-4">
             <ShieldAlert className="w-6 h-6 text-blue-600" />
           </div>
-          <h3 className="text-lg font-bold text-gray-900">No Assigned Courses</h3>
-          <p className="text-sm text-gray-500 mt-2 max-w-md mx-auto">
+          <h3 className="text-base sm:text-lg font-bold text-gray-900">No Assigned Courses</h3>
+          <p className="text-xs sm:text-sm text-gray-500 mt-2 max-w-md mx-auto">
             Your gradebook will appear after your School Admin assigns you to a class and subject.
           </p>
         </div>
       ) : (
-        <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 grid grid-cols-1 md:grid-cols-5 gap-4 items-end">
+        <div className="bg-white p-4 sm:p-6 rounded-2xl shadow-xs border border-gray-100 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4 items-end">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Class</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Class</label>
             <select
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900"
+              className="block w-full rounded-xl border-gray-300 shadow-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent p-2.5 border text-sm text-gray-900 bg-white"
               value={selectedClass}
               onChange={(event) => handleClassChange(event.target.value)}
             >
@@ -252,9 +252,9 @@ export default function GradesEntry() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Subject</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Subject</label>
             <select
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900"
+              className="block w-full rounded-xl border-gray-300 shadow-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent p-2.5 border text-sm text-gray-900 bg-white"
               value={selectedSubject}
               onChange={(event) => setSelectedSubject(event.target.value)}
             >
@@ -263,9 +263,9 @@ export default function GradesEntry() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Type</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Type</label>
             <select
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900"
+              className="block w-full rounded-xl border-gray-300 shadow-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent p-2.5 border text-sm text-gray-900 bg-white"
               value={assessmentType}
               onChange={(event) => setAssessmentType(event.target.value)}
             >
@@ -275,10 +275,10 @@ export default function GradesEntry() {
             </select>
           </div>
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">Max Score</label>
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Max Score</label>
             <input
               type="number"
-              className="block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900"
+              className="block w-full rounded-xl border-gray-300 shadow-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent p-2.5 border text-sm text-gray-900"
               value={maxScore}
               onChange={(event) => setMaxScore(Number(event.target.value))}
               min="1"
@@ -288,54 +288,56 @@ export default function GradesEntry() {
       )}
 
       {errorConfig && (
-        <div className="p-4 bg-yellow-50 text-yellow-800 rounded-lg border border-yellow-200 text-sm font-medium shadow-sm">
+        <div className="p-4 bg-yellow-50 text-yellow-800 rounded-2xl border border-yellow-200 text-xs sm:text-sm font-medium shadow-xs">
           {errorConfig}
         </div>
       )}
 
       {message && (
-        <div className={`p-4 rounded-lg text-sm font-medium ${message.includes('success') ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>
+        <div className={`p-4 rounded-2xl text-xs sm:text-sm font-medium ${message.includes('success') ? 'bg-green-50 text-green-800 border border-green-100' : 'bg-red-50 text-red-800 border border-red-100'}`}>
           {message}
         </div>
       )}
 
       {loading ? (
-        <div className="p-8 text-center text-gray-500">Loading grade spreadsheet...</div>
+        <div className="p-8 text-center text-xs sm:text-sm text-gray-500 bg-white rounded-2xl border border-gray-100">Loading grade spreadsheet...</div>
       ) : students.length > 0 ? (
-        <div className="bg-white shadow-sm border border-gray-100 rounded-xl overflow-hidden">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
-              <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Roll / ID</th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Student Name</th>
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase">Score (out of {maxScore})</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {students.map((student) => (
-                <tr key={student.student_id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{student.admission_number}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{student.first_name} {student.last_name}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-right">
-                    <input
-                      type="number"
-                      min="0"
-                      max={maxScore}
-                      className="inline-block w-24 text-right rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 p-2 border text-gray-900"
-                      value={student.score}
-                      onChange={(event) => handleScoreChange(student.student_id, event.target.value)}
-                      placeholder="0"
-                    />
-                  </td>
+        <div className="bg-white shadow-xs border border-gray-100 rounded-2xl overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-gray-200">
+              <thead className="bg-gray-50/80">
+                <tr>
+                  <th className="px-4 sm:px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Roll / ID</th>
+                  <th className="px-4 sm:px-6 py-3.5 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Student Name</th>
+                  <th className="px-4 sm:px-6 py-3.5 text-right text-xs font-bold text-gray-500 uppercase tracking-wider">Score (out of {maxScore})</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-          <div className="p-4 border-t border-gray-100 bg-gray-50 flex justify-end">
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {students.map((student) => (
+                  <tr key={student.student_id} className="hover:bg-gray-50/50 transition-colors">
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-500 font-mono">{student.admission_number}</td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-bold text-gray-900">{student.first_name} {student.last_name}</td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right">
+                      <input
+                        type="number"
+                        min="0"
+                        max={maxScore}
+                        className="inline-block w-24 sm:w-28 text-right rounded-xl border-gray-300 shadow-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent p-2 border text-sm text-gray-900 font-semibold"
+                        value={student.score}
+                        onChange={(event) => handleScoreChange(student.student_id, event.target.value)}
+                        placeholder="0"
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div className="p-4 border-t border-gray-100 bg-gray-50/80 flex justify-end sticky bottom-0 z-10 backdrop-blur-xs">
             <button
               onClick={handleSave}
               disabled={saving}
-              className="flex items-center px-6 py-2 bg-blue-600 text-white font-medium rounded-lg shadow-sm hover:bg-blue-700 transition disabled:opacity-70"
+              className="w-full sm:w-auto flex items-center justify-center px-6 py-2.5 bg-blue-600 text-white text-xs sm:text-sm font-bold rounded-xl shadow-xs hover:bg-blue-700 transition disabled:opacity-70"
             >
               <FileSpreadsheet className="w-4 h-4 mr-2" />
               {saving ? 'Saving...' : 'Save Grades'}
@@ -343,10 +345,11 @@ export default function GradesEntry() {
           </div>
         </div>
       ) : selectedClass && selectedSubject && !showTeacherEmptyState ? (
-        <div className="p-8 text-center text-gray-500 bg-white rounded-xl border border-gray-100 shadow-sm">
+        <div className="p-8 text-center text-xs sm:text-sm text-gray-500 bg-white rounded-2xl border border-gray-100 shadow-xs">
           No students found matching this class.
         </div>
       ) : null}
     </div>
   );
 }
+

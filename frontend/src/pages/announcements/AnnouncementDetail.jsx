@@ -2,12 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { Link, useParams } from 'react-router-dom';
 import axios from 'axios';
 import { ArrowLeft, CalendarDays, FileText, Pencil, UserCircle } from 'lucide-react';
-import API_URL, { API_BASE_URL } from '../../config/api';
-
-function mediaUrl(value) {
-  if (!value) return '';
-  return value.startsWith('/uploads/') ? `${API_BASE_URL}${value}` : value;
-}
+import API_URL from '../../config/api';
+import { mediaUrl } from '../../utils/media';
 
 function formatDate(value) {
   if (!value) return 'Draft';

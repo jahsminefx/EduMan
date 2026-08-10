@@ -41,14 +41,25 @@ import AIManagement from './pages/admin/AIManagement';
 import AIUsageLogs from './pages/admin/AIUsageLogs';
 import AISettings from './pages/admin/AISettings';
 
-const ANNOUNCEMENT_ROLES = ['SchoolAdmin', 'Teacher', 'Student', 'Parent'];
+// Support Center Pages
+import SupportDashboardPage from './pages/support/SupportDashboard';
+import TicketList from './pages/support/TicketList';
+import CreateTicket from './pages/support/CreateTicket';
+import TicketDetail from './pages/support/TicketDetail';
+import EnterpriseInbox from './pages/support/EnterpriseInbox';
+import KnowledgeBasePage from './pages/support/KnowledgeBasePage';
+import AdminKnowledgeBase from './pages/support/AdminKnowledgeBase';
+import SupportAnalytics from './pages/support/SupportAnalytics';
 
-// Placeholder Components for future features
-// SuperAdmin pages are now real components imported above
+const ANNOUNCEMENT_ROLES = ['SchoolAdmin', 'Teacher', 'Student', 'Parent'];
+const TICKETING_ROLES = ['SuperAdmin', 'SupportOfficer', 'SchoolAdmin', 'Teacher'];
+const ALL_KB_ROLES = ['SuperAdmin', 'SupportOfficer', 'SchoolAdmin', 'Teacher', 'Student', 'Parent', 'ContentManager', 'Accountant'];
+
+// Placeholder Components for secondary modules
 const ParentDashboard = () => <div className="p-8"><h1>Parent Dashboard</h1><p>View your children and fee statements here.</p></div>;
 const ContentDashboard = () => <ContentLibrary />;
 const FinanceDashboard = () => <div className="p-8"><h1>Fee Management</h1><p>Manage school finances here.</p></div>;
-const SupportDashboard = () => <div className="p-8"><h1>System Logs</h1><p>View error traces here.</p></div>;
+
 
 // Protected Route Component
 const ProtectedRoute = ({ children, allowedRoles }) => {
@@ -58,6 +69,7 @@ const ProtectedRoute = ({ children, allowedRoles }) => {
   if (allowedRoles && !allowedRoles.includes(user.role)) return <Navigate to="/dashboard" />;
   return children;
 };
+
 
 const AppRoutes = () => {
   return (
@@ -318,16 +330,81 @@ const AppRoutes = () => {
           } 
         />
 
-        {/* Support Routes */}
+        {/* Support Center Routes */}
         <Route 
-          path="support/*" 
+          path="support" 
+          element={
+            <ProtectedRoute allowedRoles={ALL_KB_ROLES}>
+              <SupportDashboardPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="support/inbox" 
           element={
             <ProtectedRoute allowedRoles={['SuperAdmin', 'SupportOfficer']}>
-              <SupportDashboard />
+              <EnterpriseInbox />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="support/tickets" 
+          element={
+            <ProtectedRoute allowedRoles={TICKETING_ROLES}>
+              <TicketList />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="support/tickets/new" 
+          element={
+            <ProtectedRoute allowedRoles={TICKETING_ROLES}>
+              <CreateTicket />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="support/tickets/:id" 
+          element={
+            <ProtectedRoute allowedRoles={TICKETING_ROLES}>
+              <TicketDetail />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="support/kb" 
+          element={
+            <ProtectedRoute allowedRoles={ALL_KB_ROLES}>
+              <KnowledgeBasePage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="support/kb/manage" 
+          element={
+            <ProtectedRoute allowedRoles={['SuperAdmin']}>
+              <AdminKnowledgeBase />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="support/kb/:slug" 
+          element={
+            <ProtectedRoute allowedRoles={ALL_KB_ROLES}>
+              <KnowledgeBasePage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="support/analytics" 
+          element={
+            <ProtectedRoute allowedRoles={['SuperAdmin', 'SupportOfficer']}>
+              <SupportAnalytics />
             </ProtectedRoute>
           } 
         />
       </Route>
+
 
       <Route
         path="/announcements"

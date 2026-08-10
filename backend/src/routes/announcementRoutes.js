@@ -4,12 +4,13 @@ const path = require('path');
 const fs = require('fs');
 const announcementController = require('../controllers/announcementController');
 const { protect, authorize, requireSchoolScope } = require('../middleware/authMiddleware');
+const { ALLOWED_IMAGE_EXTENSIONS } = require('../utils/cloudinaryImage');
 
 const router = express.Router();
 
 const uploadsDir = path.join(__dirname, '../../uploads');
 const allowedExtensions = new Set([
-    '.jpg', '.jpeg', '.png', '.gif', '.webp',
+    ...ALLOWED_IMAGE_EXTENSIONS,
     '.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx', '.txt', '.rtf'
 ]);
 

@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const submissionController = require('../controllers/submissionController');
 const { protect, authorize, requireSchoolScope } = require('../middleware/authMiddleware');
+const { ALLOWED_IMAGE_EXTENSIONS, ALLOWED_VIDEO_EXTENSIONS } = require('../utils/cloudinaryImage');
 
 // Multer config for assignment submissions
 const storage = multer.diskStorage({
@@ -17,7 +18,7 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
-    const allowedExtensions = ['.mp4', '.mov', '.webm', '.pdf', '.jpg', '.jpeg', '.png'];
+    const allowedExtensions = ['.pdf', ...ALLOWED_IMAGE_EXTENSIONS, ...ALLOWED_VIDEO_EXTENSIONS];
     const ext = path.extname(file.originalname).toLowerCase();
     if (allowedExtensions.includes(ext)) {
         cb(null, true);

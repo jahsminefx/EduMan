@@ -59,7 +59,7 @@ export default function AssignmentSubmit({ assignmentId, onComplete }) {
     const ext = file.name.split('.').pop().toLowerCase();
     if (['mp4', 'mov', 'webm'].includes(ext)) return <Video className="w-12 h-12 text-blue-500" />;
     if (ext === 'pdf') return <FileText className="w-12 h-12 text-red-500" />;
-    if (['jpg', 'jpeg', 'png'].includes(ext)) return <ImageIcon className="w-12 h-12 text-green-500" />;
+    if (['jpg', 'jpeg', 'png', 'webp'].includes(ext)) return <ImageIcon className="w-12 h-12 text-green-500" />;
     return <File className="w-12 h-12 text-gray-500" />;
   };
 
@@ -81,7 +81,7 @@ export default function AssignmentSubmit({ assignmentId, onComplete }) {
               type="file" 
               id="file-upload" 
               className="hidden" 
-              accept=".mp4,.mov,.webm,.pdf,.jpg,.jpeg,.png"
+              accept=".mp4,.mov,.webm,.pdf,.jpg,.jpeg,.png,.webp"
               onChange={handleFileChange} 
             />
             
@@ -92,7 +92,7 @@ export default function AssignmentSubmit({ assignmentId, onComplete }) {
                   {file ? file.name : 'Click to select or drag and drop'}
                 </span>
                 <p className="text-xs text-gray-500 mt-1">
-                  Supports Video (MP4, MOV), PDF, and Images (JPG, PNG) up to 50MB
+                  Supports Video (MP4, MOV), PDF, and Images (JPG, PNG, WEBP) up to 50MB
                 </p>
               </div>
             </div>

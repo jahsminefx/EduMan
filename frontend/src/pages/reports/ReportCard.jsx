@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react';
 import axios from 'axios';
 import { Printer, GraduationCap, BookOpen } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import API_URL, { API_BASE_URL } from '../../config/api';
+import API_URL from '../../config/api';
+import { mediaUrl } from '../../utils/media';
 
 export default function ReportCard() {
   const { user } = useAuth();
@@ -130,45 +131,45 @@ export default function ReportCard() {
 
   return (
     <div className="space-y-6">
-      <div className="print:hidden bg-white p-4 rounded-xl shadow-sm border border-gray-100">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+      <div className="print:hidden bg-white p-4 sm:p-6 rounded-2xl shadow-xs border border-gray-100">
+        <div className="flex flex-col gap-4">
           <div>
-            <h2 className="text-xl font-semibold text-gray-800">{isStudent ? 'My Report Card' : 'Report Cards'}</h2>
-            <p className="text-sm text-gray-500">Academic performance report</p>
+            <h2 className="text-lg sm:text-xl font-bold text-gray-900">{isStudent ? 'My Report Card' : 'Report Cards'}</h2>
+            <p className="text-xs sm:text-sm text-gray-500">Academic performance report</p>
           </div>
 
           {isStudent ? (
-            <div className="flex gap-4 items-end flex-wrap">
-              <div className="min-w-[180px]">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Session</label>
-                <select value={sessionId} onChange={event => handleSessionChange(event.target.value)} className="border rounded-md p-2 w-full">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3 flex-wrap">
+              <div className="w-full sm:w-48">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Session</label>
+                <select value={sessionId} onChange={event => handleSessionChange(event.target.value)} className="border rounded-xl p-2.5 w-full text-sm bg-white shadow-xs focus:ring-2 focus:ring-blue-500">
                   <option value="">Select Session</option>
                   {sessions.map(session => <option key={session.id} value={session.id}>{session.name}</option>)}
                 </select>
               </div>
-              <div className="min-w-[180px]">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Term</label>
-                <select value={termId} onChange={event => setTermId(event.target.value)} className="border rounded-md p-2 w-full" disabled={!sessionId}>
+              <div className="w-full sm:w-48">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Term</label>
+                <select value={termId} onChange={event => setTermId(event.target.value)} className="border rounded-xl p-2.5 w-full text-sm bg-white shadow-xs focus:ring-2 focus:ring-blue-500" disabled={!sessionId}>
                   <option value="">Select Term</option>
                   {terms.filter(term => String(term.session_id) === String(sessionId)).map(term => <option key={term.id} value={term.id}>{term.name}</option>)}
                 </select>
               </div>
-              <button onClick={() => fetchReport()} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">Load Report</button>
-              <div className="px-4 py-2 rounded-lg bg-blue-50 text-blue-700 text-sm font-bold flex items-center">
+              <button onClick={() => fetchReport()} className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 text-xs sm:text-sm font-semibold transition shadow-xs">Load Report</button>
+              <div className="w-full sm:w-auto px-4 py-2.5 rounded-xl bg-blue-50 text-blue-700 text-xs sm:text-sm font-bold flex items-center justify-center">
                 <BookOpen className="w-4 h-4 mr-2" />
                 My Report Card
               </div>
               {report && (
-                <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 text-sm font-medium">
-                  <Printer className="w-4 h-4 mr-1" /> Print
+                <button onClick={handlePrint} className="w-full sm:w-auto flex items-center justify-center px-5 py-2.5 bg-gray-800 text-white rounded-xl hover:bg-gray-900 text-xs sm:text-sm font-semibold transition shadow-xs">
+                  <Printer className="w-4 h-4 mr-1.5" /> Print
                 </button>
               )}
             </div>
           ) : (
-            <div className="flex gap-4 items-end flex-wrap">
-              <div className="min-w-[240px]">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Student</label>
-                <select value={selectedStudent} onChange={event => setSelectedStudent(event.target.value)} className="border rounded-md p-2 w-full">
+            <div className="flex flex-col sm:flex-row items-stretch sm:items-end gap-3 flex-wrap">
+              <div className="w-full sm:w-60">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Student</label>
+                <select value={selectedStudent} onChange={event => setSelectedStudent(event.target.value)} className="border rounded-xl p-2.5 w-full text-sm bg-white shadow-xs focus:ring-2 focus:ring-blue-500">
                   <option value="">Select Student</option>
                   {students.map(student => (
                     <option key={student.id} value={student.id}>
@@ -177,24 +178,24 @@ export default function ReportCard() {
                   ))}
                 </select>
               </div>
-              <div className="min-w-[180px]">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Session</label>
-                <select value={sessionId} onChange={event => handleSessionChange(event.target.value)} className="border rounded-md p-2 w-full">
+              <div className="w-full sm:w-44">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Session</label>
+                <select value={sessionId} onChange={event => handleSessionChange(event.target.value)} className="border rounded-xl p-2.5 w-full text-sm bg-white shadow-xs focus:ring-2 focus:ring-blue-500">
                   <option value="">Select Session</option>
                   {sessions.map(session => <option key={session.id} value={session.id}>{session.name}</option>)}
                 </select>
               </div>
-              <div className="min-w-[180px]">
-                <label className="block text-sm font-medium text-gray-700 mb-1">Term</label>
-                <select value={termId} onChange={event => setTermId(event.target.value)} className="border rounded-md p-2 w-full" disabled={!sessionId}>
+              <div className="w-full sm:w-44">
+                <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Term</label>
+                <select value={termId} onChange={event => setTermId(event.target.value)} className="border rounded-xl p-2.5 w-full text-sm bg-white shadow-xs focus:ring-2 focus:ring-blue-500" disabled={!sessionId}>
                   <option value="">Select Term</option>
                   {terms.filter(term => String(term.session_id) === String(sessionId)).map(term => <option key={term.id} value={term.id}>{term.name}</option>)}
                 </select>
               </div>
-              <button onClick={() => fetchReport()} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-medium">Load Report</button>
+              <button onClick={() => fetchReport()} className="w-full sm:w-auto px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 text-xs sm:text-sm font-semibold transition shadow-xs">Load Report</button>
               {report && (
-                <button onClick={handlePrint} className="flex items-center px-4 py-2 bg-gray-800 text-white rounded-lg hover:bg-gray-900 text-sm font-medium">
-                  <Printer className="w-4 h-4 mr-1" /> Print
+                <button onClick={handlePrint} className="w-full sm:w-auto flex items-center justify-center px-5 py-2.5 bg-gray-800 text-white rounded-xl hover:bg-gray-900 text-xs sm:text-sm font-semibold transition shadow-xs">
+                  <Printer className="w-4 h-4 mr-1.5" /> Print
                 </button>
               )}
             </div>
@@ -203,37 +204,37 @@ export default function ReportCard() {
       </div>
 
       {error && (
-        <div className="p-4 bg-red-50 text-red-800 rounded-lg border border-red-100 text-sm font-medium">
+        <div className="p-4 bg-red-50 text-red-800 rounded-2xl border border-red-100 text-xs sm:text-sm font-medium">
           {error}
         </div>
       )}
 
-      {loading && <div className="p-8 text-center text-gray-500">Loading report...</div>}
+      {loading && <div className="p-8 text-center text-xs sm:text-sm text-gray-500 bg-white rounded-2xl border border-gray-100">Loading report...</div>}
 
       {report && studentInfo && (
-        <div className="bg-white p-8 rounded-xl shadow-sm border border-gray-100 print:shadow-none print:border-0 print:p-0" id="report-card">
+        <div className="bg-white p-5 sm:p-8 rounded-2xl shadow-xs border border-gray-100 print:shadow-none print:border-0 print:p-0" id="report-card">
           <div className="text-center border-b-2 border-gray-800 pb-4 mb-6">
             <div className="flex justify-center mb-3">
               {schoolInfo?.logo_url ? (
-                <img src={`${API_BASE_URL}${schoolInfo.logo_url}`} alt="School logo" className="w-16 h-16 object-contain" />
+                <img src={mediaUrl(schoolInfo.logo_url)} alt="School logo" className="w-14 h-14 sm:w-16 sm:h-16 object-contain" />
               ) : (
                 <GraduationCap className="w-12 h-12 text-blue-600" />
               )}
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 uppercase tracking-wider">{schoolInfo?.name || 'School'}</h1>
-            <p className="text-sm text-gray-600 mt-1">{schoolInfo?.address || 'School Address'}</p>
-            <p className="text-xs text-gray-500 mt-1">
+            <h1 className="text-xl sm:text-2xl font-bold text-gray-900 uppercase tracking-wider">{schoolInfo?.name || 'School'}</h1>
+            <p className="text-xs sm:text-sm text-gray-600 mt-1">{schoolInfo?.address || 'School Address'}</p>
+            <p className="text-[11px] sm:text-xs text-gray-500 mt-1">
               {schoolInfo?.phone && <span>Phone: {schoolInfo.phone}</span>}
               {schoolInfo?.email && <span>{schoolInfo?.phone ? ' | ' : ''}{schoolInfo.email}</span>}
             </p>
             {schoolInfo?.motto && <p className="text-xs text-gray-500 italic mt-1">{schoolInfo.motto}</p>}
-            <h2 className="text-lg font-bold text-gray-900 uppercase tracking-wider mt-4">Student Report Card</h2>
+            <h2 className="text-base sm:text-lg font-bold text-gray-900 uppercase tracking-wider mt-4">Student Report Card</h2>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6 text-sm">
-            <div><span className="font-semibold text-gray-600">Name:</span> <span className="text-gray-900">{studentInfo.first_name} {studentInfo.last_name}</span></div>
-            <div><span className="font-semibold text-gray-600">Adm No:</span> <span className="text-gray-900">{studentInfo.admission_number}</span></div>
-            <div><span className="font-semibold text-gray-600">Class:</span> <span className="text-gray-900">{studentInfo.class_name || 'N/A'}</span></div>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-3 sm:gap-4 mb-6 text-xs sm:text-sm">
+            <div><span className="font-semibold text-gray-600">Name:</span> <span className="text-gray-900 font-bold">{studentInfo.first_name} {studentInfo.last_name}</span></div>
+            <div><span className="font-semibold text-gray-600">Adm No:</span> <span className="text-gray-900 font-mono">{studentInfo.admission_number}</span></div>
+            <div><span className="font-semibold text-gray-600">Class:</span> <span className="text-gray-900 font-bold">{studentInfo.class_name || 'N/A'}</span></div>
             <div><span className="font-semibold text-gray-600">Session:</span> <span className="text-gray-900">{academicInfo?.session_name || schoolInfo?.current_session_name || 'N/A'}</span></div>
             <div><span className="font-semibold text-gray-600">Term:</span> <span className="text-gray-900">{academicInfo?.term_name || schoolInfo?.current_term_name || 'N/A'}</span></div>
           </div>
@@ -241,15 +242,15 @@ export default function ReportCard() {
           {subjects.length > 0 ? (
             <>
               <div className="overflow-x-auto">
-                <table className="min-w-full border border-gray-300 text-sm">
+                <table className="min-w-full border border-gray-300 text-xs sm:text-sm">
                   <thead>
                     <tr className="bg-gray-800 text-white">
-                      <th className="border border-gray-300 px-4 py-2 text-left">Subject</th>
-                      <th className="border border-gray-300 px-4 py-2 text-center">CA Score</th>
-                      <th className="border border-gray-300 px-4 py-2 text-center">Exam Score</th>
-                      <th className="border border-gray-300 px-4 py-2 text-center">Total</th>
-                      <th className="border border-gray-300 px-4 py-2 text-center">Grade</th>
-                      <th className="border border-gray-300 px-4 py-2 text-center">Remark</th>
+                      <th className="border border-gray-300 px-3 sm:px-4 py-2.5 text-left">Subject</th>
+                      <th className="border border-gray-300 px-3 sm:px-4 py-2.5 text-center">CA Score</th>
+                      <th className="border border-gray-300 px-3 sm:px-4 py-2.5 text-center">Exam Score</th>
+                      <th className="border border-gray-300 px-3 sm:px-4 py-2.5 text-center">Total</th>
+                      <th className="border border-gray-300 px-3 sm:px-4 py-2.5 text-center">Grade</th>
+                      <th className="border border-gray-300 px-3 sm:px-4 py-2.5 text-center">Remark</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -263,29 +264,29 @@ export default function ReportCard() {
 
                       return (
                         <tr key={name} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                          <td className="border border-gray-300 px-4 py-2 font-medium">{name}</td>
-                          <td className="border border-gray-300 px-4 py-2 text-center">{caScore}</td>
-                          <td className="border border-gray-300 px-4 py-2 text-center">{examScore}</td>
-                          <td className="border border-gray-300 px-4 py-2 text-center font-semibold">{total}</td>
-                          <td className="border border-gray-300 px-4 py-2 text-center font-bold">{grade}</td>
-                          <td className="border border-gray-300 px-4 py-2 text-center text-xs">{getRemark(grade)}</td>
+                          <td className="border border-gray-300 px-3 sm:px-4 py-2 font-medium">{name}</td>
+                          <td className="border border-gray-300 px-3 sm:px-4 py-2 text-center">{caScore}</td>
+                          <td className="border border-gray-300 px-3 sm:px-4 py-2 text-center">{examScore}</td>
+                          <td className="border border-gray-300 px-3 sm:px-4 py-2 text-center font-semibold">{total}</td>
+                          <td className="border border-gray-300 px-3 sm:px-4 py-2 text-center font-bold">{grade}</td>
+                          <td className="border border-gray-300 px-3 sm:px-4 py-2 text-center text-xs">{getRemark(grade)}</td>
                         </tr>
                       );
                     })}
                   </tbody>
                   <tfoot>
                     <tr className="bg-gray-100 font-semibold">
-                      <td className="border border-gray-300 px-4 py-2">Overall</td>
-                      <td className="border border-gray-300 px-4 py-2 text-center" colSpan="2"></td>
-                      <td className="border border-gray-300 px-4 py-2 text-center">{totalObtained}</td>
-                      <td className="border border-gray-300 px-4 py-2 text-center font-bold">{getGrade(average)}</td>
-                      <td className="border border-gray-300 px-4 py-2 text-center text-xs">Avg: {average}%</td>
+                      <td className="border border-gray-300 px-3 sm:px-4 py-2">Overall</td>
+                      <td className="border border-gray-300 px-3 sm:px-4 py-2 text-center" colSpan="2"></td>
+                      <td className="border border-gray-300 px-3 sm:px-4 py-2 text-center">{totalObtained}</td>
+                      <td className="border border-gray-300 px-3 sm:px-4 py-2 text-center font-bold">{getGrade(average)}</td>
+                      <td className="border border-gray-300 px-3 sm:px-4 py-2 text-center text-xs">Avg: {average}%</td>
                     </tr>
                   </tfoot>
                 </table>
               </div>
 
-              <div className="mt-10 grid grid-cols-2 gap-8 text-sm">
+              <div className="mt-10 grid grid-cols-2 gap-8 text-xs sm:text-sm">
                 <div className="border-t border-gray-400 pt-2 text-center">
                   <p className="text-gray-600">Class Teacher's Signature</p>
                 </div>
@@ -295,7 +296,7 @@ export default function ReportCard() {
               </div>
             </>
           ) : (
-            <div className="p-8 text-center text-gray-500">No grades recorded for this term.</div>
+            <div className="p-8 text-center text-xs sm:text-sm text-gray-500">No grades recorded for this term.</div>
           )}
         </div>
       )}
@@ -304,10 +305,11 @@ export default function ReportCard() {
         @media print {
           body * { visibility: hidden; }
           #report-card, #report-card * { visibility: visible; }
-          #report-card { position: absolute; left: 0; top: 0; width: 100%; padding: 20mm; }
+          #report-card { position: absolute; left: 0; top: 0; width: 100%; padding: 15mm; }
           .print\\:hidden { display: none !important; }
         }
       `}</style>
     </div>
   );
 }
+

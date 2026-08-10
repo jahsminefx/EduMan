@@ -1,4 +1,5 @@
 const { getDB } = require('../config/database');
+const { deleteStoredMedia, deleteTempFiles, uploadImage } = require('../utils/cloudinaryImage');
 
 const VALID_STATUSES = ['Draft', 'Published'];
 
@@ -11,6 +12,14 @@ function uploadedPath(file) {
     return file ? `/uploads/${file.filename}` : null;
 }
 
+function allUploadedFiles(req) {
+    return Object.values(req.files || {}).flat().filter(Boolean);
+}
+
+function cleanupRequestUploads(req) {
+    deleteTempFiles(allUploadedFiles(req));
+}
+
 function getUploadedFile(req, fieldName) {
     return req.files?.[fieldName]?.[0] || null;
 }
@@ -20,22 +29,75 @@ function attachmentType(file) {
     return file.mimetype?.startsWith('image/') ? 'image' : 'document';
 }
 
-function buildAttachment(file) {
-    if (!file) {
+function emptyAttachment() {
+    return {
+        attachment_path: null,
+        attachment_public_id: null,
+        attachment_name: null,
+        attachment_type: null,
+        attachment_mime: null
+    };
+}
+
+async function buildAttachment(file, req) {
+    if (!file) return emptyAttachment();
+
+    if (file.mimetype?.startsWith('image/')) {
+        const image = await uploadImage(file, {
+            imageType: 'blog',
+            folder: `schools/${req.user.school_id}/announcements/attachments`,
+            context: {
+                school_id: String(req.user.school_id),
+                uploaded_by: String(req.user.id),
+                upload_type: 'announcement_attachment'
+            }
+        });
+
         return {
-            attachment_path: null,
-            attachment_name: null,
-            attachment_type: null,
-            attachment_mime: null
+            attachment_path: image.url,
+            attachment_public_id: image.publicId,
+            attachment_name: file.originalname,
+            attachment_type: 'image',
+            attachment_mime: file.mimetype || null
         };
     }
 
     return {
         attachment_path: uploadedPath(file),
+        attachment_public_id: null,
         attachment_name: file.originalname,
         attachment_type: attachmentType(file),
         attachment_mime: file.mimetype || null
     };
+}
+
+function buildFeaturedImage(file, req) {
+    if (!file) return null;
+
+    return uploadImage(file, {
+        imageType: 'blog',
+        folder: `schools/${req.user.school_id}/announcements/featured`,
+        context: {
+            school_id: String(req.user.school_id),
+            uploaded_by: String(req.user.id),
+            upload_type: 'announcement_featured_image'
+        }
+    });
+}
+
+function mediaReference(url, publicId) {
+    if (!url && !publicId) return null;
+    return { url, publicId };
+}
+
+async function deleteMediaList(mediaList) {
+    const seen = new Set();
+    for (const media of mediaList.filter(Boolean)) {
+        const key = `${media.publicId || ''}:${media.url || ''}`;
+        if (seen.has(key)) continue;
+        seen.add(key);
+        await deleteStoredMedia(media);
+    }
 }
 
 function normalizeStatus(status) {
@@ -160,19 +222,25 @@ exports.createAnnouncement = async (req, res) => {
     const status = normalizeStatus(req.body.status);
     const featuredImageFile = getUploadedFile(req, 'featured_image_file');
     const attachmentFile = getUploadedFile(req, 'attachment_file');
-    const featuredImage = uploadedPath(featuredImageFile) || cleanString(req.body.featured_image) || null;
-    const attachment = buildAttachment(attachmentFile);
+    let featuredUpload = null;
+    let attachment = emptyAttachment();
 
     if (!title || !cleanString(title) || !content || !cleanString(content)) {
+        cleanupRequestUploads(req);
         return res.status(400).json({ error: 'Validation Error', message: 'Title and content are required.' });
     }
 
     if (!status) {
+        cleanupRequestUploads(req);
         return res.status(400).json({ error: 'Validation Error', message: 'status must be Draft or Published.' });
     }
 
     try {
         const db = getDB();
+        featuredUpload = await buildFeaturedImage(featuredImageFile, req);
+        const featuredImage = featuredUpload?.url || cleanString(req.body.featured_image) || null;
+        const featuredImagePublicId = featuredUpload?.publicId || null;
+        attachment = await buildAttachment(attachmentFile, req);
         const publishedAt = status === 'Published' ? new Date() : null;
         const result = await db.run(`
             INSERT INTO announcements (
@@ -181,14 +249,16 @@ exports.createAnnouncement = async (req, res) => {
                 title,
                 content,
                 featured_image,
+                featured_image_public_id,
                 attachment_path,
+                attachment_public_id,
                 attachment_name,
                 attachment_type,
                 attachment_mime,
                 status,
                 published_at
             )
-            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+            VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13)
             RETURNING id
         `, [
             req.user.school_id,
@@ -196,7 +266,9 @@ exports.createAnnouncement = async (req, res) => {
             cleanString(title),
             cleanString(content),
             featuredImage,
+            featuredImagePublicId,
             attachment.attachment_path,
+            attachment.attachment_public_id,
             attachment.attachment_name,
             attachment.attachment_type,
             attachment.attachment_mime,
@@ -207,7 +279,15 @@ exports.createAnnouncement = async (req, res) => {
         const announcement = await findScopedAnnouncement(db, result.lastID, req.user.school_id);
         res.status(201).json({ message: 'Announcement created successfully.', announcement });
     } catch (err) {
-        res.status(500).json({ error: 'Server Error', message: err.message });
+        await deleteMediaList([
+            mediaReference(featuredUpload?.url, featuredUpload?.publicId),
+            mediaReference(attachment.attachment_path, attachment.attachment_public_id)
+        ]);
+        cleanupRequestUploads(req);
+        res.status(err.statusCode || 500).json({
+            error: err.statusCode ? 'Validation Error' : 'Server Error',
+            message: err.message
+        });
     }
 };
 
@@ -216,12 +296,16 @@ exports.updateAnnouncement = async (req, res) => {
     const status = normalizeStatus(req.body.status);
     const featuredImageFile = getUploadedFile(req, 'featured_image_file');
     const attachmentFile = getUploadedFile(req, 'attachment_file');
+    let attachment = null;
+    const newMediaToDeleteOnFailure = [];
 
     if (!title || !cleanString(title) || !content || !cleanString(content)) {
+        cleanupRequestUploads(req);
         return res.status(400).json({ error: 'Validation Error', message: 'Title and content are required.' });
     }
 
     if (!status) {
+        cleanupRequestUploads(req);
         return res.status(400).json({ error: 'Validation Error', message: 'status must be Draft or Published.' });
     }
 
@@ -230,28 +314,54 @@ exports.updateAnnouncement = async (req, res) => {
         const existing = await findScopedAnnouncement(db, req.params.id, req.user.school_id);
 
         if (!existing) {
+            cleanupRequestUploads(req);
             return res.status(404).json({ error: 'Not Found', message: 'Announcement not found.' });
         }
 
         if (!canMutateAnnouncement(req.user, existing)) {
+            cleanupRequestUploads(req);
             return res.status(403).json({ error: 'Forbidden', message: 'You can only manage announcements you authored.' });
         }
 
+        const oldMediaToDelete = [];
         const removeFeaturedImage = req.body.remove_featured_image === 'true';
-        const featuredImage = uploadedPath(featuredImageFile)
-            || (removeFeaturedImage ? '' : cleanString(req.body.featured_image))
-            || (removeFeaturedImage ? null : existing.featured_image);
+        let featuredImage = existing.featured_image;
+        let featuredImagePublicId = existing.featured_image_public_id;
 
-        const uploadedAttachment = buildAttachment(attachmentFile);
+        if (featuredImageFile) {
+            const featuredUpload = await buildFeaturedImage(featuredImageFile, req);
+            featuredImage = featuredUpload.url;
+            featuredImagePublicId = featuredUpload.publicId;
+            newMediaToDeleteOnFailure.push(mediaReference(featuredUpload.url, featuredUpload.publicId));
+            oldMediaToDelete.push(mediaReference(existing.featured_image, existing.featured_image_public_id));
+        } else if (removeFeaturedImage) {
+            featuredImage = null;
+            featuredImagePublicId = null;
+            oldMediaToDelete.push(mediaReference(existing.featured_image, existing.featured_image_public_id));
+        } else if (cleanString(req.body.featured_image) && cleanString(req.body.featured_image) !== existing.featured_image) {
+            featuredImage = cleanString(req.body.featured_image);
+            featuredImagePublicId = null;
+            oldMediaToDelete.push(mediaReference(existing.featured_image, existing.featured_image_public_id));
+        }
+
         const removeAttachment = req.body.remove_attachment === 'true';
-        const attachment = attachmentFile
-            ? uploadedAttachment
-            : {
+        if (attachmentFile) {
+            attachment = await buildAttachment(attachmentFile, req);
+            newMediaToDeleteOnFailure.push(mediaReference(attachment.attachment_path, attachment.attachment_public_id));
+            oldMediaToDelete.push(mediaReference(existing.attachment_path, existing.attachment_public_id));
+        } else {
+            attachment = {
                 attachment_path: removeAttachment ? null : existing.attachment_path,
+                attachment_public_id: removeAttachment ? null : existing.attachment_public_id,
                 attachment_name: removeAttachment ? null : existing.attachment_name,
                 attachment_type: removeAttachment ? null : existing.attachment_type,
                 attachment_mime: removeAttachment ? null : existing.attachment_mime
             };
+
+            if (removeAttachment) {
+                oldMediaToDelete.push(mediaReference(existing.attachment_path, existing.attachment_public_id));
+            }
+        }
 
         const publishedAt = status === 'Published'
             ? (existing.published_at || new Date())
@@ -262,19 +372,23 @@ exports.updateAnnouncement = async (req, res) => {
             SET title = $1,
                 content = $2,
                 featured_image = $3,
-                attachment_path = $4,
-                attachment_name = $5,
-                attachment_type = $6,
-                attachment_mime = $7,
-                status = $8,
+                featured_image_public_id = $4,
+                attachment_path = $5,
+                attachment_public_id = $6,
+                attachment_name = $7,
+                attachment_type = $8,
+                attachment_mime = $9,
+                status = $10,
                 updated_at = CURRENT_TIMESTAMP,
-                published_at = $9
-            WHERE id = $10 AND school_id = $11
+                published_at = $11
+            WHERE id = $12 AND school_id = $13
         `, [
             cleanString(title),
             cleanString(content),
             featuredImage,
+            featuredImagePublicId,
             attachment.attachment_path,
+            attachment.attachment_public_id,
             attachment.attachment_name,
             attachment.attachment_type,
             attachment.attachment_mime,
@@ -284,10 +398,16 @@ exports.updateAnnouncement = async (req, res) => {
             req.user.school_id
         ]);
 
+        await deleteMediaList(oldMediaToDelete);
         const announcement = await findScopedAnnouncement(db, req.params.id, req.user.school_id);
         res.json({ message: 'Announcement updated successfully.', announcement });
     } catch (err) {
-        res.status(500).json({ error: 'Server Error', message: err.message });
+        await deleteMediaList(newMediaToDeleteOnFailure);
+        cleanupRequestUploads(req);
+        res.status(err.statusCode || 500).json({
+            error: err.statusCode ? 'Validation Error' : 'Server Error',
+            message: err.message
+        });
     }
 };
 
@@ -305,6 +425,10 @@ exports.deleteAnnouncement = async (req, res) => {
         }
 
         await db.run('DELETE FROM announcements WHERE id = $1 AND school_id = $2', [req.params.id, req.user.school_id]);
+        await deleteMediaList([
+            mediaReference(existing.featured_image, existing.featured_image_public_id),
+            mediaReference(existing.attachment_path, existing.attachment_public_id)
+        ]);
         res.json({ message: 'Announcement deleted successfully.' });
     } catch (err) {
         res.status(500).json({ error: 'Server Error', message: err.message });

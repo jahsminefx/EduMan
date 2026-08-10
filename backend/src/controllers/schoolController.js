@@ -1,5 +1,6 @@
 const { getDB } = require('../config/database');
 const bcrypt = require('bcryptjs');
+const { deleteStoredMedia, uploadImage } = require('../utils/cloudinaryImage');
 
 function cleanString(value) {
     if (value === undefined || value === null) return null;
@@ -115,6 +116,8 @@ exports.updateMySchool = async (req, res) => {
         current_session_id,
         current_term_id
     } = req.body;
+    let uploadedLogo = null;
+
     try {
         const db = getDB();
         const school_id = req.user.school_id;
@@ -147,22 +150,37 @@ exports.updateMySchool = async (req, res) => {
             }
         }
 
-        const existing = await db.get('SELECT logo_url FROM schools WHERE id = $1', [school_id]);
-        const logoUrl = req.file ? `/uploads/${req.file.filename}` : (cleanString(req.body.logo_url) || existing?.logo_url || null);
+        const existing = await db.get('SELECT logo_url, logo_public_id FROM schools WHERE id = $1', [school_id]);
+        if (req.file) {
+            uploadedLogo = await uploadImage(req.file, {
+                imageType: 'logo',
+                folder: `schools/${school_id}/logos`,
+                context: {
+                    school_id: String(school_id),
+                    uploaded_by: String(req.user.id)
+                }
+            });
+        }
+
+        const submittedLogoUrl = cleanString(req.body.logo_url);
+        const logoUrl = uploadedLogo?.url || submittedLogoUrl || existing?.logo_url || null;
+        const logoPublicId = uploadedLogo?.publicId || (logoUrl === existing?.logo_url ? existing?.logo_public_id : null);
+        const shouldDeleteOldLogo = Boolean(existing?.logo_url && logoUrl !== existing.logo_url);
 
         await db.transaction(async (client) => {
             await client.run(
                 `UPDATE schools
-                 SET name=$1, address=$2, phone=$3, email=$4, logo_url=$5, motto=$6, website=$7,
-                     principal_name=$8, school_type=$9, city=$10, state=$11, country=$12,
-                     current_session_id=$13, current_term_id=$14
-                 WHERE id=$15`,
+                 SET name=$1, address=$2, phone=$3, email=$4, logo_url=$5, logo_public_id=$6, motto=$7, website=$8,
+                     principal_name=$9, school_type=$10, city=$11, state=$12, country=$13,
+                     current_session_id=$14, current_term_id=$15
+                 WHERE id=$16`,
                 [
                     schoolName,
                     cleanString(address),
                     cleanString(phone),
                     cleanString(email),
                     logoUrl,
+                    logoPublicId,
                     cleanString(motto),
                     cleanString(website),
                     cleanString(principal_name),
@@ -179,10 +197,23 @@ exports.updateMySchool = async (req, res) => {
             await client.run('UPDATE academic_sessions SET is_active = CASE WHEN id = $1 THEN 1 ELSE 0 END WHERE school_id = $2', [sessionId, school_id]);
             await client.run('UPDATE academic_terms SET is_active = CASE WHEN id = $1 THEN 1 ELSE 0 END WHERE school_id = $2', [termId, school_id]);
         });
+
+        if (shouldDeleteOldLogo) {
+            await deleteStoredMedia({
+                url: existing.logo_url,
+                publicId: existing.logo_public_id
+            });
+        }
         
         res.json({ message: 'School profile updated successfully' });
     } catch (err) {
-        res.status(500).json({ error: 'Server Error', message: err.message });
+        if (uploadedLogo?.publicId) {
+            await deleteStoredMedia({ url: uploadedLogo.url, publicId: uploadedLogo.publicId });
+        }
+        res.status(err.statusCode || 500).json({
+            error: err.statusCode ? 'Validation Error' : 'Server Error',
+            message: err.message
+        });
     }
 };
 

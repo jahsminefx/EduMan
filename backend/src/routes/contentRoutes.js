@@ -5,6 +5,7 @@ const path = require('path');
 const fs = require('fs');
 const contentController = require('../controllers/contentController');
 const { protect, authorize, requireSchoolScope } = require('../middleware/authMiddleware');
+const { ALLOWED_IMAGE_EXTENSIONS, ALLOWED_VIDEO_EXTENSIONS } = require('../utils/cloudinaryImage');
 
 // Multer config for learning content files
 const storage = multer.diskStorage({
@@ -16,8 +17,8 @@ const storage = multer.diskStorage({
     filename: (req, file, cb) => cb(null, `content_${Date.now()}${path.extname(file.originalname)}`)
 });
 const allowedExtensions = new Set([
-    '.jpg', '.jpeg', '.png', '.gif', '.webp',
-    '.mp4', '.mov', '.webm', '.m4v',
+    ...ALLOWED_IMAGE_EXTENSIONS,
+    ...ALLOWED_VIDEO_EXTENSIONS,
     '.pdf', '.doc', '.docx', '.ppt', '.pptx', '.xls', '.xlsx', '.txt', '.rtf'
 ]);
 const upload = multer({

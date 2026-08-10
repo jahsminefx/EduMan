@@ -187,6 +187,8 @@ async function initDB(retryCount = 0) {
             // Announcement attachments
             try {
                 await pool.query("ALTER TABLE announcements ADD COLUMN IF NOT EXISTS attachment_path VARCHAR(500)");
+                await pool.query("ALTER TABLE announcements ADD COLUMN IF NOT EXISTS featured_image_public_id TEXT");
+                await pool.query("ALTER TABLE announcements ADD COLUMN IF NOT EXISTS attachment_public_id TEXT");
                 await pool.query("ALTER TABLE announcements ADD COLUMN IF NOT EXISTS attachment_name VARCHAR(255)");
                 await pool.query("ALTER TABLE announcements ADD COLUMN IF NOT EXISTS attachment_type VARCHAR(30)");
                 await pool.query("ALTER TABLE announcements ADD COLUMN IF NOT EXISTS attachment_mime VARCHAR(120)");
@@ -204,6 +206,11 @@ async function initDB(retryCount = 0) {
                 await pool.query("ALTER TABLE schools ADD COLUMN IF NOT EXISTS city TEXT");
                 await pool.query("ALTER TABLE schools ADD COLUMN IF NOT EXISTS state TEXT");
                 await pool.query("ALTER TABLE schools ADD COLUMN IF NOT EXISTS country TEXT");
+                await pool.query("ALTER TABLE schools ADD COLUMN IF NOT EXISTS logo_public_id TEXT");
+                await pool.query("ALTER TABLE learning_contents ADD COLUMN IF NOT EXISTS file_public_id TEXT");
+                await pool.query("ALTER TABLE homework ADD COLUMN IF NOT EXISTS file_public_id TEXT");
+                await pool.query("ALTER TABLE homework_submissions ADD COLUMN IF NOT EXISTS file_public_id TEXT");
+                await pool.query("ALTER TABLE assignment_submissions ADD COLUMN IF NOT EXISTS file_public_id TEXT");
                 await pool.query("ALTER TABLE teachers ADD COLUMN IF NOT EXISTS gender TEXT");
                 await pool.query("ALTER TABLE students ADD COLUMN IF NOT EXISTS age INTEGER");
                 await pool.query("ALTER TABLE assessments ADD COLUMN IF NOT EXISTS session_id INTEGER REFERENCES academic_sessions(id) ON DELETE SET NULL");
@@ -306,6 +313,137 @@ async function initDB(retryCount = 0) {
             } catch (patchErr) {
                 console.log('Schema patch (EduMan AI) skipped or already applied.', patchErr.message);
             }
+            // Support Center tables patch
+            try {
+                await pool.query(`
+                    CREATE TABLE IF NOT EXISTS support_threads (
+                        id SERIAL PRIMARY KEY,
+                        ticket_number TEXT UNIQUE NOT NULL,
+                        school_id INTEGER REFERENCES schools(id) ON DELETE CASCADE,
+                        created_by INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        subject TEXT NOT NULL,
+                        category TEXT NOT NULL,
+                        priority TEXT NOT NULL DEFAULT 'MEDIUM',
+                        status TEXT NOT NULL DEFAULT 'OPEN',
+                        assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                        last_reply_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        first_response_at TIMESTAMP,
+                        closed_at TIMESTAMP,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        ai_summary TEXT,
+                        ai_suggested_reply TEXT,
+                        ai_sentiment TEXT,
+                        ai_priority_score REAL,
+                        ai_category_score REAL,
+                        ai_resolution TEXT,
+                        ai_duplicate_id INTEGER,
+                        ai_metadata TEXT
+                    );
+                    CREATE TABLE IF NOT EXISTS support_messages (
+                        id SERIAL PRIMARY KEY,
+                        thread_id INTEGER NOT NULL REFERENCES support_threads(id) ON DELETE CASCADE,
+                        sender_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        message TEXT NOT NULL,
+                        is_internal INTEGER DEFAULT 0,
+                        mentions TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                    CREATE TABLE IF NOT EXISTS support_attachments (
+                        id SERIAL PRIMARY KEY,
+                        message_id INTEGER NOT NULL REFERENCES support_messages(id) ON DELETE CASCADE,
+                        file_name TEXT NOT NULL,
+                        file_url TEXT NOT NULL,
+                        file_type TEXT NOT NULL,
+                        file_size INTEGER NOT NULL,
+                        public_id TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                    CREATE TABLE IF NOT EXISTS support_assignments (
+                        id SERIAL PRIMARY KEY,
+                        thread_id INTEGER NOT NULL REFERENCES support_threads(id) ON DELETE CASCADE,
+                        assigned_from INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                        assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                        reason TEXT,
+                        assigned_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                    CREATE TABLE IF NOT EXISTS support_tags (
+                        id SERIAL PRIMARY KEY,
+                        name TEXT UNIQUE NOT NULL,
+                        color TEXT DEFAULT '#3B82F6'
+                    );
+                    CREATE TABLE IF NOT EXISTS support_thread_tags (
+                        thread_id INTEGER NOT NULL REFERENCES support_threads(id) ON DELETE CASCADE,
+                        tag_id INTEGER NOT NULL REFERENCES support_tags(id) ON DELETE CASCADE,
+                        PRIMARY KEY(thread_id, tag_id)
+                    );
+                    CREATE TABLE IF NOT EXISTS support_canned_responses (
+                        id SERIAL PRIMARY KEY,
+                        title TEXT NOT NULL,
+                        category TEXT,
+                        content TEXT NOT NULL,
+                        created_by INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                    CREATE TABLE IF NOT EXISTS support_feedback (
+                        id SERIAL PRIMARY KEY,
+                        thread_id INTEGER UNIQUE NOT NULL REFERENCES support_threads(id) ON DELETE CASCADE,
+                        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        rating INTEGER NOT NULL,
+                        comment TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                    CREATE TABLE IF NOT EXISTS support_watchers (
+                        id SERIAL PRIMARY KEY,
+                        thread_id INTEGER NOT NULL REFERENCES support_threads(id) ON DELETE CASCADE,
+                        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(thread_id, user_id)
+                    );
+                    CREATE TABLE IF NOT EXISTS knowledge_base_articles (
+                        id SERIAL PRIMARY KEY,
+                        title TEXT NOT NULL,
+                        slug TEXT UNIQUE NOT NULL,
+                        category TEXT NOT NULL,
+                        content TEXT NOT NULL,
+                        featured_image TEXT,
+                        published INTEGER DEFAULT 0,
+                        author_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        views INTEGER DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                    CREATE TABLE IF NOT EXISTS support_activity_logs (
+                        id SERIAL PRIMARY KEY,
+                        thread_id INTEGER NOT NULL REFERENCES support_threads(id) ON DELETE CASCADE,
+                        user_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+                        action TEXT NOT NULL,
+                        details TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                    CREATE TABLE IF NOT EXISTS support_bookmarks (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        article_id INTEGER NOT NULL REFERENCES knowledge_base_articles(id) ON DELETE CASCADE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE(user_id, article_id)
+                    );
+                    CREATE TABLE IF NOT EXISTS notifications (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        title TEXT NOT NULL,
+                        message TEXT NOT NULL,
+                        type TEXT NOT NULL DEFAULT 'support',
+                        link TEXT,
+                        is_read INTEGER DEFAULT 0,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
+                `);
+                console.log('Schema patch (Support Center) applied.');
+            } catch (patchErr) {
+                console.log('Schema patch (Support Center) skipped or already applied.', patchErr.message);
+            }
         } else {
             console.warn('Warning: schema.sql not found at', schemaPath);
         }
@@ -319,14 +457,20 @@ async function initDB(retryCount = 0) {
         const adminRes = await db.get("SELECT id FROM users WHERE role = $1 LIMIT 1", ['SuperAdmin']);
 
         if (!adminRes) {
-            const defaultPassword = process.env.SUPERADMIN_PASSWORD || 'ASDFGHJKL';
-            const hash = await bcrypt.hash(defaultPassword, 10);
-            console.log('No SuperAdmin found. Seeding default SuperAdmin...');
-            await pool.query(
-                'INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4)',
-                ['Default Admin', 'admin@eduman.local', hash, 'SuperAdmin']
-            );
-            console.log('Default SuperAdmin created (admin@eduman.local). Password set from SUPERADMIN_PASSWORD env var.');
+            const superAdminEmail = process.env.SUPERADMIN_EMAIL || (isProduction ? null : 'admin@eduman.local');
+            const superAdminPassword = process.env.SUPERADMIN_PASSWORD || (isProduction ? null : 'ASDFGHJKL');
+
+            if (isProduction && (!superAdminEmail || !superAdminPassword)) {
+                console.warn('Production Notice: No SuperAdmin account exists yet. Set SUPERADMIN_EMAIL and SUPERADMIN_PASSWORD environment variables to automatically seed initial SuperAdmin account.');
+            } else if (superAdminEmail && superAdminPassword) {
+                const hash = await bcrypt.hash(superAdminPassword, 10);
+                console.log(`No SuperAdmin found. Seeding initial SuperAdmin account (${superAdminEmail})...`);
+                await pool.query(
+                    'INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4)',
+                    ['System Admin', superAdminEmail, hash, 'SuperAdmin']
+                );
+                console.log(`Initial SuperAdmin account created successfully for ${superAdminEmail}.`);
+            }
         } else {
             console.log('SuperAdmin account already exists — no changes made.');
         }
