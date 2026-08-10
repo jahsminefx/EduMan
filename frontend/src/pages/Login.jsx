@@ -64,7 +64,7 @@ export default function Login() {
                   type="email"
                   required
                   className="focus:ring-blue-500 focus:border-blue-500 block w-full pl-10 text-xs sm:text-sm border-gray-300 rounded-xl py-2.5 border transition-colors text-gray-900"
-                  placeholder="admin@eduman.local"
+                  placeholder="admin@eduman.africa"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                 />

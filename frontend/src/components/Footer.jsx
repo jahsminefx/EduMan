@@ -31,7 +31,7 @@ export default function Footer() {
           <div>
             <h3 className="text-white font-semibold mb-4">Contact</h3>
             <ul className="space-y-2 text-sm">
-              <li>hello@eduman.local</li>
+              <li>hello@eduman.africa</li>
               <li>09156457073</li>
               <li>Delta state, Nigeria</li>
             </ul>
