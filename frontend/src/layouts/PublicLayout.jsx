@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import Navbar from '../components/Navbar';
 import Footer from '../components/Footer';
+import InstallPWA from '../components/InstallPWA';
 
 export default function PublicLayout() {
   const location = useLocation();
@@ -23,6 +24,7 @@ export default function PublicLayout() {
         <Outlet />
       </main>
       <Footer />
+      <InstallPWA />
     </div>
   );
 }

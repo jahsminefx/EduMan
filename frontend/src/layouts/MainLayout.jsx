@@ -25,6 +25,8 @@ import {
 import BrandLogo from '../components/BrandLogo';
 
 import NotificationDropdown from '../components/NotificationDropdown';
+import InstallPWA from '../components/InstallPWA';
+
 
 const ANNOUNCEMENT_ROLES = ['SchoolAdmin', 'Teacher', 'Student', 'Parent'];
 
@@ -302,6 +304,7 @@ export default function MainLayout() {
             <Outlet />
           </div>
         </main>
+        <InstallPWA />
       </div>
     </div>
   );
