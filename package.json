@@ -3,10 +3,10 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "postinstall": "cd frontend && npm install && npm run build && cd ../backend && npm install",
+    "postinstall": "cd frontend && npm install --include=dev && npm run build && cd ../backend && npm install --include=dev",
     "start": "cd backend && npm start"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": "20.x"
   }
 }
