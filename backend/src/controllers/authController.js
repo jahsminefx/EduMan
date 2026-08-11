@@ -1,6 +1,7 @@
 const { getDB } = require('../config/database');
 const bcrypt = require('bcryptjs');
 const { generateToken } = require('../utils/auth');
+const { sendWelcomeEmail } = require('../services/notificationService');
 
 exports.login = async (req, res) => {
     const { email, password } = req.body;
@@ -130,6 +131,15 @@ exports.register = async (req, res) => {
 
         const user = { id: result.user_id, name: 'Admin User', email, role };
         const token = generateToken(user, result.school_id);
+
+        // Send welcome email
+        sendWelcomeEmail({
+            email,
+            name: 'Admin User',
+            role: 'School Admin',
+            schoolName: name,
+            password
+        });
 
         res.status(201).json({
             message: 'School and Admin account created successfully',

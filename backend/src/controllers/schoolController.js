@@ -1,6 +1,7 @@
 const { getDB } = require('../config/database');
 const bcrypt = require('bcryptjs');
 const { deleteStoredMedia, uploadImage } = require('../utils/cloudinaryImage');
+const { sendWelcomeEmail } = require('../services/notificationService');
 
 function cleanString(value) {
     if (value === undefined || value === null) return null;
@@ -65,6 +66,15 @@ exports.createSchool = async (req, res) => {
             );
 
             return { schoolId, userId };
+        });
+
+        // Send welcome email with credentials
+        sendWelcomeEmail({
+            email: admin_email,
+            name: admin_name,
+            role: 'School Admin',
+            schoolName: name,
+            password: admin_password
         });
 
         res.json({ message: 'School and Admin created successfully', schoolId: result.schoolId, userId: result.userId });

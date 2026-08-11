@@ -1,5 +1,6 @@
 const { getDB } = require('../config/database');
 const bcrypt = require('bcryptjs');
+const { sendWelcomeEmail } = require('../services/notificationService');
 
 const VALID_GENDERS = new Set(['Male', 'Female', 'Other']);
 
@@ -90,6 +91,16 @@ exports.createTeacher = async (req, res) => {
             }
 
             return { teacherId, userId };
+        });
+
+        // Send welcome email with credentials
+        const schoolObj = await db.get('SELECT name FROM schools WHERE id = $1', [school_id]);
+        sendWelcomeEmail({
+            email,
+            name: `${first_name} ${last_name}`,
+            role: 'Teacher',
+            schoolName: schoolObj?.name || 'EduMan School',
+            password
         });
 
         res.json({ 

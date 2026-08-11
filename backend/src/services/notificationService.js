@@ -227,12 +227,67 @@ async function notifyMentions(thread, mentionUserIds, senderUser) {
     }
 }
 
+/**
+ * Sends welcome email with account credentials to newly registered users
+ */
+async function sendWelcomeEmail({ email, name, role, schoolName = 'EduMan', password = null }) {
+    if (!email) return;
+    try {
+        const appUrl = process.env.OPENROUTER_SITE_URL || 'https://eduman.africa';
+        const loginUrl = `${appUrl}/login`;
+        const subject = `Welcome to EduMan — Account Access & Credentials`;
+
+        const passwordHtml = password
+            ? `<div style="background-color:#f3f4f6; border-left:4px solid #4f46e5; padding:12px 16px; margin:16px 0; border-radius:4px;">
+                <p style="margin:0 0 4px 0; font-size:12px; color:#6b7280; text-transform:uppercase; font-weight:bold;">Your Temporary Password</p>
+                <code style="font-size:16px; font-weight:bold; color:#1f2937; background:#e5e7eb; padding:4px 8px; border-radius:4px;">${password}</code>
+               </div>`
+            : '';
+
+        const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; background-color: #ffffff;">
+            <div style="background-color: #4f46e5; color: #ffffff; padding: 24px; text-align: center;">
+                <h1 style="margin: 0; font-size: 24px; font-weight: bold;">Welcome to EduMan</h1>
+                <p style="margin: 4px 0 0 0; font-size: 14px; opacity: 0.9;">Smart School Management System</p>
+            </div>
+            <div style="padding: 24px; color: #374151; line-height: 1.6;">
+                <p style="font-size: 16px; margin-top: 0;">Hi <strong>${name}</strong>,</p>
+                <p>Your account has been created for <strong>${schoolName}</strong> with the role of <strong>${role}</strong>.</p>
+                
+                <div style="background-color: #f9fafb; border: 1px solid #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                    <p style="margin: 0; font-size: 14px;"><strong>Login Email:</strong> ${email}</p>
+                    <p style="margin: 6px 0 0 0; font-size: 14px;"><strong>Role:</strong> ${role}</p>
+                </div>
+
+                ${passwordHtml}
+
+                <p style="margin-top: 24px; text-align: center;">
+                    <a href="${loginUrl}" style="background-color: #4f46e5; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Log In to EduMan</a>
+                </p>
+                <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+                <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
+                    If you have any questions, contact your school administrator or reach out to us at <a href="mailto:hello@eduman.africa" style="color: #4f46e5;">hello@eduman.africa</a>.
+                </p>
+            </div>
+        </div>
+        `;
+
+        const text = `Hi ${name},\n\nWelcome to EduMan! Your account has been created for ${schoolName} as a ${role}.\n\nLogin Email: ${email}\n${password ? `Temporary Password: ${password}\n` : ''}\nLog in here: ${loginUrl}`;
+
+        await sendEmailNotification({ to: email, subject, text, html });
+    } catch (err) {
+        console.error('Failed to send welcome email:', err);
+    }
+}
+
 module.exports = {
     createNotification,
     sendEmailNotification,
+    sendWelcomeEmail,
     notifyNewTicket,
     notifyNewReply,
     notifyAssignment,
     notifyStatusChange,
     notifyMentions
 };
+
