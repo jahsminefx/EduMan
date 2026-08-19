@@ -149,10 +149,13 @@ const db = {
 };
 
 const MAX_RETRIES = 5;
+let dbInitPromise = null;
 
-async function initDB(retryCount = 0) {
-    try {
-        console.log(`Attempting to connect to ${usingMemoryDb ? 'in-memory PostgreSQL' : 'PostgreSQL'}...`);
+function initDB(retryCount = 0) {
+    if (dbInitPromise) return dbInitPromise;
+    dbInitPromise = (async () => {
+        try {
+            console.log(`Attempting to connect to ${usingMemoryDb ? 'in-memory PostgreSQL' : 'PostgreSQL'}...`);
 
         // Test connection
         const testRes = await pool.query('SELECT NOW()');
@@ -439,10 +442,124 @@ async function initDB(retryCount = 0) {
                         is_read INTEGER DEFAULT 0,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
                     );
+                    ALTER TABLE users ADD COLUMN IF NOT EXISTS setup_token TEXT;
+                    ALTER TABLE users ADD COLUMN IF NOT EXISTS setup_token_expires TIMESTAMP;
                 `);
-                console.log('Schema patch (Support Center) applied.');
+                console.log('Schema patch (Support Center & Password Setup) applied.');
             } catch (patchErr) {
-                console.log('Schema patch (Support Center) skipped or already applied.', patchErr.message);
+                console.log('Schema patch (Support Center & Password Setup) skipped or already applied.', patchErr.message);
+            }
+
+            // Run migration 004: Global Roles Hardening
+            try {
+                const migPath = path.join(__dirname, '../migrations/004_global_roles_hardening.sql');
+                if (fs.existsSync(migPath)) {
+                    const migSql = fs.readFileSync(migPath, 'utf8');
+                    await runSqlScript(migSql);
+                    console.log('Migration 004 (Global Roles Hardening) applied.');
+                }
+            } catch (migErr) {
+                const msg = (migErr.message || '').toLowerCase();
+                const code = migErr.code || '';
+                if (['42P07', '42701', '42710', '23505'].includes(code) || msg.includes('already exists') || msg.includes('duplicate')) {
+                    console.log('Migration 004 skipped or already applied:', migErr.message);
+                } else {
+                    console.error('CRITICAL: Migration 004 failed to apply:', migErr);
+                    throw migErr;
+                }
+            }
+
+            // Run migration 005: Parent & Accountant Hardening
+            try {
+                const mig5Path = path.join(__dirname, '../migrations/005_parent_accountant_hardening.sql');
+                if (fs.existsSync(mig5Path)) {
+                    const mig5Sql = fs.readFileSync(mig5Path, 'utf8');
+                    await runSqlScript(mig5Sql);
+                    console.log('Migration 005 (Parent & Accountant Hardening) applied.');
+                }
+            } catch (migErr) {
+                const msg = (migErr.message || '').toLowerCase();
+                const code = migErr.code || '';
+                if (['42P07', '42701', '42710', '23505'].includes(code) || msg.includes('already exists') || msg.includes('duplicate')) {
+                    console.log('Migration 005 skipped or already applied:', migErr.message);
+                } else {
+                    console.error('CRITICAL: Migration 005 failed to apply:', migErr);
+                    throw migErr;
+                }
+            }
+
+            // Run migration 006: SuperAdmin Hardening & Platform Expansion
+            try {
+                const mig6Path = path.join(__dirname, '../migrations/006_superadmin_hardening.sql');
+                if (fs.existsSync(mig6Path)) {
+                    const mig6Sql = fs.readFileSync(mig6Path, 'utf8');
+                    await runSqlScript(mig6Sql);
+                    console.log('Migration 006 (SuperAdmin Hardening & Platform Expansion) applied.');
+                }
+
+                // Seed default non-secret platform settings if empty
+                const defaultSettings = [
+                    ['platform_name', 'EduMan Africa', 'Global platform name displayed across portals'],
+                    ['support_email', 'support@eduman.africa', 'Official support contact email'],
+                    ['contact_email', 'hello@eduman.africa', 'General inquiries contact email'],
+                    ['timezone', 'Africa/Lagos', 'Default platform timezone'],
+                    ['maintenance_mode', 'false', 'Global platform maintenance mode flag'],
+                    ['registration_open', 'true', 'Self-service institution registration status'],
+                    ['max_upload_size_mb', '50', 'Maximum file upload size limit in MB']
+                ];
+                for (const [sKey, sVal, sDesc] of defaultSettings) {
+                    await pool.query(
+                        `INSERT INTO platform_settings (setting_key, setting_value, description)
+                         VALUES ($1, $2, $3) ON CONFLICT (setting_key) DO NOTHING`,
+                        [sKey, sVal, sDesc]
+                    );
+                }
+            } catch (migErr) {
+                const msg = (migErr.message || '').toLowerCase();
+                const code = migErr.code || '';
+                if (['42P07', '42701', '42710', '23505'].includes(code) || msg.includes('already exists') || msg.includes('duplicate')) {
+                    console.log('Migration 006 skipped or already applied:', migErr.message);
+                } else {
+                    console.error('CRITICAL: Migration 006 failed to apply:', migErr);
+                    throw migErr;
+                }
+            }
+            // Run migration 007: Harden Invitation Tokens
+            try {
+                const mig7Path = path.join(__dirname, '../migrations/007_harden_invitation_tokens.sql');
+                if (fs.existsSync(mig7Path)) {
+                    const mig7Sql = fs.readFileSync(mig7Path, 'utf8');
+                    await runSqlScript(mig7Sql);
+                    console.log('Migration 007 (Harden Invitation Setup Tokens) applied.');
+                }
+            } catch (migErr) {
+                const msg = (migErr.message || '').toLowerCase();
+                const code = migErr.code || '';
+                if (['42P07', '42701', '42710', '23505'].includes(code) || msg.includes('already exists') || msg.includes('duplicate')) {
+                    console.log('Migration 007 skipped or already applied:', migErr.message);
+                } else {
+                    console.error('CRITICAL: Migration 007 failed to apply:', migErr);
+                    throw migErr;
+                }
+            }
+
+            // Run migration 008: Schemes of Work (Per Subject)
+            try {
+                const mig8Path = path.join(__dirname, '../migrations/008_schemes_of_work.sql');
+                if (fs.existsSync(mig8Path)) {
+                    const mig8Sql = fs.readFileSync(mig8Path, 'utf8');
+                    await runSqlScript(mig8Sql);
+                    console.log('Migration 008 (Schemes of Work per Subject) applied.');
+                }
+            } catch (migErr) {
+                const msg = (migErr.message || '').toLowerCase();
+                const code = migErr.code || '';
+                if (['42P07', '42701', '42710', '23505'].includes(code) || msg.includes('already exists') || msg.includes('duplicate')) {
+                    console.log('Migration 008 skipped or already applied:', migErr.message);
+                } else {
+                    console.error('CRITICAL: Migration 008 failed to apply:', migErr);
+                    throw migErr;
+                }
             }
         } else {
             console.warn('Warning: schema.sql not found at', schemaPath);
@@ -495,6 +612,8 @@ async function initDB(retryCount = 0) {
 
         throw error;
     }
+    })();
+    return dbInitPromise;
 }
 
 function getDB() {

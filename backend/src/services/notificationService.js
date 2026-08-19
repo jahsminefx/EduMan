@@ -1,6 +1,30 @@
 const { getDB } = require('../config/database');
 const nodemailer = require('nodemailer');
 
+// In-memory email store for TEST environment
+let sentEmails = [];
+
+/**
+ * Gets a copy of all captured emails (Test Mode)
+ */
+function getSentEmails() {
+    return [...sentEmails];
+}
+
+/**
+ * Clears the captured emails store (Test Mode)
+ */
+function clearSentEmails() {
+    sentEmails = [];
+}
+
+/**
+ * Gets the most recently captured email (Test Mode)
+ */
+function getLastSentEmail() {
+    return sentEmails.length > 0 ? sentEmails[sentEmails.length - 1] : null;
+}
+
 /**
  * Creates an in-app notification record in the database
  */
@@ -20,36 +44,76 @@ async function createNotification({ userId, title, message, type = 'support', li
 }
 
 /**
- * Sends email alert (log fallback if SMTP is unconfigured)
+ * Central Environment-Aware Email Adapter
+ * - TEST: Intercepts outgoing emails into in-memory store; ZERO external SMTP/network calls.
+ * - DEV: Logs to console if SMTP unconfigured; logs clean dev warning on failure.
+ * - PROD: Attempts Brevo SMTP; logs error for monitoring if failed, but NEVER throws or rolls back transactions.
  */
 async function sendEmailNotification({ to, subject, text, html }) {
-    if (!to) return;
+    if (!to) return { success: false, reason: 'No recipient specified' };
+
+    const env = process.env.NODE_ENV || 'development';
+
+    // 1. TEST MODE: Intercept in-memory, zero SMTP/network calls
+    if (env === 'test') {
+        let token = null;
+        const match = (html || text || '').match(/token=([a-f0-9]+)/i);
+        if (match) {
+            token = match[1];
+        }
+
+        const emailRecord = {
+            to,
+            subject,
+            text,
+            html,
+            token,
+            timestamp: new Date()
+        };
+        sentEmails.push(emailRecord);
+        return { success: true, mode: 'test', record: emailRecord };
+    }
+
+    // 2. DEV MODE with unconfigured / placeholder credentials
+    if (!process.env.SMTP_USER || process.env.SMTP_USER === 'your_brevo_email@example.com') {
+        console.log(`[Dev Intercept] Email alert queued for: ${to} | Subject: ${subject}`);
+        return { success: true, mode: 'dev-intercept' };
+    }
+
+    // 3. PROD / DEV WITH SMTP CREDENTIALS: Brevo SMTP
     try {
         const transporter = nodemailer.createTransport({
             host: process.env.SMTP_HOST || 'smtp-relay.brevo.com',
-            port: process.env.SMTP_PORT || 587,
+            port: parseInt(process.env.SMTP_PORT || '587', 10),
             auth: {
                 user: process.env.SMTP_USER,
                 pass: process.env.SMTP_PASS,
             },
         });
 
+        const senderEmail = process.env.CONTACT_FROM_EMAIL || process.env.SMTP_USER || 'noreply@eduman.africa';
+
         const mailOptions = {
-            from: process.env.CONTACT_EMAIL_FROM || process.env.SMTP_USER || 'support@eduman.com',
+            from: `EduMan Support <${senderEmail}>`,
             to,
             subject,
             text,
             html: html || `<p>${text}</p>`
         };
 
-        if (!process.env.SMTP_USER || process.env.SMTP_USER === 'your_brevo_email@example.com') {
-            console.log('Intercepted Support Email Notification (Dev Mode):', mailOptions.subject, 'To:', to);
-            return;
-        }
-
         await transporter.sendMail(mailOptions);
+        if (env !== 'production') {
+            console.log(`[Brevo SMTP] Email sent successfully to ${to}: ${subject}`);
+        }
+        return { success: true, mode: 'smtp' };
     } catch (err) {
-        console.error('Failed to send email notification:', err.message);
+        if (env === 'production') {
+            console.error('[Production SMTP Error] Failed to send email:', err.message);
+        } else if (env === 'development') {
+            console.error('[Dev SMTP Error] Failed to send email:', err.message);
+        }
+        // Always catch and resolve cleanly so caller database operations never fail or crash
+        return { success: false, error: err.message };
     }
 }
 
@@ -71,11 +135,11 @@ async function notifyNewTicket(thread, creatorUser) {
         for (const staff of supportStaff) {
             await createNotification({ userId: staff.id, title, message, link });
             if (staff.email) {
-                sendEmailNotification({
+                await sendEmailNotification({
                     to: staff.email,
                     subject: `[EDUMAN Support] ${title}`,
                     text: `A new ticket #${thread.ticket_number} has been created by ${creatorUser.name}.\nSubject: ${thread.subject}\nCategory: ${thread.category}\nPriority: ${thread.priority}`
-                });
+                }).catch(() => {});
             }
         }
     } catch (err) {
@@ -102,11 +166,11 @@ async function notifyNewReply(thread, messageObj, senderUser) {
 
                 await createNotification({ userId: creator.id, title, message: msg, link });
                 if (creator.email) {
-                    sendEmailNotification({
+                    await sendEmailNotification({
                         to: creator.email,
                         subject: `[EDUMAN Support] ${title}`,
                         text: `Hi ${creator.name},\n\nThere is a new reply on ticket #${thread.ticket_number}.\nSender: ${senderUser.name}\nMessage: ${messageObj.message}`
-                    });
+                    }).catch(() => {});
                 }
             }
         }
@@ -121,11 +185,11 @@ async function notifyNewReply(thread, messageObj, senderUser) {
 
                 await createNotification({ userId: agent.id, title, message: msg, link });
                 if (agent.email) {
-                    sendEmailNotification({
+                    await sendEmailNotification({
                         to: agent.email,
                         subject: `[EDUMAN Support] ${title}`,
                         text: `Hi ${agent.name},\n\nCustomer ${senderUser.name} replied to ticket #${thread.ticket_number}.\nMessage: ${messageObj.message}`
-                    });
+                    }).catch(() => {});
                 }
             }
         }
@@ -160,11 +224,11 @@ async function notifyAssignment(thread, assignedToUser, assignerUser) {
 
         await createNotification({ userId: assignedToUser.id, title, message, link });
         if (assignedToUser.email) {
-            sendEmailNotification({
+            await sendEmailNotification({
                 to: assignedToUser.email,
                 subject: `[EDUMAN Support] ${title}`,
                 text: `Hi ${assignedToUser.name},\n\nYou have been assigned ticket #${thread.ticket_number} (${thread.subject}).`
-            });
+            }).catch(() => {});
         }
     } catch (err) {
         console.error('Error sending assignment notification:', err);
@@ -185,11 +249,11 @@ async function notifyStatusChange(thread, newStatus, changerUser) {
 
             await createNotification({ userId: creator.id, title, message, link });
             if (creator.email) {
-                sendEmailNotification({
+                await sendEmailNotification({
                     to: creator.email,
                     subject: `[EDUMAN Support] ${title}`,
                     text: `Hi ${creator.name},\n\nYour ticket #${thread.ticket_number} status has been updated to "${newStatus}".`
-                });
+                }).catch(() => {});
             }
         }
     } catch (err) {
@@ -214,11 +278,11 @@ async function notifyMentions(thread, mentionUserIds, senderUser) {
 
                 await createNotification({ userId: user.id, title, message, link });
                 if (user.email) {
-                    sendEmailNotification({
+                    await sendEmailNotification({
                         to: user.email,
                         subject: `[EDUMAN Support] ${title}`,
                         text: `Hi ${user.name},\n\n${senderUser.name} mentioned you in ticket #${thread.ticket_number}.`
-                    });
+                    }).catch(() => {});
                 }
             }
         }
@@ -228,12 +292,61 @@ async function notifyMentions(thread, mentionUserIds, senderUser) {
 }
 
 /**
- * Sends welcome email with account credentials to newly registered users
+ * Standardized 1-click password setup invitation link sent to newly created users
+ * Used across Student, Parent, Accountant, ContentManager, and SupportOfficer roles.
  */
-async function sendWelcomeEmail({ email, name, role, schoolName = 'EduMan', password = null }) {
-    if (!email) return;
+async function sendInvitationEmail({ email, name, role, schoolName, token }) {
     try {
-        const appUrl = process.env.OPENROUTER_SITE_URL || 'https://eduman.africa';
+        const appUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const setupUrl = `${appUrl}/setup-password?token=${token}`;
+        const subject = `Invitation to EduMan — Set Up Your Password for ${schoolName}`;
+
+        const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; background-color: #ffffff;">
+            <div style="background-color: #4f46e5; color: #ffffff; padding: 24px; text-align: center;">
+                <h1 style="margin: 0; font-size: 24px; font-weight: bold;">Welcome to EduMan</h1>
+                <p style="margin: 4px 0 0 0; font-size: 14px; opacity: 0.9;">Account Invitation for ${schoolName}</p>
+            </div>
+            <div style="padding: 24px; color: #374151; line-height: 1.6;">
+                <p style="font-size: 16px; margin-top: 0;">Hi <strong>${name}</strong>,</p>
+                <p>An account has been created for you at <strong>${schoolName}</strong> as a <strong>${role}</strong>.</p>
+                
+                <div style="background-color: #f9fafb; border: 1px solid #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0;">
+                    <p style="margin: 0; font-size: 14px;"><strong>Account Email:</strong> ${email}</p>
+                    <p style="margin: 6px 0 0 0; font-size: 14px;"><strong>Assigned Role:</strong> ${role}</p>
+                </div>
+
+                <p>Please click the button below to set up your password and activate your account:</p>
+
+                <p style="margin-top: 24px; text-align: center;">
+                    <a href="${setupUrl}" style="background-color: #4f46e5; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold; display: inline-block;">Set Up My Password</a>
+                </p>
+                
+                <p style="font-size: 12px; color: #6b7280; margin-top: 16px;">Or copy and paste this link in your browser: <br/><a href="${setupUrl}" style="color: #4f46e5;">${setupUrl}</a></p>
+                
+                <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+                <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
+                    This invitation link is valid for 7 days. If you did not request this, please ignore this email.
+                </p>
+            </div>
+        </div>
+        `;
+
+        const text = `Hi ${name},\n\nAn account has been created for you at ${schoolName} as a ${role}.\n\nAccount Email: ${email}\nSet up your password here: ${setupUrl}`;
+
+        return await sendEmailNotification({ to: email, subject, text, html });
+    } catch (err) {
+        return { success: false, error: err.message };
+    }
+}
+
+async function sendWelcomeEmail({ email, name, role, schoolName, password, token }) {
+    if (token) {
+        return sendInvitationEmail({ email, name, role, schoolName, token });
+    }
+
+    try {
+        const appUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
         const loginUrl = `${appUrl}/login`;
         const subject = `Welcome to EduMan — Account Access & Credentials`;
 
@@ -274,20 +387,23 @@ async function sendWelcomeEmail({ email, name, role, schoolName = 'EduMan', pass
 
         const text = `Hi ${name},\n\nWelcome to EduMan! Your account has been created for ${schoolName} as a ${role}.\n\nLogin Email: ${email}\n${password ? `Temporary Password: ${password}\n` : ''}\nLog in here: ${loginUrl}`;
 
-        await sendEmailNotification({ to: email, subject, text, html });
+        return await sendEmailNotification({ to: email, subject, text, html });
     } catch (err) {
-        console.error('Failed to send welcome email:', err);
+        return { success: false, error: err.message };
     }
 }
 
 module.exports = {
+    getSentEmails,
+    clearSentEmails,
+    getLastSentEmail,
     createNotification,
     sendEmailNotification,
     sendWelcomeEmail,
+    sendInvitationEmail,
     notifyNewTicket,
     notifyNewReply,
     notifyAssignment,
     notifyStatusChange,
     notifyMentions
 };
-

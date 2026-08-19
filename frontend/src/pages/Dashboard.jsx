@@ -1,6 +1,6 @@
 import React, { useCallback, useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
-import { Link } from 'react-router-dom';
+import { Link, Navigate } from 'react-router-dom';
 import axios from 'axios';
 import API_URL from '../config/api';
 import { 
@@ -20,6 +20,11 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
 
   const fetchData = useCallback(async ({ silent = false } = {}) => {
+    if (['Parent', 'Accountant', 'ContentManager', 'SupportOfficer'].includes(user?.role)) {
+      setLoading(false);
+      return;
+    }
+
     if (!silent) setLoading(true);
     try {
       const cacheBust = Date.now();
@@ -331,14 +336,9 @@ export default function Dashboard() {
       {user.role === 'SchoolAdmin' && renderSchoolAdmin()}
       {user.role === 'Teacher' && renderTeacher()}
       {user.role === 'Student' && renderStudent()}
-      {user.role === 'Parent' && (
-        <div className="bg-white p-8 sm:p-12 rounded-2xl border border-gray-100 shadow-xs text-center">
-          <Users className="h-12 w-12 sm:h-16 sm:w-16 text-green-500 mx-auto mb-4 sm:mb-6 opacity-20" />
-          <h3 className="text-lg sm:text-xl font-bold text-gray-900">Parental Perspective</h3>
-          <p className="mt-2 text-xs sm:text-sm text-gray-500 max-w-md mx-auto">Monitor your child's academic journey and attendance patterns here. Role-specific view coming soon.</p>
-        </div>
-      )}
-      {['ContentManager', 'Accountant', 'SupportOfficer'].includes(user.role) && (
+      {user.role === 'Parent' && <Navigate to="/dashboard/parent/overview" replace />}
+      {user.role === 'Accountant' && <Navigate to="/dashboard/finance/overview" replace />}
+      {['ContentManager', 'SupportOfficer'].includes(user.role) && (
         <div className="bg-white p-8 sm:p-12 border rounded-2xl shadow-xs border-gray-100 text-center">
           <BarChart3 className="h-12 w-12 sm:h-16 sm:w-16 text-gray-400 mx-auto mb-4 sm:mb-6 opacity-20" />
           <h3 className="text-lg sm:text-xl font-bold text-gray-900">Module Dashboard</h3>

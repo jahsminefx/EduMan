@@ -305,24 +305,62 @@ export default function StudentsList() {
                   <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Parent/Guardian Name</label>
                   <input type="text" className="w-full rounded-xl border-gray-300 shadow-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent p-2.5 border text-sm text-gray-900" value={formData.parent_name} onChange={(e) => setFormData({...formData, parent_name: e.target.value})} />
                 </div>
-                <div className="sm:col-span-2">
+                <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Parent Phone</label>
                   <input type="tel" className="w-full rounded-xl border-gray-300 shadow-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent p-2.5 border text-sm text-gray-900" value={formData.parent_phone} onChange={(e) => setFormData({...formData, parent_phone: e.target.value})} />
                 </div>
+
                 {!editingId && (
-                  <div className="sm:col-span-2 border-t pt-4 mt-2">
-                    <h4 className="text-xs sm:text-sm font-bold text-gray-900 mb-3 flex items-center">
-                      <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                      Student Login Credentials
+                  <div className="sm:col-span-2 border-t pt-4 mt-2 space-y-4">
+                    <h4 className="text-xs sm:text-sm font-bold text-gray-900 flex items-center">
+                      <CheckCircle className="w-4 h-4 mr-2 text-blue-500" />
+                      Parent Portal Account Link
                     </h4>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Email Address *</label>
-                        <input type="email" required className="w-full rounded-xl border-gray-300 shadow-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent p-2.5 border text-sm text-gray-900" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} placeholder="student@school.com" />
+                    
+                    <div className="grid grid-cols-3 gap-2">
+                      <label className={`p-2.5 border rounded-xl text-center text-xs font-semibold cursor-pointer transition ${formData.parent_action === 'CREATE_NEW' ? 'border-blue-600 bg-blue-50/50 text-blue-700' : 'border-gray-200 text-gray-600'}`}>
+                        <input type="radio" name="parent_action" value="CREATE_NEW" checked={formData.parent_action === 'CREATE_NEW'} onChange={(e) => setFormData({...formData, parent_action: e.target.value})} className="sr-only" />
+                        Create New Parent
+                      </label>
+                      <label className={`p-2.5 border rounded-xl text-center text-xs font-semibold cursor-pointer transition ${formData.parent_action === 'LINK_EXISTING' ? 'border-blue-600 bg-blue-50/50 text-blue-700' : 'border-gray-200 text-gray-600'}`}>
+                        <input type="radio" name="parent_action" value="LINK_EXISTING" checked={formData.parent_action === 'LINK_EXISTING'} onChange={(e) => setFormData({...formData, parent_action: e.target.value})} className="sr-only" />
+                        Link Existing Parent
+                      </label>
+                      <label className={`p-2.5 border rounded-xl text-center text-xs font-semibold cursor-pointer transition ${formData.parent_action === 'NONE' ? 'border-blue-600 bg-blue-50/50 text-blue-700' : 'border-gray-200 text-gray-600'}`}>
+                        <input type="radio" name="parent_action" value="NONE" checked={formData.parent_action === 'NONE'} onChange={(e) => setFormData({...formData, parent_action: e.target.value})} className="sr-only" />
+                        No Parent Account
+                      </label>
+                    </div>
+
+                    {formData.parent_action === 'CREATE_NEW' && (
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 bg-gray-50 p-3 rounded-xl border border-gray-200">
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Parent Email *</label>
+                          <input type="email" required className="w-full rounded-xl border-gray-300 p-2 border text-xs" placeholder="parent@gmail.com" value={formData.parent_email || ''} onChange={(e) => setFormData({...formData, parent_email: e.target.value})} />
+                        </div>
+                        <div>
+                          <label className="block text-xs font-medium text-gray-700 mb-1">Relationship</label>
+                          <select className="w-full rounded-xl border-gray-300 p-2 border text-xs bg-white" value={formData.parent_relationship || 'Parent'} onChange={(e) => setFormData({...formData, parent_relationship: e.target.value})}>
+                            <option value="Father">Father</option>
+                            <option value="Mother">Mother</option>
+                            <option value="Guardian">Guardian</option>
+                            <option value="Other">Other</option>
+                          </select>
+                        </div>
                       </div>
-                      <div>
-                        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Login Password *</label>
-                        <input type="password" required minLength="6" className="w-full rounded-xl border-gray-300 shadow-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent p-2.5 border text-sm text-gray-900" value={formData.password} onChange={(e) => setFormData({...formData, password: e.target.value})} placeholder="Min 6 characters" />
+                    )}
+
+                    <div className="border-t pt-4">
+                      <h4 className="text-xs sm:text-sm font-bold text-gray-900 mb-3 flex items-center">
+                        <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
+                        Student Login Credentials
+                      </h4>
+                      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Student Login Email *</label>
+                          <input type="email" required className="w-full rounded-xl border-gray-300 shadow-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent p-2.5 border text-sm text-gray-900" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} placeholder="student@school.com" />
+                          <p className="text-[11px] text-gray-500 mt-1">An invitation link with a 1-click password setup will be emailed to the student.</p>
+                        </div>
                       </div>
                     </div>
                   </div>

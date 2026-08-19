@@ -8,13 +8,14 @@ import {
   HelpCircle, 
   FileText, 
   UserCheck, 
-  Sparkles,
-  ArrowLeft,
-  X
+  Sparkles, 
+  ArrowLeft, 
+  X 
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import axios from 'axios';
 import API_URL from '../../config/api';
+import MarkdownRenderer from '../../components/MarkdownRenderer';
 
 const CATEGORIES = [
   'All Categories',
@@ -162,7 +163,7 @@ export default function KnowledgeBasePage() {
                 </h3>
 
                 <p className="text-xs text-gray-600 line-clamp-3 leading-relaxed">
-                  {art.content.replace(/<[^>]*>?/gm, '')}
+                  {art.content.replace(/<[^>]*>?/gm, '').replace(/[#*`_~-]/g, '').trim()}
                 </p>
               </div>
 
@@ -213,8 +214,8 @@ export default function KnowledgeBasePage() {
                 <span>{activeArticle.views} views</span>
               </div>
 
-              <div className="prose prose-sm max-w-none text-xs sm:text-sm text-gray-700 leading-relaxed space-y-3 whitespace-pre-line">
-                {activeArticle.content}
+              <div className="py-2">
+                <MarkdownRenderer content={activeArticle.content} />
               </div>
             </div>
 

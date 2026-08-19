@@ -5,6 +5,8 @@ CREATE TABLE IF NOT EXISTS users (
     email TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
     role TEXT NOT NULL CHECK(role IN ('SuperAdmin', 'SchoolAdmin', 'Teacher', 'Student', 'Parent', 'ContentManager', 'Accountant', 'SupportOfficer')),
+    setup_token TEXT,
+    setup_token_expires TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -612,9 +614,36 @@ CREATE TABLE IF NOT EXISTS notifications (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+CREATE TABLE IF NOT EXISTS contact_inquiries (
+    id SERIAL PRIMARY KEY,
+    inquiry_number TEXT UNIQUE NOT NULL,
+    name TEXT NOT NULL,
+    email TEXT NOT NULL,
+    subject TEXT NOT NULL,
+    message TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'NEW',
+    assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    converted_ticket_id INTEGER REFERENCES support_threads(id) ON DELETE SET NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE TABLE IF NOT EXISTS contact_inquiry_messages (
+    id SERIAL PRIMARY KEY,
+    inquiry_id INTEGER NOT NULL REFERENCES contact_inquiries(id) ON DELETE CASCADE,
+    sender_id INTEGER REFERENCES users(id) ON DELETE SET NULL,
+    sender_name TEXT NOT NULL,
+    sender_email TEXT NOT NULL,
+    message TEXT NOT NULL,
+    is_internal INTEGER DEFAULT 0,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 CREATE INDEX IF NOT EXISTS idx_support_threads_school ON support_threads(school_id);
 CREATE INDEX IF NOT EXISTS idx_support_threads_status ON support_threads(status);
 CREATE INDEX IF NOT EXISTS idx_support_threads_created_by ON support_threads(created_by);
 CREATE INDEX IF NOT EXISTS idx_support_messages_thread ON support_messages(thread_id);
 CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id, is_read);
+CREATE INDEX IF NOT EXISTS idx_contact_inquiries_status ON contact_inquiries(status);
+CREATE INDEX IF NOT EXISTS idx_contact_inquiries_assigned ON contact_inquiries(assigned_to);
 

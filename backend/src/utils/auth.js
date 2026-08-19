@@ -12,7 +12,7 @@ const JWT_KEY = SECRET || 'fallback_secret_dev_only';
 
 const generateToken = (user, school_id = null) => {
     return jwt.sign(
-        { id: user.id, role: user.role, email: user.email, school_id },
+        { id: user.id, role: user.role, email: user.email, school_id, token_version: user.token_version || 1 },
         JWT_KEY,
         { expiresIn: '7d' }
     );

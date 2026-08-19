@@ -19,6 +19,14 @@ const quizResponseSchema = {
     type: 'object',
     properties: {
         title: { type: 'string', description: 'A concise classroom-ready quiz title.' },
+        subject_match: {
+            type: 'boolean',
+            description: 'Set to true if the topic legitimately belongs to the curriculum of the specified subject. Set to false if the topic belongs to an entirely different subject (e.g. Photosynthesis under Mathematics).'
+        },
+        mismatch_reason: {
+            type: 'string',
+            description: 'If subject_match is false, explain why the topic does not belong to this subject and specify which subject it belongs to.'
+        },
         questions: {
             type: 'array',
             items: {
@@ -40,7 +48,7 @@ const quizResponseSchema = {
             }
         }
     },
-    required: ['title', 'questions'],
+    required: ['title', 'subject_match', 'questions'],
     additionalProperties: false
 };
 
@@ -48,18 +56,54 @@ const contentResponseSchema = {
     type: 'object',
     properties: {
         title: { type: 'string', description: 'A concise title suitable for a school learning library.' },
+        subject_match: {
+            type: 'boolean',
+            description: 'Set to true if the topic legitimately belongs to the curriculum of the specified subject. Set to false if the topic belongs to an entirely different subject (e.g. Photosynthesis under Mathematics).'
+        },
+        mismatch_reason: {
+            type: 'string',
+            description: 'If subject_match is false, explain why the topic does not belong to this subject and specify which subject it belongs to.'
+        },
         body: {
             type: 'string',
             description: 'Complete document in readable Markdown with headings, paragraphs, and lists.'
         }
     },
-    required: ['title', 'body'],
+    required: ['title', 'subject_match', 'body'],
     additionalProperties: false
 };
 
 function cleanString(value, maxLength = 500) {
     if (value === undefined || value === null) return '';
     return String(value).trim().slice(0, maxLength);
+}
+
+function sanitizeAiBody(raw) {
+    if (!raw) return '';
+    let text = String(raw).trim();
+
+    // 1. Remove wrapping ```markdown ... ``` or ``` ... ``` code fences
+    text = text.replace(/^```(?:markdown|text|md)?\r?\n([\s\S]*?)\r?\n```$/i, '$1');
+
+    // 2. Normalize escaped line breaks, tabs, and quotes
+    text = text.replace(/\\n/g, '\n').replace(/\\t/g, '  ').replace(/\\"/g, '"');
+
+    // 3. Remove raw JSON wrapping if the LLM outputted raw JSON string
+    if (text.startsWith('{') && text.endsWith('}')) {
+        try {
+            const parsed = JSON.parse(text);
+            if (parsed.body) text = parsed.body;
+            else if (parsed.content) text = parsed.content;
+        } catch {
+            // keep as-is
+        }
+    }
+
+    // 4. Clean up redundant repeating hash marks (e.g. #######) or multiple duplicate horizontal rules
+    text = text.replace(/#{4,}/g, '###');
+    text = text.replace(/(?:---|\*\*\*)\s*(?:---|\*\*\*)+/g, '---');
+
+    return text.trim();
 }
 
 function positiveId(value) {
@@ -303,22 +347,21 @@ function buildQuizPrompt(context, input) {
             : 'Every question must be multiple-choice with exactly four plausible options.';
 
     return [
-        'Create a curriculum-appropriate school quiz for a teacher to review before publication.',
-        `Subject: ${context.subject_name}`,
-        `Class: ${context.class_name} (level ${context.class_level || 'not specified'})`,
-        `Topic: ${input.topic}`,
+        'You are creating a curriculum-aligned school assessment quiz for a teacher to review.',
+        `Target Subject: ${context.subject_name}`,
+        `Target Class: ${context.class_name} (Level ${context.class_level || 'standard'})`,
+        `Requested Topic: ${input.topic}`,
         `Difficulty: ${input.difficulty}`,
         `Number of questions: ${input.number_of_questions}`,
-        `Academic session: ${context.academic_session}`,
-        `Term: ${context.term}`,
+        `Academic session: ${context.academic_session}, Term: ${context.term}`,
         typeInstructions,
-        'Requirements:',
-        '- Use clear, age-appropriate language.',
+        'CRITICAL SUBJECT ALIGNMENT RULES:',
+        `- Verify that "${input.topic}" authentically belongs to the standard school curriculum for "${context.subject_name}".`,
+        `- If "${input.topic}" belongs to an entirely DIFFERENT subject (e.g. Photosynthesis requested under Mathematics, or Quadratic Equations requested under Literature, or World War II requested under Chemistry), set "subject_match": false and provide a clear "mismatch_reason" stating which subject this topic actually belongs to.`,
+        '- Never fabricate awkward or artificial cross-subject questions (e.g. do NOT create math problems about photosynthesis or chemistry problems about Shakespeare).',
+        '- When subject_match is true, ensure all questions strictly test authentic concepts within the domain of ' + context.subject_name + '.',
         '- Avoid ambiguous trick questions.',
-        '- Put the correct answer at a varied option index.',
-        '- Provide a concise explanation for every answer.',
-        '- Return exactly the requested number of questions.',
-        '- Do not include commentary outside the structured response.'
+        '- Provide concise, helpful explanations for every answer option.'
     ].join('\n');
 }
 
@@ -326,25 +369,26 @@ function buildContentPrompt(context, input) {
     const contentLabel = input.content_type.replace(/_/g, ' ');
     const toneLabel = input.tone.replace(/_/g, ' ');
     return [
-        `Create a complete ${contentLabel} for a teacher to review before publishing.`,
-        `Subject: ${context.subject_name}`,
-        `Class: ${context.class_name} (level ${context.class_level || 'not specified'})`,
-        `Topic: ${input.topic}`,
+        `You are creating a comprehensive, curriculum-aligned ${contentLabel} for classroom instruction.`,
+        `Target Subject: ${context.subject_name}`,
+        `Target Class: ${context.class_name} (Level ${context.class_level || 'standard'})`,
+        `Requested Topic: ${input.topic}`,
         `Length: ${input.length}`,
         `Tone: ${toneLabel}`,
         `Include examples: ${input.include_examples ? 'yes' : 'no'}`,
         `Include assessment questions: ${input.include_assessment ? 'yes' : 'no'}`,
-        `Academic session: ${context.academic_session}`,
-        `Term: ${context.term}`,
-        'Requirements:',
-        '- Use clear Markdown headings and classroom-ready formatting.',
-        '- Keep facts accurate and age-appropriate.',
-        '- Include learning objectives and a concise summary.',
-        input.include_examples ? '- Include practical worked examples.' : '- Do not add a dedicated examples section.',
+        `Academic session: ${context.academic_session}, Term: ${context.term}`,
+        'CRITICAL SUBJECT ALIGNMENT RULES:',
+        `- Verify that "${input.topic}" authentically belongs to the standard school curriculum for "${context.subject_name}".`,
+        `- If "${input.topic}" belongs to an entirely DIFFERENT subject (e.g. Photosynthesis requested under Mathematics, or Newton\'s Laws requested under History, or Accounting principles requested under Biology), set "subject_match": false and provide a clear "mismatch_reason" explaining which subject this topic actually belongs to.`,
+        '- Never invent artificial cross-discipline topics (e.g. do NOT write "Mathematics notes on Photosynthesis" or "English Grammar notes on Balancing Chemical Equations").',
+        '- When subject_match is true, write clean, structured, high-quality learning content strictly within the domain of ' + context.subject_name + '.',
+        '- Include clear learning objectives, structured core explanations, and a concise summary.',
+        input.include_examples ? '- Include practical, subject-appropriate worked examples.' : '- Do not add a dedicated examples section.',
         input.include_assessment
-            ? '- End with assessment questions and a separate teacher answer guide.'
+            ? '- End with assessment questions and a teacher answer guide.'
             : '- Do not include assessment questions.',
-        '- Do not include commentary outside the structured response.'
+        '- Do not include code block wrappers (like ```markdown) or robotic conversational filler.'
     ].join('\n');
 }
 
@@ -372,7 +416,7 @@ async function generateQuizData(req, teacher, context, input) {
             messages: [
                 {
                     role: 'system',
-                    content: 'You are EduMan AI, an expert school assessment designer. Produce safe, accurate, teacher-reviewable educational material.'
+                    content: 'You are EduMan AI, an expert school assessment designer. Strictly enforce academic subject boundaries and curriculum alignment.'
                 },
                 { role: 'user', content: prompt }
             ],
@@ -380,6 +424,11 @@ async function generateQuizData(req, teacher, context, input) {
             schemaName: 'eduman_quiz',
             maxTokens: Math.min(12000, Math.max(2500, input.number_of_questions * 500))
         });
+
+        if (result.data.subject_match === false) {
+            const reason = result.data.mismatch_reason || `The topic "${input.topic}" does not belong to the ${context.subject_name} curriculum. Please select the correct subject to generate materials for this topic.`;
+            throw Object.assign(new Error(reason), { status: 400 });
+        }
 
         const questions = normalizeQuestions(result.data.questions);
         if (questions.length !== input.number_of_questions) {
@@ -421,7 +470,7 @@ async function generateContentData(req, teacher, context, input) {
             messages: [
                 {
                     role: 'system',
-                    content: 'You are EduMan AI, an expert instructional designer. Produce accurate, age-appropriate learning documents that teachers review before publication.'
+                    content: 'You are EduMan AI, an expert instructional designer. Strictly enforce academic subject boundaries and curriculum alignment.'
                 },
                 { role: 'user', content: prompt }
             ],
@@ -430,8 +479,13 @@ async function generateContentData(req, teacher, context, input) {
             maxTokens: input.length === 'long' ? 10000 : input.length === 'short' ? 3500 : 6500
         });
 
+        if (result.data.subject_match === false) {
+            const reason = result.data.mismatch_reason || `The topic "${input.topic}" does not belong to the ${context.subject_name} curriculum. Please select the correct subject to generate materials for this topic.`;
+            throw Object.assign(new Error(reason), { status: 400 });
+        }
+
         const title = cleanString(result.data.title, 300);
-        const body = cleanString(result.data.body, 100000);
+        const body = sanitizeAiBody(cleanString(result.data.body, 100000));
         if (!title || body.length < 100) {
             throw new Error('EduMan AI returned incomplete learning content. Please regenerate.');
         }

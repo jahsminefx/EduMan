@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
-import { Mail, Phone, MapPin, Send, CheckCircle } from 'lucide-react';
+import { HelpCircle, Phone, MapPin, Send, CheckCircle } from 'lucide-react';
+import { Link } from 'react-router-dom';
 
 const contactInfo = [
-  { icon: Mail, label: 'Email', value: 'hello@eduman.africa', href: 'mailto:hello@eduman.africa' },
+  { icon: HelpCircle, label: 'In-App Support', value: 'EduMan Ticket System', href: '/dashboard/support' },
   { icon: Phone, label: 'Phone', value: '09156457073', href: 'tel:09156457073' },
   { icon: MapPin, label: 'Office', value: 'Delta state, Nigeria', href: null },
 ];
@@ -24,9 +25,7 @@ export default function ContactPage() {
     setStatus('sending');
 
     try {
-      const resp = await fetch('/api/contact', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(form) });
-      if (!resp.ok) throw new Error('API Error');
-      // await new Promise(resolve => setTimeout(resolve, 1200)); // Remove fake delay
+      await axios.post(`${API_URL}/contact`, form);
       setStatus('success');
       setForm({ name: '', email: '', subject: '', message: '' });
     } catch {
@@ -61,13 +60,10 @@ export default function ContactPage() {
               <div className="space-y-3 sm:space-y-4">
                 {contactInfo.map((item, i) => {
                   const Icon = item.icon;
-                  const Wrapper = item.href ? 'a' : 'div';
-                  return (
-                    <Wrapper
-                      key={i}
-                      {...(item.href ? { href: item.href } : {})}
-                      className="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-100 hover:bg-blue-50 transition-colors group"
-                    >
+                  const isInternal = item.href && item.href.startsWith('/');
+                  
+                  const content = (
+                    <div className="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl border border-gray-100 hover:bg-blue-50 transition-colors group cursor-pointer">
                       <div className="w-10 h-10 bg-blue-100 rounded-xl flex items-center justify-center group-hover:bg-blue-200 transition-colors flex-shrink-0">
                         <Icon className="w-5 h-5 text-blue-600" />
                       </div>
@@ -75,8 +71,16 @@ export default function ContactPage() {
                         <div className="text-[10px] sm:text-xs text-gray-400 uppercase tracking-wider font-semibold">{item.label}</div>
                         <div className="text-xs sm:text-sm font-medium text-gray-900">{item.value}</div>
                       </div>
-                    </Wrapper>
+                    </div>
                   );
+
+                  if (isInternal) {
+                    return <Link key={i} to={item.href}>{content}</Link>;
+                  }
+                  if (item.href) {
+                    return <a key={i} href={item.href}>{content}</a>;
+                  }
+                  return <div key={i}>{content}</div>;
                 })}
               </div>
             </div>

@@ -163,8 +163,12 @@ export default function SchoolsList() {
                       <td className="px-4 sm:px-6 py-4 text-center hidden sm:table-cell"><span className="text-xs sm:text-sm font-bold text-gray-700">{s.teacher_count}</span></td>
                       <td className="px-4 sm:px-6 py-4 text-center hidden sm:table-cell"><span className="text-xs sm:text-sm font-bold text-gray-700">{s.student_count}</span></td>
                       <td className="px-4 sm:px-6 py-4 text-center">
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold ${s.is_active === 1 ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                          {s.is_active === 1 ? 'Active' : 'Inactive'}
+                        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[10px] sm:text-[11px] font-bold ${
+                          s.status === 'SUSPENDED' ? 'bg-amber-100 text-amber-800' :
+                          s.status === 'ARCHIVED' ? 'bg-gray-100 text-gray-700' :
+                          'bg-emerald-100 text-emerald-800'
+                        }`}>
+                          {s.status || (s.is_active === 1 ? 'ACTIVE' : 'SUSPENDED')}
                         </span>
                       </td>
                       <td className="px-4 sm:px-6 py-4 text-right">
@@ -176,6 +180,34 @@ export default function SchoolsList() {
                           >
                             <Edit3 className="w-4 h-4" />
                           </button>
+                          {s.status === 'SUSPENDED' ? (
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                if (window.confirm(`Reactivate ${s.name}?`)) {
+                                  await axios.put(`${API_URL}/superadmin/schools/${s.id}/reactivate`, {});
+                                  fetchSchools();
+                                }
+                              }}
+                              className="px-2 py-1 bg-emerald-50 text-emerald-700 font-bold text-[10px] rounded-lg hover:bg-emerald-100"
+                            >
+                              Reactivate
+                            </button>
+                          ) : (
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation();
+                                const reason = window.prompt(`Enter suspension reason for ${s.name}:`);
+                                if (reason && reason.trim()) {
+                                  await axios.put(`${API_URL}/superadmin/schools/${s.id}/suspend`, { reason: reason.trim() });
+                                  fetchSchools();
+                                }
+                              }}
+                              className="px-2 py-1 bg-amber-50 text-amber-700 font-bold text-[10px] rounded-lg hover:bg-amber-100"
+                            >
+                              Suspend
+                            </button>
+                          )}
                           {expandedId === s.id ? <ChevronUp className="w-4 h-4 text-gray-400" /> : <ChevronDown className="w-4 h-4 text-gray-400" />}
                         </div>
                       </td>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
+import ErrorBoundary from './components/ErrorBoundary';
 
 // Layouts
 import MainLayout from './layouts/MainLayout';
@@ -10,6 +11,7 @@ import PublicLayout from './layouts/PublicLayout';
 import HomePage from './pages/public/HomePage';
 import AboutPage from './pages/public/AboutPage';
 import ContactPage from './pages/public/ContactPage';
+import SetupPasswordPage from './pages/public/SetupPasswordPage';
 
 // Dashboard Pages
 import Dashboard from './pages/Dashboard';
@@ -23,6 +25,8 @@ import AttendanceEntry from './pages/teacher/AttendanceEntry';
 import GradesEntry from './pages/teacher/GradesEntry';
 import HomeworkPage from './pages/teacher/HomeworkPage';
 import TimetableManagement from './pages/teacher/TimetableManagement';
+import SchemeOfWorkPage from './pages/teacher/SchemeOfWorkPage';
+import StudentSchemeOfWork from './pages/student/StudentSchemeOfWork';
 import ClassInfo from './pages/student/ClassInfo';
 import ContentLibrary from './pages/content/ContentLibrary';
 import QuizPage from './pages/quiz/QuizPage';
@@ -47,18 +51,34 @@ import TicketList from './pages/support/TicketList';
 import CreateTicket from './pages/support/CreateTicket';
 import TicketDetail from './pages/support/TicketDetail';
 import EnterpriseInbox from './pages/support/EnterpriseInbox';
+import ContactInbox from './pages/support/ContactInbox';
 import KnowledgeBasePage from './pages/support/KnowledgeBasePage';
 import AdminKnowledgeBase from './pages/support/AdminKnowledgeBase';
 import SupportAnalytics from './pages/support/SupportAnalytics';
 
-const ANNOUNCEMENT_ROLES = ['SchoolAdmin', 'Teacher', 'Student', 'Parent'];
-const TICKETING_ROLES = ['SuperAdmin', 'SupportOfficer', 'SchoolAdmin', 'Teacher'];
-const ALL_KB_ROLES = ['SuperAdmin', 'SupportOfficer', 'SchoolAdmin', 'Teacher', 'Student', 'Parent', 'ContentManager', 'Accountant'];
+// Parent Portal Pages
+import ParentDashboardPage from './pages/parent/ParentDashboardPage';
+import MyChildrenPage from './pages/parent/MyChildrenPage';
+import ParentFeeStatements from './pages/parent/ParentFeeStatements';
 
-// Placeholder Components for secondary modules
-const ParentDashboard = () => <div className="p-8"><h1>Parent Dashboard</h1><p>View your children and fee statements here.</p></div>;
-const ContentDashboard = () => <ContentLibrary />;
-const FinanceDashboard = () => <div className="p-8"><h1>Fee Management</h1><p>Manage school finances here.</p></div>;
+// SuperAdmin Platform Pages
+import PlatformStaffPage from './pages/superadmin/PlatformStaffPage';
+import SuperAdminCommandCenter from './pages/superadmin/SuperAdminCommandCenter';
+import GlobalUserSearchPage from './pages/superadmin/GlobalUserSearchPage';
+import SuperAdminAuditLogsPage from './pages/superadmin/AuditLogsPage';
+import SuperAdminEscalationsPage from './pages/superadmin/EscalationsPage';
+import PlatformSettingsPage from './pages/superadmin/PlatformSettingsPage';
+
+// Accountant & Finance Portal Pages
+import FinanceDashboardPage from './pages/finance/FinanceDashboardPage';
+import FeeManagementPage from './pages/finance/FeeManagementPage';
+import InvoicesPage from './pages/finance/InvoicesPage';
+import PaymentRecordsPage from './pages/finance/PaymentRecordsPage';
+import FinancialReportsPage from './pages/finance/FinancialReportsPage';
+
+const ANNOUNCEMENT_ROLES = ['SchoolAdmin', 'Teacher', 'Student', 'Parent'];
+const TICKETING_ROLES = ['SuperAdmin', 'SupportOfficer', 'SchoolAdmin', 'Teacher', 'Parent'];
+const ALL_KB_ROLES = ['SuperAdmin', 'SupportOfficer', 'SchoolAdmin', 'Teacher', 'Student', 'Parent', 'ContentManager', 'Accountant'];
 
 
 // Protected Route Component
@@ -79,6 +99,7 @@ const AppRoutes = () => {
         <Route path="/" element={<HomePage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/contact" element={<ContactPage />} />
+        <Route path="/setup-password" element={<SetupPasswordPage />} />
       </Route>
 
       {/* Legacy login redirect */}
@@ -240,6 +261,22 @@ const AppRoutes = () => {
         />
 
         <Route 
+          path="teacher/schemes" 
+          element={
+            <ProtectedRoute allowedRoles={['Teacher', 'SchoolAdmin', 'SuperAdmin']}>
+               <SchemeOfWorkPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="student/schemes" 
+          element={
+            <ProtectedRoute allowedRoles={['Student', 'Parent']}>
+               <StudentSchemeOfWork />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
           path="student/class-info" 
           element={
             <ProtectedRoute allowedRoles={['Student']}>
@@ -299,13 +336,77 @@ const AppRoutes = () => {
             </ProtectedRoute>
           } 
         />
+        <Route 
+          path="superadmin/command-center" 
+          element={
+            <ProtectedRoute allowedRoles={['SuperAdmin']}>
+              <SuperAdminCommandCenter />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="superadmin/platform-staff" 
+          element={
+            <ProtectedRoute allowedRoles={['SuperAdmin']}>
+              <PlatformStaffPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="superadmin/user-search" 
+          element={
+            <ProtectedRoute allowedRoles={['SuperAdmin']}>
+              <GlobalUserSearchPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="superadmin/audit-logs" 
+          element={
+            <ProtectedRoute allowedRoles={['SuperAdmin']}>
+              <SuperAdminAuditLogsPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="superadmin/escalations" 
+          element={
+            <ProtectedRoute allowedRoles={['SuperAdmin']}>
+              <SuperAdminEscalationsPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="superadmin/settings" 
+          element={
+            <ProtectedRoute allowedRoles={['SuperAdmin']}>
+              <PlatformSettingsPage />
+            </ProtectedRoute>
+          } 
+        />
 
         {/* Parent Routes */}
         <Route 
-          path="parent/*" 
+          path="parent/overview" 
           element={
             <ProtectedRoute allowedRoles={['Parent']}>
-              <ParentDashboard />
+              <ParentDashboardPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="parent/children" 
+          element={
+            <ProtectedRoute allowedRoles={['Parent']}>
+              <MyChildrenPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="parent/fees" 
+          element={
+            <ProtectedRoute allowedRoles={['Parent']}>
+              <ParentFeeStatements />
             </ProtectedRoute>
           } 
         />
@@ -315,17 +416,49 @@ const AppRoutes = () => {
           path="content/*" 
           element={
             <ProtectedRoute allowedRoles={['SuperAdmin', 'SchoolAdmin', 'ContentManager', 'Teacher', 'Student', 'Parent']}>
-              <ContentDashboard />
+              <ContentLibrary />
             </ProtectedRoute>
           } 
         />
 
         {/* Finance Routes */}
         <Route 
-          path="finance/*" 
+          path="finance/overview" 
           element={
             <ProtectedRoute allowedRoles={['SuperAdmin', 'SchoolAdmin', 'Accountant']}>
-              <FinanceDashboard />
+              <FinanceDashboardPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="finance/fees" 
+          element={
+            <ProtectedRoute allowedRoles={['SuperAdmin', 'SchoolAdmin', 'Accountant']}>
+              <FeeManagementPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="finance/invoices" 
+          element={
+            <ProtectedRoute allowedRoles={['SuperAdmin', 'SchoolAdmin', 'Accountant']}>
+              <InvoicesPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="finance/payments" 
+          element={
+            <ProtectedRoute allowedRoles={['SuperAdmin', 'SchoolAdmin', 'Accountant']}>
+              <PaymentRecordsPage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="finance/reports" 
+          element={
+            <ProtectedRoute allowedRoles={['SuperAdmin', 'SchoolAdmin', 'Accountant']}>
+              <FinancialReportsPage />
             </ProtectedRoute>
           } 
         />
@@ -344,6 +477,14 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute allowedRoles={['SuperAdmin', 'SupportOfficer']}>
               <EnterpriseInbox />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="support/contact" 
+          element={
+            <ProtectedRoute allowedRoles={['SuperAdmin', 'SupportOfficer']}>
+              <ContactInbox />
             </ProtectedRoute>
           } 
         />
@@ -382,7 +523,7 @@ const AppRoutes = () => {
         <Route 
           path="support/kb/manage" 
           element={
-            <ProtectedRoute allowedRoles={['SuperAdmin']}>
+            <ProtectedRoute allowedRoles={['SuperAdmin', 'SupportOfficer', 'ContentManager']}>
               <AdminKnowledgeBase />
             </ProtectedRoute>
           } 
@@ -434,11 +575,13 @@ const AppRoutes = () => {
 
 const App = () => {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <AppRoutes />
-      </BrowserRouter>
-    </AuthProvider>
+    <ErrorBoundary>
+      <AuthProvider>
+        <BrowserRouter>
+          <AppRoutes />
+        </BrowserRouter>
+      </AuthProvider>
+    </ErrorBoundary>
   );
 };
 

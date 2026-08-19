@@ -1,6 +1,8 @@
 const { getDB } = require('../config/database');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const { sendWelcomeEmail } = require('../services/notificationService');
+const { generateSetupToken, recordInvitationAudit } = require('../utils/tokenUtils');
 
 const VALID_GENDERS = new Set(['Male', 'Female', 'Other']);
 
@@ -8,8 +10,8 @@ function normalizeGender(value) {
     const raw = String(value || '').trim().toLowerCase();
     if (raw === 'm' || raw === 'male') return 'Male';
     if (raw === 'f' || raw === 'female') return 'Female';
-    if (raw === 'other') return 'Other';
-    return '';
+    if (raw === 'o' || raw === 'other') return 'Other';
+    return value;
 }
 
 function cleanString(value) {
@@ -18,7 +20,10 @@ function cleanString(value) {
 }
 
 function isValidEmail(email) {
-    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    if (typeof email !== 'string') return false;
+    const clean = email.trim();
+    if (!clean || clean.length > 254) return false;
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(clean);
 }
 
 function parseCsvLine(line) {
@@ -126,15 +131,55 @@ exports.getMyStudentProfile = async (req, res) => {
     }
 };
 
+exports.searchParents = async (req, res) => {
+    try {
+        const db = getDB();
+        const school_id = req.user.school_id;
+        const { q = '' } = req.query;
+        const searchTerm = `%${q.trim()}%`;
+
+        const parents = await db.all(`
+            SELECT DISTINCT u.id, u.name, u.email, s.parent_phone as phone
+            FROM users u
+            JOIN parent_student_links psl ON u.id = psl.parent_user_id
+            JOIN students s ON psl.student_id = s.id
+            WHERE s.school_id = $1 AND u.role = 'Parent' AND (u.name ILIKE $2 OR u.email ILIKE $2)
+            ORDER BY u.name ASC
+            LIMIT 20
+        `, [school_id, searchTerm]);
+
+        res.json({ parents });
+    } catch (err) {
+        console.error('Error searching parents:', err);
+        res.status(500).json({ error: 'Server Error', message: 'Failed to search parents' });
+    }
+};
+
 exports.createStudent = async (req, res) => {
-    const { admission_number, first_name, last_name, gender, age, dob, class_id, parent_name, parent_phone, email, password } = req.body;
+    const {
+        admission_number,
+        first_name,
+        last_name,
+        gender,
+        age,
+        dob,
+        class_id,
+        parent_name,
+        parent_phone,
+        email,
+        password,
+        parent_action = 'NONE', // CREATE_NEW, LINK_EXISTING, NONE
+        parent_email = '',
+        parent_relationship = 'Parent',
+        parent_user_id = null
+    } = req.body;
     
     try {
         const db = getDB();
         
         const normalizedGender = normalizeGender(gender);
-        if (!admission_number || !first_name || !last_name || !email || !password) {
-            return res.status(400).json({ error: 'Validation Error', message: 'Missing required fields (admission_number, name, email, password)' });
+        if (!admission_number || !first_name || !last_name || !email) {
+            return res.status(400).json({ error: 'Validation Error', message: 'Missing required fields (admission_number, name, email)' });
         }
         if (!VALID_GENDERS.has(normalizedGender)) {
             return res.status(400).json({ error: 'Validation Error', message: 'Please select a valid gender.' });
@@ -154,45 +199,122 @@ exports.createStudent = async (req, res) => {
 
         const existingEmail = await db.get('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [email]);
         if (existingEmail) {
-            return res.status(400).json({ error: 'Duplicate', message: 'Email already exists.' });
+            return res.status(400).json({ error: 'Duplicate', message: 'Student email already exists.' });
         }
 
+        let createdParentUserId = null;
+        let rawParentToken = null;
+        const { rawToken: rawStudentToken, tokenHash: studentTokenHash } = generateSetupToken();
+
         const result = await db.transaction(async (client) => {
-            // 1. Create User record for login
-            const password_hash = await bcrypt.hash(password, 10);
+            // 1. Create Student User record for login with hashed setup_token
+            const password_hash = await bcrypt.hash(password || crypto.randomBytes(16).toString('hex'), 10);
             const userResult = await client.run(
-                `INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id`,
-                [`${first_name} ${last_name}`, email, password_hash, 'Student']
+                `INSERT INTO users (name, email, password_hash, role, setup_token, setup_token_expires) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP + INTERVAL '7 days') RETURNING id`,
+                [`${first_name} ${last_name}`, email, password_hash, 'Student', studentTokenHash]
             );
             const user_id = userResult.lastID;
 
             // 2. Create Student record linked to User
+            const finalParentName = parent_name || (parent_action === 'CREATE_NEW' ? parent_name : '');
+            const finalParentPhone = parent_phone || '';
             const studentResult = await client.run(
                 `INSERT INTO students (user_id, school_id, admission_number, first_name, last_name, gender, age, dob, class_id, parent_name, parent_phone) 
                  VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11) RETURNING id`,
-                [user_id, school_id, admission_number, first_name, last_name, normalizedGender, age || null, dob || null, class_id || null, parent_name, parent_phone]
+                [user_id, school_id, admission_number, first_name, last_name, normalizedGender, age || null, dob || null, class_id || null, finalParentName, finalParentPhone]
             );
+            const student_id = studentResult.lastID;
 
-            return { student_id: studentResult.lastID, user_id };
+            // 3. Handle Parent Creation / Linking Workflow
+            if (parent_action === 'CREATE_NEW' && parent_email && parent_email.trim()) {
+                const cleanParentEmail = parent_email.trim().toLowerCase();
+                const pName = parent_name ? parent_name.trim() : `Parent of ${first_name}`;
+                
+                // Check if user already exists
+                const existingPUser = await client.get(`SELECT id FROM users WHERE LOWER(email) = $1`, [cleanParentEmail]);
+                if (existingPUser) {
+                    createdParentUserId = existingPUser.id;
+                } else {
+                    const parentTokenObj = generateSetupToken();
+                    rawParentToken = parentTokenObj.rawToken;
+                    const pHash = await bcrypt.hash(crypto.randomBytes(16).toString('hex'), 10);
+                    const pUserRes = await client.run(
+                        `INSERT INTO users (name, email, password_hash, role, setup_token, setup_token_expires) VALUES ($1, $2, $3, 'Parent', $4, CURRENT_TIMESTAMP + INTERVAL '7 days') RETURNING id`,
+                        [pName, cleanParentEmail, pHash, parentTokenObj.tokenHash]
+                    );
+                    createdParentUserId = pUserRes.lastID;
+                }
+
+                // Link to student
+                await client.run(
+                    `INSERT INTO parent_student_links (parent_user_id, student_id, relationship, is_primary)
+                     VALUES ($1, $2, $3, 1) ON CONFLICT DO NOTHING`,
+                    [createdParentUserId, student_id, parent_relationship || 'Parent']
+                );
+            } else if (parent_action === 'LINK_EXISTING' && parent_user_id) {
+                // Ensure parent exists and belongs to a student in current school
+                const validParent = await client.get(`SELECT id FROM users WHERE id = $1 AND role = 'Parent'`, [parent_user_id]);
+                if (validParent) {
+                    await client.run(
+                        `INSERT INTO parent_student_links (parent_user_id, student_id, relationship, is_primary)
+                         VALUES ($1, $2, $3, 1) ON CONFLICT DO NOTHING`,
+                        [parent_user_id, student_id, parent_relationship || 'Parent']
+                    );
+                }
+            }
+
+            return { student_id, user_id, parent_user_id: createdParentUserId };
         });
 
-        // Send welcome email with credentials
+        // Audit Trail
+        const clientIp = req.ip || req.headers['x-forwarded-for'] || req.socket?.remoteAddress || '127.0.0.1';
+        await recordInvitationAudit({
+            actorId: req.user?.id,
+            action: 'INVITATION_CREATED',
+            targetUserId: result.user_id,
+            role: 'Student',
+            reason: `Created student account for ${first_name} ${last_name}`,
+            ipAddress: clientIp
+        });
+
+        if (createdParentUserId && rawParentToken) {
+            await recordInvitationAudit({
+                actorId: req.user?.id,
+                action: 'INVITATION_CREATED',
+                targetUserId: createdParentUserId,
+                role: 'Parent',
+                reason: `Created parent account for ${parent_name || 'Parent'}`,
+                ipAddress: clientIp
+            });
+        }
+
+        // Send welcome email with setup_token invitation link using RAW token
         const schoolObj = await db.get('SELECT name FROM schools WHERE id = $1', [school_id]);
         sendWelcomeEmail({
             email,
             name: `${first_name} ${last_name}`,
             role: 'Student',
             schoolName: schoolObj?.name || 'EduMan School',
-            password
-        });
+            token: rawStudentToken
+        }).catch(() => {});
+
+        if (rawParentToken && parent_email) {
+            sendWelcomeEmail({
+                email: parent_email,
+                name: parent_name || 'Parent',
+                role: 'Parent',
+                schoolName: schoolObj?.name || 'EduMan School',
+                token: rawParentToken
+            }).catch(() => {});
+        }
 
         res.json({ 
             message: 'Student and login account created successfully', 
             id: result.student_id,
-            user_id: result.user_id
+            user_id: result.user_id,
+            parent_user_id: result.parent_user_id
         });
     } catch (err) {
-        // PostgreSQL unique violation error code
         if (err.code === '23505') {
             const field = err.detail && err.detail.includes('email') ? 'Email' : 'Admission number';
             return res.status(400).json({ error: 'Duplicate', message: `${field} already exists.` });

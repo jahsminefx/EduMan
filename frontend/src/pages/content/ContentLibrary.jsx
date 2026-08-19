@@ -5,6 +5,7 @@ import { useAuth } from '../../contexts/AuthContext';
 import { API_URL } from '../../config/api';
 import { displayLabel, downloadProtected } from '../ai/aiUtils';
 import { mediaUrl } from '../../utils/media';
+import MarkdownRenderer from '../../components/MarkdownRenderer';
 
 const emptyForm = { title: '', description: '', type: 'image', class_id: '', subject_id: '' };
 
@@ -343,7 +344,7 @@ export default function ContentLibrary() {
       {selectedAiResource && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
           <div className="max-h-[90vh] w-full max-w-4xl overflow-y-auto rounded-2xl bg-white p-6 shadow-xl">
-            <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start justify-between gap-4 border-b border-gray-100 pb-4">
               <div>
                 <span className="text-xs font-bold uppercase tracking-wide text-violet-600">EduMan AI • Teacher Approved</span>
                 <h3 className="mt-1 text-xl font-bold text-gray-900">{selectedAiResource.title}</h3>
@@ -351,7 +352,9 @@ export default function ContentLibrary() {
               </div>
               <button onClick={() => setSelectedAiResource(null)} className="rounded-lg p-2 text-gray-500 hover:bg-gray-100"><X className="h-5 w-5" /></button>
             </div>
-            <div className="mt-6 whitespace-pre-wrap rounded-xl bg-gray-50 p-5 text-sm leading-7 text-gray-800">{selectedAiResource.body}</div>
+            <div className="mt-6 py-2">
+              <MarkdownRenderer content={selectedAiResource.body} />
+            </div>
           </div>
         </div>
       )}

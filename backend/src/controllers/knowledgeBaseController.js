@@ -15,14 +15,15 @@ exports.getArticles = async (req, res) => {
     try {
         const { category = '', search = '', published = '' } = req.query;
         const userRole = req.user?.role;
+        const isStaff = ['SuperAdmin', 'SupportOfficer', 'ContentManager'].includes(userRole);
         const db = getDB();
 
         let whereClauses = [];
         let params = [];
         let pIdx = 1;
 
-        // Non-SuperAdmin users can only view published articles
-        if (userRole !== 'SuperAdmin') {
+        // Non-staff users can only view published articles
+        if (!isStaff) {
             whereClauses.push(`published = 1`);
         } else if (published !== '') {
             whereClauses.push(`published = $${pIdx++}`);
@@ -94,11 +95,12 @@ exports.getArticleBySlug = async (req, res) => {
     }
 };
 
-// ── CREATE ARTICLE (SUPER ADMIN) ──
+// ── CREATE ARTICLE (SUPER ADMIN, SUPPORT OFFICER, CONTENT MANAGER) ──
 exports.createArticle = async (req, res) => {
     try {
-        if (req.user.role !== 'SuperAdmin') {
-            return res.status(403).json({ error: 'Forbidden', message: 'Only SuperAdmin can author Knowledge Base articles.' });
+        const userRole = req.user.role;
+        if (!['SuperAdmin', 'SupportOfficer', 'ContentManager'].includes(userRole)) {
+            return res.status(403).json({ error: 'Forbidden', message: 'You do not have permission to author Knowledge Base articles.' });
         }
 
         const { title, category, content, featured_image, published = 1 } = req.body;
@@ -128,11 +130,12 @@ exports.createArticle = async (req, res) => {
     }
 };
 
-// ── UPDATE ARTICLE (SUPER ADMIN) ──
+// ── UPDATE ARTICLE (SUPER ADMIN, SUPPORT OFFICER, CONTENT MANAGER) ──
 exports.updateArticle = async (req, res) => {
     try {
-        if (req.user.role !== 'SuperAdmin') {
-            return res.status(403).json({ error: 'Forbidden', message: 'Only SuperAdmin can edit Knowledge Base articles.' });
+        const userRole = req.user.role;
+        if (!['SuperAdmin', 'SupportOfficer', 'ContentManager'].includes(userRole)) {
+            return res.status(403).json({ error: 'Forbidden', message: 'You do not have permission to edit Knowledge Base articles.' });
         }
 
         const { id } = req.params;
@@ -172,11 +175,12 @@ exports.updateArticle = async (req, res) => {
     }
 };
 
-// ── DELETE ARTICLE (SUPER ADMIN) ──
+// ── DELETE ARTICLE (SUPER ADMIN, SUPPORT OFFICER, CONTENT MANAGER) ──
 exports.deleteArticle = async (req, res) => {
     try {
-        if (req.user.role !== 'SuperAdmin') {
-            return res.status(403).json({ error: 'Forbidden', message: 'Only SuperAdmin can delete Knowledge Base articles.' });
+        const userRole = req.user.role;
+        if (!['SuperAdmin', 'SupportOfficer', 'ContentManager'].includes(userRole)) {
+            return res.status(403).json({ error: 'Forbidden', message: 'You do not have permission to delete Knowledge Base articles.' });
         }
 
         const { id } = req.params;

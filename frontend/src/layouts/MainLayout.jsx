@@ -20,7 +20,8 @@ import {
   Info,
   Sparkles,
   History,
-  Bot
+  Bot,
+  Layers
 } from 'lucide-react';
 import BrandLogo from '../components/BrandLogo';
 
@@ -36,19 +37,27 @@ export default function MainLayout() {
   const [isSidebarOpen, setIsSidebarOpen] = React.useState(false);
 
   const getLinks = () => {
+    if (!user) return [];
+
     const base = [
       { name: 'Dashboard', path: '/dashboard', icon: LayoutDashboard },
     ];
 
-    if (ANNOUNCEMENT_ROLES.includes(user.role)) {
+    if (user.role && ANNOUNCEMENT_ROLES.includes(user.role)) {
       base.push({ name: 'Announcements', path: '/announcements', icon: Megaphone });
     }
 
     switch(user.role) {
       case 'SuperAdmin':
         base.push(
+          { name: 'Command Center', path: '/dashboard/superadmin/command-center', icon: Sparkles },
           { name: 'Manage Schools', path: '/dashboard/admin/schools', icon: BookOpen },
           { name: 'School Admins', path: '/dashboard/admin/school-admins', icon: UserCog },
+          { name: 'Platform Staff', path: '/dashboard/superadmin/platform-staff', icon: Users },
+          { name: 'User Search', path: '/dashboard/superadmin/user-search', icon: UserCog },
+          { name: 'Audit Logs', path: '/dashboard/superadmin/audit-logs', icon: History },
+          { name: 'Escalations Queue', path: '/dashboard/superadmin/escalations', icon: HelpCircle },
+          { name: 'Platform Settings', path: '/dashboard/superadmin/settings', icon: Info },
           { name: 'Support Inbox', path: '/dashboard/support/inbox', icon: HelpCircle },
           { name: 'Manage Knowledge Base', path: '/dashboard/support/kb/manage', icon: FolderOpen },
           { name: 'Support Analytics', path: '/dashboard/support/analytics', icon: Sparkles }
@@ -61,6 +70,7 @@ export default function MainLayout() {
           { name: 'Subjects', path: '/dashboard/admin/subjects', icon: Library },
           { name: 'Teachers', path: '/dashboard/admin/teachers', icon: Users },
           { name: 'Students', path: '/dashboard/admin/students', icon: GraduationCap },
+          { name: 'Scheme of Work', path: '/dashboard/teacher/schemes', icon: Layers },
           { name: 'Report Cards', path: '/dashboard/reports/card', icon: FolderOpen },
           { name: 'EduMan AI', path: '/dashboard/admin/ai', icon: Bot },
           { name: 'EduMan AI Logs', path: '/dashboard/admin/ai/usage', icon: History },
@@ -77,6 +87,7 @@ export default function MainLayout() {
           { name: 'Attendance', path: '/dashboard/teacher/attendance', icon: Calendar },
           { name: 'Gradebook', path: '/dashboard/teacher/grades', icon: BookOpen },
           { name: 'Timetable', path: '/dashboard/teacher/timetable', icon: Clock },
+          { name: 'Scheme of Work', path: '/dashboard/teacher/schemes', icon: Layers },
           { name: 'Homework', path: '/dashboard/teacher/homework', icon: FolderOpen },
           { name: 'EduMan AI', path: '/dashboard/teacher/ai', icon: Sparkles },
           { name: 'EduMan AI Drafts', path: '/dashboard/teacher/ai/drafts', icon: History },
@@ -93,6 +104,7 @@ export default function MainLayout() {
       case 'Student':
         base.push(
           { name: 'My Homework', path: '/dashboard/teacher/homework', icon: FolderOpen },
+          { name: 'Scheme of Work', path: '/dashboard/student/schemes', icon: Layers },
           { name: 'Class Info', path: '/dashboard/student/class-info', icon: Info },
           { name: 'Quizzes', path: '/dashboard/quiz', icon: HelpCircle },
           { name: 'My Report Card', path: '/dashboard/reports/card', icon: BookOpen },
@@ -104,30 +116,39 @@ export default function MainLayout() {
       case 'Parent':
         base.push(
           { name: 'My Children', path: '/dashboard/parent/children', icon: Users },
-          { name: 'Report Cards', path: '/dashboard/reports/card', icon: GraduationCap },
+          { name: 'Scheme of Work', path: '/dashboard/student/schemes', icon: Layers },
           { name: 'Fee Statements', path: '/dashboard/parent/fees', icon: FolderOpen },
-          { name: 'Help Center', path: '/dashboard/support/kb', icon: HelpCircle }
+          { name: 'Support Center', path: '/dashboard/support', icon: HelpCircle },
+          { name: 'My Tickets', path: '/dashboard/support/tickets', icon: FolderOpen },
+          { name: 'Knowledge Base', path: '/dashboard/support/kb', icon: BookOpen }
         );
         break;
         
       case 'ContentManager':
         base.push(
           { name: 'Content Library', path: '/dashboard/content/library', icon: Library },
-          { name: 'Help Center', path: '/dashboard/support/kb', icon: HelpCircle }
+          { name: 'Knowledge Base', path: '/dashboard/support/kb', icon: BookOpen },
+          { name: 'Manage Knowledge Base', path: '/dashboard/support/kb/manage', icon: FolderOpen }
         );
         break;
         
       case 'Accountant':
         base.push(
           { name: 'Fee Management', path: '/dashboard/finance/fees', icon: FolderOpen },
-          { name: 'Help Center', path: '/dashboard/support/kb', icon: HelpCircle }
+          { name: 'Invoices & Statements', path: '/dashboard/finance/invoices', icon: FolderOpen },
+          { name: 'Payments & Receipts', path: '/dashboard/finance/payments', icon: FolderOpen },
+          { name: 'Financial Reports', path: '/dashboard/finance/reports', icon: Sparkles },
+          { name: 'Knowledge Base', path: '/dashboard/support/kb', icon: BookOpen }
         );
         break;
 
       case 'SupportOfficer':
         base.push(
           { name: 'Support Inbox', path: '/dashboard/support/inbox', icon: HelpCircle },
-          { name: 'Knowledge Base', path: '/dashboard/support/kb', icon: BookOpen }
+          { name: 'Contact Messages', path: '/dashboard/support/contact', icon: FolderOpen },
+          { name: 'Knowledge Base', path: '/dashboard/support/kb', icon: BookOpen },
+          { name: 'Manage Knowledge Base', path: '/dashboard/support/kb/manage', icon: FolderOpen },
+          { name: 'Support Analytics', path: '/dashboard/support/analytics', icon: Sparkles }
         );
         break;
       
@@ -164,8 +185,16 @@ export default function MainLayout() {
   // Compute title & breadcrumbs
   const pathSegments = location.pathname.split('/').filter(Boolean);
   const currentTitle = (location.pathname === '/' || location.pathname === '/dashboard') 
-    ? (user.school_name || 'Dashboard Overview') 
-    : pathSegments[pathSegments.length - 1].replace(/-/g, ' ');
+    ? (user?.school_name || 'Dashboard Overview') 
+    : (pathSegments[pathSegments.length - 1]?.replace(/-/g, ' ') || 'Overview');
+
+  if (!user) {
+    return (
+      <div className="flex items-center justify-center min-h-screen bg-gray-50">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-blue-500"></div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex transition-colors duration-200">
@@ -236,8 +265,8 @@ export default function MainLayout() {
               </div>
             </div>
             <div className="ml-3 min-w-0 flex-1">
-              <p className="text-xs sm:text-sm font-bold text-gray-900 truncate">{user.name}</p>
-              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider truncate">{user.role}</p>
+              <p className="text-xs sm:text-sm font-bold text-gray-900 truncate">{user.name || 'User'}</p>
+              <p className="text-[10px] font-bold text-gray-500 uppercase tracking-wider truncate">{user.role || ''}</p>
             </div>
           </div>
           <button

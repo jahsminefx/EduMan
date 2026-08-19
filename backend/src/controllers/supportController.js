@@ -41,6 +41,32 @@ async function logActivity(threadId, userId, action, details = null) {
     }
 }
 
+function calculateSLATargets(priority, baseDate = new Date()) {
+    const now = baseDate.getTime();
+    let respMs = 8 * 60 * 60 * 1000;
+    let resMs = 48 * 60 * 60 * 1000;
+
+    const p = String(priority || 'MEDIUM').toUpperCase();
+    if (p === 'LOW') {
+        respMs = 24 * 60 * 60 * 1000;
+        resMs = 72 * 60 * 60 * 1000;
+    } else if (p === 'MEDIUM') {
+        respMs = 8 * 60 * 60 * 1000;
+        resMs = 48 * 60 * 60 * 1000;
+    } else if (p === 'HIGH') {
+        respMs = 2 * 60 * 60 * 1000;
+        resMs = 24 * 60 * 60 * 1000;
+    } else if (p === 'URGENT') {
+        respMs = 30 * 60 * 1000;
+        resMs = 4 * 60 * 60 * 1000;
+    }
+
+    return {
+        firstResponseDueAt: new Date(now + respMs).toISOString(),
+        resolutionDueAt: new Date(now + resMs).toISOString()
+    };
+}
+
 // ── 1. CREATE TICKET ──
 exports.createThread = async (req, res) => {
     try {
@@ -82,11 +108,14 @@ exports.createThread = async (req, res) => {
         const aiCategory = await aiSupportService.categorizeAndScoreTicket(subject, message);
         const aiPriority = await aiSupportService.detectPriority(subject, message);
 
+        // Calculate SLA targets
+        const slaTargets = calculateSLATargets(priority);
+
         // Insert thread
         const threadRes = await db.get(
             `INSERT INTO support_threads (
-                ticket_number, school_id, created_by, subject, category, priority, status, last_reply_at, ai_category_score, ai_priority_score
-            ) VALUES ($1, $2, $3, $4, $5, $6, 'OPEN', CURRENT_TIMESTAMP, $7, $8) RETURNING id`,
+                ticket_number, school_id, created_by, subject, category, priority, status, last_reply_at, ai_category_score, ai_priority_score, first_response_due_at, resolution_due_at, sla_status
+            ) VALUES ($1, $2, $3, $4, $5, $6, 'OPEN', CURRENT_TIMESTAMP, $7, $8, $9, $10, 'IN_SLA') RETURNING id`,
             [
                 ticketNumber,
                 schoolId,
@@ -95,7 +124,9 @@ exports.createThread = async (req, res) => {
                 category.trim(),
                 priority,
                 aiCategory.confidenceScore,
-                aiPriority.priorityScore
+                aiPriority.priorityScore,
+                slaTargets.firstResponseDueAt,
+                slaTargets.resolutionDueAt
             ]
         );
         const threadId = threadRes.id;
@@ -190,8 +221,8 @@ exports.getThreads = async (req, res) => {
         let paramIdx = 1;
 
         // TENANT ISOLATION RULES
-        if (userRole === 'Teacher') {
-            // Teachers view strictly their own tickets
+        if (userRole === 'Teacher' || userRole === 'Parent') {
+            // Teachers and Parents view strictly their own tickets
             whereClauses.push(`t.created_by = $${paramIdx++}`);
             params.push(userId);
         } else if (userRole === 'SchoolAdmin') {
@@ -356,7 +387,7 @@ exports.getThreadById = async (req, res) => {
         }
 
         // TENANT ACCESS CHECK
-        if (userRole === 'Teacher' && thread.created_by !== userId) {
+        if (['Teacher', 'Parent'].includes(userRole) && thread.created_by !== userId) {
             return res.status(403).json({ error: 'Forbidden', message: 'You can only view your own tickets.' });
         }
         if (userRole === 'SchoolAdmin' && thread.school_id !== schoolId) {
@@ -460,7 +491,7 @@ exports.addMessage = async (req, res) => {
         }
 
         // Tenant access check
-        if (userRole === 'Teacher' && thread.created_by !== userId) {
+        if (['Teacher', 'Parent'].includes(userRole) && thread.created_by !== userId) {
             return res.status(403).json({ error: 'Forbidden', message: 'You cannot reply to this ticket.' });
         }
         if (userRole === 'SchoolAdmin' && thread.school_id !== req.user.school_id) {
@@ -660,6 +691,51 @@ exports.updateThread = async (req, res) => {
     } catch (err) {
         console.error('Error updating ticket:', err);
         return res.status(500).json({ error: 'Server Error', message: 'Failed to update ticket' });
+    }
+};
+
+// ── 5B. ESCALATE TICKET TO SUPERADMIN ──
+exports.escalateThread = async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { reason } = req.body;
+        const userId = req.user.id;
+
+        if (!reason || !reason.trim()) {
+            return res.status(400).json({ error: 'Bad Request', message: 'Escalation reason is required.' });
+        }
+
+        const db = getDB();
+        const thread = await db.get(`SELECT * FROM support_threads WHERE id = $1`, [id]);
+        if (!thread) {
+            return res.status(404).json({ error: 'Not Found', message: 'Support ticket not found.' });
+        }
+
+        await db.run(
+            `UPDATE support_threads 
+             SET escalation_status = 'ESCALATED', escalated_at = CURRENT_TIMESTAMP, escalated_by = $1, escalation_reason = $2, priority = 'URGENT', updated_at = CURRENT_TIMESTAMP
+             WHERE id = $3`,
+            [userId, reason.trim(), thread.id]
+        );
+
+        await logActivity(thread.id, userId, 'Escalated', `Ticket escalated to SuperAdmin. Reason: ${reason.trim()}`);
+
+        // Notify SuperAdmins
+        const superAdmins = await db.all(`SELECT id FROM users WHERE role = 'SuperAdmin' AND is_active = 1`);
+        for (const admin of superAdmins) {
+            await notificationService.createNotification({
+                userId: admin.id,
+                title: `ESCALATED TICKET #${thread.ticket_number}`,
+                message: `Ticket "${thread.subject}" escalated by ${req.user.name}: ${reason.trim()}`,
+                type: 'support',
+                link: `/dashboard/support/tickets/${thread.id}`
+            });
+        }
+
+        res.json({ message: `Ticket #${thread.ticket_number} successfully escalated to SuperAdmin` });
+    } catch (err) {
+        console.error('Error escalating ticket:', err);
+        res.status(500).json({ error: 'Server Error', message: 'Failed to escalate ticket' });
     }
 };
 

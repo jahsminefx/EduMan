@@ -3,6 +3,7 @@ import axios from 'axios';
 import { BookOpenCheck, Download, Eye, FileText, Library, X } from 'lucide-react';
 import API_URL from '../../config/api';
 import { displayLabel, downloadProtected } from './aiUtils';
+import MarkdownRenderer from '../../components/MarkdownRenderer';
 
 export default function AIPublished() {
   const [data, setData] = useState({ quizzes: [], resources: [] });
@@ -91,7 +92,9 @@ export default function AIPublished() {
               <div><h3 className="text-base sm:text-xl font-bold text-gray-900">{selected.title}</h3><p className="text-xs sm:text-sm text-gray-500">{selected.class_name} • {selected.subject_name}</p></div>
               <button onClick={() => setSelected(null)} className="rounded-xl p-2 text-gray-400 hover:bg-gray-100"><X className="h-5 w-5" /></button>
             </div>
-            <div className="whitespace-pre-wrap rounded-xl bg-gray-50/80 p-4 sm:p-5 text-xs sm:text-sm leading-relaxed text-gray-800 font-mono">{selected.body}</div>
+            <div className="py-2">
+              <MarkdownRenderer content={selected.body} />
+            </div>
           </div>
         </div>
       )}

@@ -78,6 +78,9 @@ const contactRoutes = require('./routes/contactRoutes');
 const supportRoutes = require('./routes/supportRoutes');
 const knowledgeBaseRoutes = require('./routes/knowledgeBaseRoutes');
 const notificationRoutes = require('./routes/notificationRoutes');
+const parentRoutes = require('./routes/parentRoutes');
+const financeRoutes = require('./routes/financeRoutes');
+const schemeRoutes = require('./routes/schemeRoutes');
 
 // Simple health check route
 app.get('/api/health', (req, res) => {
@@ -108,6 +111,9 @@ app.use('/api/contact', contactLimiter, contactRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/knowledge-base', knowledgeBaseRoutes);
 app.use('/api/notifications', notificationRoutes);
+app.use('/api/parent', parentRoutes);
+app.use('/api/finance', financeRoutes);
+app.use('/api/schemes', schemeRoutes);
 
 
 // ── Serve frontend build in production ──

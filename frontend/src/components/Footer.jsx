@@ -27,11 +27,12 @@ export default function Footer() {
             </ul>
           </div>
 
-          {/* Contact */}
+          {/* Support */}
           <div>
-            <h3 className="text-white font-semibold mb-4">Contact</h3>
+            <h3 className="text-white font-semibold mb-4">Support & Contact</h3>
             <ul className="space-y-2 text-sm">
-              <li>hello@eduman.africa</li>
+              <li><Link to="/contact" className="hover:text-white transition-colors">Send Support Message</Link></li>
+              <li><Link to="/dashboard/support" className="hover:text-white transition-colors">In-App Support Center</Link></li>
               <li>09156457073</li>
               <li>Delta state, Nigeria</li>
             </ul>

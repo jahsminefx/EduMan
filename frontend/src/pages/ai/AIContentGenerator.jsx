@@ -1,8 +1,9 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import axios from 'axios';
-import { CheckCircle, Download, FileText, Loader2, RefreshCw, Save, Send, Sparkles } from 'lucide-react';
+import { CheckCircle, Download, Edit3, Eye, FileText, Loader2, RefreshCw, Save, Send, Sparkles } from 'lucide-react';
 import API_URL from '../../config/api';
+import MarkdownRenderer from '../../components/MarkdownRenderer';
 import {
   applyOptionDefaults,
   assignmentValue,
@@ -30,6 +31,7 @@ export default function AIContentGenerator() {
   const [options, setOptions] = useState({ assignments: [], sessions: [], terms: [], usage: null });
   const [form, setForm] = useState(emptyForm);
   const [resource, setResource] = useState(null);
+  const [viewMode, setViewMode] = useState('preview');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState('');
   const [message, setMessage] = useState({ type: '', text: '' });
@@ -224,15 +226,53 @@ export default function AIContentGenerator() {
 
       {resource && (
         <div className="space-y-5">
-          <div className="rounded-2xl border border-gray-100 bg-white p-4 sm:p-6 shadow-xs">
+          <div className="rounded-2xl border border-gray-100 bg-white p-4 sm:p-6 shadow-xs space-y-4">
             <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
               <label className="sm:col-span-2 text-xs sm:text-sm font-medium text-gray-700">Document title<input value={resource.title} onChange={event => setResource({ ...resource, title: event.target.value })} className="mt-1 w-full rounded-xl border border-gray-300 p-2.5 text-sm text-gray-900 font-bold" /></label>
               <label className="text-xs sm:text-sm font-medium text-gray-700">Content type<select value={resource.content_type} onChange={event => setResource({ ...resource, content_type: event.target.value })} className="mt-1 w-full rounded-xl border border-gray-300 bg-white p-2.5 text-sm text-gray-900">{contentTypeOptions.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
             </div>
-            <label className="mt-5 block text-xs sm:text-sm font-medium text-gray-700">
-              Document body
-              <textarea value={resource.body} onChange={event => setResource({ ...resource, body: event.target.value })} rows="24" className="mt-1 w-full rounded-xl border border-gray-300 p-3.5 sm:p-4 font-mono text-xs sm:text-sm leading-relaxed text-gray-900 focus:ring-2 focus:ring-blue-500" />
-            </label>
+
+            {/* View Mode Switcher */}
+            <div className="flex items-center justify-between border-b border-gray-100 pb-2 pt-2">
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => setViewMode('preview')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                    viewMode === 'preview'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <Eye className="w-3.5 h-3.5" /> Formatted Preview
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setViewMode('edit')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold transition ${
+                    viewMode === 'edit'
+                      ? 'bg-blue-600 text-white shadow-xs'
+                      : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                  }`}
+                >
+                  <Edit3 className="w-3.5 h-3.5" /> Edit Raw Text
+                </button>
+              </div>
+              <span className="text-[11px] text-gray-400 font-medium hidden sm:inline">
+                {viewMode === 'preview' ? 'Ready for publication preview' : 'Edit document text directly'}
+              </span>
+            </div>
+
+            {viewMode === 'preview' ? (
+              <div className="rounded-2xl border border-gray-200 bg-gray-50/50 p-5 sm:p-6">
+                <MarkdownRenderer content={resource.body} />
+              </div>
+            ) : (
+              <label className="block text-xs sm:text-sm font-medium text-gray-700">
+                Document body
+                <textarea value={resource.body} onChange={event => setResource({ ...resource, body: event.target.value })} rows="24" className="mt-1 w-full rounded-xl border border-gray-300 p-3.5 sm:p-4 font-mono text-xs sm:text-sm leading-relaxed text-gray-900 focus:ring-2 focus:ring-blue-500" />
+              </label>
+            )}
           </div>
 
           <div className="sticky bottom-4 flex flex-col sm:flex-row flex-wrap items-stretch sm:items-center gap-2.5 rounded-2xl border border-gray-200 bg-white/95 p-3.5 sm:p-4 shadow-lg backdrop-blur-xs">

@@ -31,7 +31,9 @@ const upload = multer({
 });
 
 router.get('/', protect, contentController.getContents);
-router.post('/', protect, authorize('ContentManager', 'Teacher', 'SchoolAdmin'), upload.single('file'), contentController.uploadContent);
-router.delete('/:id', protect, authorize('ContentManager', 'Teacher', 'SchoolAdmin'), contentController.deleteContent);
+router.get('/analytics', protect, authorize('ContentManager', 'SuperAdmin'), contentController.getContentAnalytics);
+router.post('/', protect, authorize('ContentManager', 'Teacher', 'SchoolAdmin', 'SuperAdmin'), upload.single('file'), contentController.uploadContent);
+router.put('/:id/status', protect, authorize('ContentManager', 'SuperAdmin'), contentController.updateContentStatus);
+router.delete('/:id', protect, authorize('ContentManager', 'Teacher', 'SchoolAdmin', 'SuperAdmin'), contentController.deleteContent);
 
 module.exports = router;

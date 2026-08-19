@@ -1,6 +1,7 @@
 const { verifyToken } = require('../utils/auth');
+const { getDB } = require('../config/database');
 
-const protect = (req, res, next) => {
+const protect = async (req, res, next) => {
     const authHeader = req.headers.authorization;
     if (!authHeader || !authHeader.startsWith('Bearer ')) {
         return res.status(401).json({ error: 'Unauthorized', message: 'No token provided' });
@@ -9,7 +10,25 @@ const protect = (req, res, next) => {
     const token = authHeader.split(' ')[1];
     try {
         const decoded = verifyToken(token);
-        req.user = decoded; // { id, role, email, iat, exp }
+        const db = getDB();
+        const dbUser = await db.get(`SELECT is_active, token_version FROM users WHERE id = $1`, [decoded.id]);
+
+        if (!dbUser || dbUser.is_active === 0) {
+            return res.status(401).json({ error: 'Unauthorized', message: 'Account is inactive or disabled' });
+        }
+
+        if (decoded.token_version && dbUser.token_version && decoded.token_version !== dbUser.token_version) {
+            return res.status(401).json({ error: 'Unauthorized', message: 'Session has been revoked' });
+        }
+
+        if (decoded.role !== 'SuperAdmin' && decoded.school_id) {
+            const school = await db.get(`SELECT status, is_active FROM schools WHERE id = $1`, [decoded.school_id]);
+            if (school && (school.status === 'SUSPENDED' || school.status === 'ARCHIVED' || school.is_active === 0)) {
+                return res.status(403).json({ error: 'Forbidden', message: `School account is currently ${school.status || 'suspended'}.` });
+            }
+        }
+
+        req.user = decoded;
         next();
     } catch (err) {
         return res.status(401).json({ error: 'Unauthorized', message: 'Invalid or expired token' });
@@ -25,11 +44,11 @@ const authorize = (...roles) => {
     };
 };
 
-const { getDB } = require('../config/database');
 
 const requireSchoolScope = (req, res, next) => {
-    // SuperAdmin can float across schools, everyone else MUST have a school_id attached to their session
-    if (req.user.role !== 'SuperAdmin' && !req.user.school_id) {
+    // SuperAdmin, ContentManager, and SupportOfficer float globally
+    const GLOBAL_ROLES = new Set(['SuperAdmin', 'ContentManager', 'SupportOfficer']);
+    if (!GLOBAL_ROLES.has(req.user.role) && !req.user.school_id) {
         return res.status(403).json({ error: 'Forbidden', message: 'Your account is not bound to a valid school.' });
     }
     next();
