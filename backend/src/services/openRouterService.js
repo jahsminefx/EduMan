@@ -1,5 +1,12 @@
 const OPENROUTER_URL = 'https://openrouter.ai/api/v1/chat/completions';
 
+const FALLBACK_MODELS = [
+    'openai/gpt-4o',
+    'google/gemini-2.0-flash-001',
+    'openai/gpt-4o-mini',
+    'meta-llama/llama-3.3-70b-instruct'
+];
+
 class OpenRouterError extends Error {
     constructor(message, { status = 502, code = 'openrouter_error', retryAfter = null, details = null } = {}) {
         super(message);
@@ -36,7 +43,14 @@ function friendlyMessage(status, providerMessage) {
     if (status === 403) return 'The EduMan AI request was blocked by the provider.';
     if (status === 408 || status === 504) return 'The EduMan AI request timed out. Please try again.';
     if (status === 429) return 'The EduMan AI provider is busy or rate-limited. Please try again shortly.';
-    if (status === 502 || status === 503) return 'The selected EduMan AI model is temporarily unavailable.';
+    if (status === 502 || status === 503) return 'The EduMan AI provider encountered a temporary error. Please try again.';
+    if (providerMessage && (
+        providerMessage.toLowerCase().includes('provider returned error') ||
+        providerMessage.toLowerCase().includes('upstream') ||
+        providerMessage.toLowerCase().includes('overloaded')
+    )) {
+        return 'The EduMan AI provider encountered a temporary upstream error. Please try again.';
+    }
     return providerMessage || 'EduMan AI generation failed. Please try again.';
 }
 
@@ -60,105 +74,133 @@ async function callOpenRouter({
         });
     }
 
-    const selectedModel = model || process.env.OPENROUTER_MODEL || 'openai/gpt-4o';
+    const primaryModel = model || process.env.OPENROUTER_MODEL || 'openai/gpt-4o';
+    const modelsToTry = [primaryModel, ...FALLBACK_MODELS.filter(m => m !== primaryModel)];
     const timeoutMs = Math.max(10000, Number(process.env.OPENROUTER_TIMEOUT_MS) || 90000);
-    const requestBody = {
-        model: selectedModel,
-        messages,
-        temperature,
-        max_tokens: maxTokens,
-        stream: false,
-        response_format: {
-            type: 'json_schema',
-            json_schema: {
-                name: schemaName,
-                strict: true,
-                schema: responseSchema
+
+    let lastError = null;
+
+    for (let mIdx = 0; mIdx < modelsToTry.length; mIdx += 1) {
+        const currentModel = modelsToTry[mIdx];
+
+        // Format system instructions for structured output resilience
+        const requestBody = {
+            model: currentModel,
+            messages,
+            temperature,
+            max_tokens: maxTokens,
+            stream: false,
+            response_format: {
+                type: 'json_schema',
+                json_schema: {
+                    name: schemaName,
+                    strict: true,
+                    schema: responseSchema
+                }
             }
-        },
-        provider: {
-            require_parameters: true
-        }
-    };
+        };
 
-    for (let attempt = 0; attempt < 2; attempt += 1) {
-        const controller = new AbortController();
-        const timer = setTimeout(() => controller.abort(), timeoutMs);
+        for (let attempt = 0; attempt < 2; attempt += 1) {
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-        try {
-            const response = await fetch(OPENROUTER_URL, {
-                method: 'POST',
-                headers: {
-                    Authorization: `Bearer ${apiKey}`,
-                    'HTTP-Referer': process.env.OPENROUTER_SITE_URL || 'http://localhost:5173',
-                    'X-Title': process.env.OPENROUTER_APP_NAME || 'EduMan AI',
-                    'Content-Type': 'application/json'
-                },
-                body: JSON.stringify(requestBody),
-                signal: controller.signal
-            });
-
-            const retryAfterHeader = Number(response.headers.get('retry-after'));
-            let payload;
             try {
-                payload = await response.json();
-            } catch {
-                payload = null;
-            }
+                const response = await fetch(OPENROUTER_URL, {
+                    method: 'POST',
+                    headers: {
+                        Authorization: `Bearer ${apiKey}`,
+                        'HTTP-Referer': process.env.OPENROUTER_SITE_URL || 'http://localhost:5173',
+                        'X-Title': process.env.OPENROUTER_APP_NAME || 'EduMan AI',
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(requestBody),
+                    signal: controller.signal
+                });
 
-            const embeddedError = payload?.error || payload?.choices?.[0]?.error;
-            if (!response.ok || embeddedError) {
-                const status = Number(embeddedError?.code) || response.status || 502;
-                const retryAfter = Number.isFinite(retryAfterHeader) ? retryAfterHeader : null;
-                if (attempt === 0 && (status === 429 || status === 503)) {
-                    await wait(Math.min(Math.max((retryAfter || 2) * 1000, 1000), 10000));
-                    continue;
+                const retryAfterHeader = Number(response.headers.get('retry-after'));
+                let payload;
+                try {
+                    payload = await response.json();
+                } catch {
+                    payload = null;
                 }
 
-                throw new OpenRouterError(
-                    friendlyMessage(status, embeddedError?.message),
-                    {
-                        status,
-                        code: embeddedError?.metadata?.error_type || 'openrouter_error',
-                        retryAfter,
-                        details: embeddedError?.metadata || null
+                const embeddedError = payload?.error || payload?.choices?.[0]?.error;
+                if (!response.ok || embeddedError) {
+                    const status = Number(embeddedError?.code) || response.status || 502;
+                    const retryAfter = Number.isFinite(retryAfterHeader) ? retryAfterHeader : null;
+
+                    if (attempt === 0 && (status === 429 || status === 503)) {
+                        await wait(Math.min(Math.max((retryAfter || 2) * 1000, 1000), 5000));
+                        continue;
                     }
-                );
-            }
 
-            const content = payload?.choices?.[0]?.message?.content;
-            const parsed = typeof content === 'object' && content !== null
-                ? content
-                : parseJsonContent(content);
+                    lastError = new OpenRouterError(
+                        friendlyMessage(status, embeddedError?.message),
+                        {
+                            status,
+                            code: embeddedError?.metadata?.error_type || 'openrouter_error',
+                            retryAfter,
+                            details: embeddedError?.metadata || null
+                        }
+                    );
 
-            return {
-                data: parsed,
-                raw: payload,
-                model: payload?.model || selectedModel,
-                usage: payload?.usage || {}
-            };
-        } catch (error) {
-            if (error.name === 'AbortError') {
-                throw new OpenRouterError('The EduMan AI request timed out. Please try again.', {
-                    status: 504,
-                    code: 'timeout'
+                    // If provider returned error (502/503), break out to try fallback model
+                    if (status === 502 || status === 503 || embeddedError?.message?.toLowerCase().includes('provider returned error')) {
+                        break;
+                    }
+
+                    // For non-recoverable auth or client errors (401, 403, 400), throw immediately
+                    if (status === 401 || status === 403 || status === 400) {
+                        throw lastError;
+                    }
+
+                    break;
+                }
+
+                const content = payload?.choices?.[0]?.message?.content;
+                const parsed = typeof content === 'object' && content !== null
+                    ? content
+                    : parseJsonContent(content);
+
+                return {
+                    data: parsed,
+                    raw: payload,
+                    model: payload?.model || currentModel,
+                    usage: payload?.usage || {}
+                };
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    lastError = new OpenRouterError('The EduMan AI request timed out. Please try again.', {
+                        status: 504,
+                        code: 'timeout'
+                    });
+                    break;
+                }
+                if (error instanceof OpenRouterError || error?.name === 'OpenRouterError') {
+                    lastError = error;
+                    if (error.status === 401 || error.status === 403 || error.status === 400) {
+                        throw error;
+                    }
+                    break;
+                }
+                console.error(`OpenRouter fetch network error on model ${currentModel}:`, error);
+                lastError = new OpenRouterError('Could not connect to the EduMan AI provider. Please try again.', {
+                    status: 502,
+                    code: 'network_error'
                 });
+                break;
+            } finally {
+                clearTimeout(timer);
             }
-            if (error instanceof OpenRouterError || error?.name === 'OpenRouterError') throw error;
-            console.error('OpenRouter fetch network error:', error);
-            throw new OpenRouterError('Could not connect to the EduMan AI provider. Please try again.', {
-                status: 502,
-                code: 'network_error'
-            });
-        } finally {
-            clearTimeout(timer);
         }
     }
 
-    throw new OpenRouterError('EduMan AI generation failed. Please try again.');
+    throw lastError || new OpenRouterError('EduMan AI generation failed. Please try again.');
 }
 
 module.exports = {
     callOpenRouter,
     OpenRouterError
 };
+

@@ -536,10 +536,10 @@ exports.reviewSchemeWithAI = async (req, res) => {
         ].join('\n');
 
         // Fetch AI settings
-        const settings = await db.get(`SELECT model FROM ai_settings WHERE school_id = $1`, [schoolId]) || { model: 'google/gemini-2.5-flash' };
+        const settings = await db.get(`SELECT model FROM ai_settings WHERE school_id = $1`, [schoolId]) || { model: 'google/gemini-2.0-flash-001' };
 
         const result = await callOpenRouter({
-            model: settings.model || 'google/gemini-2.5-flash',
+            model: settings.model || 'google/gemini-2.0-flash-001',
             messages: [
                 {
                     role: 'system',
