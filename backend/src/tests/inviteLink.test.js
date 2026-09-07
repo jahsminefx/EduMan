@@ -85,6 +85,51 @@ describe('Invite Links System API', () => {
     expect(res.body.user.email).toEqual(uniqueEmail);
   });
 
+  it('should handle parent registration with student auto-linking', async () => {
+    // 1. Create Parent invite link
+    const parentLinkRes = await request(app)
+      .post('/api/invite-links')
+      .set('Authorization', `Bearer ${adminToken}`)
+      .send({
+        role: 'Parent',
+        max_uses: 5
+      });
+
+    expect(parentLinkRes.statusCode).toEqual(201);
+    const parentCode = parentLinkRes.body.inviteLink.display_code;
+
+    // 2. Reject parent registration if student admission number is invalid
+    const invalidRegRes = await request(app)
+      .post('/api/invite-links/register')
+      .send({
+        code: parentCode,
+        first_name: 'Invalid',
+        last_name: 'Parent',
+        email: `invalid.parent.${Date.now()}@test.local`,
+        password: 'password123',
+        student_admission_number: 'ADM-INVALID-999'
+      });
+
+    expect(invalidRegRes.statusCode).toEqual(400);
+    expect(invalidRegRes.body.message).toContain('No student found');
+
+    // 3. Successfully register parent with valid student admission number (GF-2025-001 from seed)
+    const validParentEmail = `test.parent.${Date.now()}@test.local`;
+    const validRegRes = await request(app)
+      .post('/api/invite-links/register')
+      .send({
+        code: parentCode,
+        first_name: 'Valid',
+        last_name: 'Parent',
+        email: validParentEmail,
+        password: 'password123',
+        student_admission_number: 'GF-2025-001'
+      });
+
+    expect(validRegRes.statusCode).toEqual(201);
+    expect(validRegRes.body.user.role).toEqual('Parent');
+  });
+
   it('should allow SchoolAdmin to revoke the invitation link', async () => {
     const res = await request(app)
       .delete(`/api/invite-links/${generatedLinkId}`)

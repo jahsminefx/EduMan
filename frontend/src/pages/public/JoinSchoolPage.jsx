@@ -380,6 +380,28 @@ export default function JoinSchoolPage() {
               </div>
             )}
 
+            {/* Parent-specific fields */}
+            {inviteInfo.role === 'Parent' && (
+              <div className="pt-2 border-t border-gray-100 space-y-3">
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 mb-1">
+                    Child's Student Admission Number(s) *
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    value={formData.student_admission_number || formData.admission_number || ''}
+                    onChange={(e) => setFormData({ ...formData, student_admission_number: e.target.value, admission_number: e.target.value })}
+                    placeholder="e.g. ADM-000001 (or ADM-001, ADM-002)"
+                    className="w-full px-3.5 py-2 text-sm border border-gray-300 rounded-xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-mono"
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    Entering your child's Admission Number links your parent account directly to their gradebook, attendance, and fee statements. Separate multiple IDs with commas.
+                  </p>
+                </div>
+              </div>
+            )}
+
             <button
               type="submit"
               disabled={submitting}

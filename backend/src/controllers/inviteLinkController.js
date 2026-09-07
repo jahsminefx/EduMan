@@ -215,7 +215,7 @@ exports.getInviteInfo = async (req, res) => {
 
 // Public API: Register via invite link
 exports.registerViaInvite = async (req, res) => {
-    const { code, first_name, last_name, email, password, gender, admission_number, phone, parent_name, parent_phone } = req.body;
+    const { code, first_name, last_name, email, password, gender, admission_number, student_admission_number, phone, parent_name, parent_phone } = req.body;
 
     if (!code || !first_name || !last_name || !email || !password) {
         return res.status(400).json({ error: 'Validation Error', message: 'First name, last name, email, password, and invite code are required.' });
@@ -266,10 +266,36 @@ exports.registerViaInvite = async (req, res) => {
             return res.status(400).json({ error: 'Duplicate Email', message: 'An account with this email address already exists.' });
         }
 
+        const targetRole = link.role;
+
+        // If Parent role, validate student admission number(s) if provided
+        let matchedStudents = [];
+        if (targetRole === 'Parent') {
+            const rawAdm = student_admission_number || admission_number || '';
+            const admNumbers = String(rawAdm)
+                .split(',')
+                .map(s => s.trim())
+                .filter(Boolean);
+
+            for (const admNo of admNumbers) {
+                const student = await db.get(
+                    'SELECT id, first_name, last_name, admission_number FROM students WHERE school_id = $1 AND LOWER(admission_number) = LOWER($2)',
+                    [link.school_id, admNo]
+                );
+
+                if (!student) {
+                    return res.status(400).json({
+                        error: 'Student Not Found',
+                        message: `No student found with Admission Number '${admNo}' at ${link.school_name}. Please check your child's ID and try again.`
+                    });
+                }
+                matchedStudents.push(student);
+            }
+        }
+
         const salt = await bcrypt.genSalt(10);
         const passwordHash = await bcrypt.hash(password, salt);
         const fullName = `${first_name.trim()} ${last_name.trim()}`;
-        const targetRole = link.role;
 
         const registrationResult = await db.transaction(async (client) => {
             // 1. Create User
@@ -316,6 +342,14 @@ exports.registerViaInvite = async (req, res) => {
                         VALUES ($1, $2, $3)
                     `, [teacherResult.lastID, link.class_id, link.school_id]);
                 }
+            } else if (targetRole === 'Parent') {
+                // Auto-link parent to matched students
+                for (const student of matchedStudents) {
+                    await client.run(`
+                        INSERT INTO parent_student_links (parent_user_id, student_id)
+                        VALUES ($1, $2)
+                    `, [userId, student.id]);
+                }
             }
 
             // 3. Increment used_count
@@ -323,6 +357,7 @@ exports.registerViaInvite = async (req, res) => {
 
             return { userId };
         });
+
 
         // 4. Generate JWT auth token
         const createdUser = {
