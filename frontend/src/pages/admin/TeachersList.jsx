@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Plus, Trash2, Mail, Phone, Edit2, Check, BookOpen } from 'lucide-react';
+import { Plus, Trash2, Mail, Phone, Edit2, Check, BookOpen, Filter, X } from 'lucide-react';
 import API_URL from '../../config/api';
 
 const normalizeGender = (value) => {
@@ -28,6 +28,8 @@ export default function TeachersList() {
   const [success, setSuccess] = useState('');
   
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterGender, setFilterGender] = useState('');
+  const [filterClass, setFilterClass] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: 'last_name', direction: 'asc' });
 
   useEffect(() => {
@@ -67,7 +69,7 @@ export default function TeachersList() {
         t.phone, 
         (t.classes || []).map(c => c.name).join('; ')
       ].map(field => `"${(field || '').toString().replace(/"/g, '""')}"`).join(','))
-    ].join('\\n');
+    ].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -78,7 +80,17 @@ export default function TeachersList() {
   const filteredTeachers = [...teachers]
     .filter(t => {
       const q = searchTerm.toLowerCase();
-      return (t.first_name + ' ' + t.last_name).toLowerCase().includes(q) || t.email.toLowerCase().includes(q) || (t.phone && t.phone.toLowerCase().includes(q));
+      const matchesSearch = (t.first_name + ' ' + t.last_name).toLowerCase().includes(q) || 
+                            t.email.toLowerCase().includes(q) || 
+                            (t.phone && t.phone.toLowerCase().includes(q));
+      const normG = normalizeGender(t.gender);
+      const matchesGender = !filterGender || normG.toLowerCase() === filterGender.toLowerCase();
+      const teacherClassIds = (t.classes || []).map(c => String(c.id));
+      const matchesClass = !filterClass || 
+        (filterClass === 'unassigned' && teacherClassIds.length === 0) ||
+        (filterClass !== 'unassigned' && teacherClassIds.includes(String(filterClass)));
+
+      return matchesSearch && matchesGender && matchesClass;
     })
     .sort((a, b) => {
       const aVal = a[sortConfig.key] || '';
@@ -201,6 +213,55 @@ export default function TeachersList() {
               <Plus className="w-4 h-4 mr-1.5" /> Add Teacher
             </button>
           </div>
+        </div>
+      </div>
+
+      {/* Filter Controls Bar */}
+      <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-gray-500 uppercase tracking-wider">
+            <Filter className="w-4 h-4 text-blue-600" /> Filters:
+          </div>
+
+          {/* Gender Filter */}
+          <select
+            value={filterGender}
+            onChange={(e) => setFilterGender(e.target.value)}
+            className="border border-gray-300 rounded-xl px-3 py-1.5 text-xs font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All Genders</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
+
+          {/* Assigned Class Filter */}
+          <select
+            value={filterClass}
+            onChange={(e) => setFilterClass(e.target.value)}
+            className="border border-gray-300 rounded-xl px-3 py-1.5 text-xs font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All Assigned Classes</option>
+            <option value="unassigned">Unassigned</option>
+            {classes.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+
+          {(filterGender || filterClass || searchTerm) && (
+            <button
+              onClick={() => {
+                setFilterGender('');
+                setFilterClass('');
+                setSearchTerm('');
+              }}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-xl transition"
+            >
+              <X className="w-3.5 h-3.5" /> Reset
+            </button>
+          )}
+        </div>
+        <div className="text-xs text-gray-500 font-medium">
+          Showing <span className="font-bold text-gray-900">{filteredTeachers.length}</span> of {teachers.length} teachers
         </div>
       </div>
 

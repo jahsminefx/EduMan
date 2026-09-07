@@ -19,6 +19,7 @@ import Dashboard from './pages/Dashboard';
 import ClassesList from './pages/admin/ClassesList';
 import StudentsList from './pages/admin/StudentsList';
 import BulkUploadStudents from './pages/admin/BulkUploadStudents';
+import ParentsList from './pages/admin/ParentsList';
 import InviteLinksManage from './pages/admin/InviteLinksManage';
 import TeachersList from './pages/admin/TeachersList';
 import SubjectsList from './pages/admin/SubjectsList';
@@ -126,6 +127,14 @@ const AppRoutes = () => {
           element={
             <ProtectedRoute allowedRoles={['SchoolAdmin']}>
               <InviteLinksManage />
+            </ProtectedRoute>
+          } 
+        />
+        <Route 
+          path="admin/parents" 
+          element={
+            <ProtectedRoute allowedRoles={['SuperAdmin', 'SchoolAdmin']}>
+              <ParentsList />
             </ProtectedRoute>
           } 
         />

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Plus, Edit2, Trash2, UserCheck } from 'lucide-react';
+import { Plus, Edit2, Trash2, UserCheck, Filter, X } from 'lucide-react';
 import API_URL from '../../config/api';
 
 export default function ClassesList() {
@@ -13,8 +13,19 @@ export default function ClassesList() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterLevel, setFilterLevel] = useState('');
+  const [filterFormTeacher, setFilterFormTeacher] = useState('');
 
-  const filteredClasses = classes.filter(c => c.name.toLowerCase().includes(searchTerm.toLowerCase()));
+  const filteredClasses = classes.filter(c => {
+    const matchesSearch = c.name.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesLevel = !filterLevel || String(c.level) === String(filterLevel);
+    const hasFormTeacher = !!c.form_teacher_id;
+    const matchesFormTeacher = !filterFormTeacher ||
+      (filterFormTeacher === 'assigned' && hasFormTeacher) ||
+      (filterFormTeacher === 'unassigned' && !hasFormTeacher);
+
+    return matchesSearch && matchesLevel && matchesFormTeacher;
+  });
 
   useEffect(() => {
     fetchClasses();
@@ -121,6 +132,54 @@ export default function ClassesList() {
           >
             <Plus className="w-4 h-4 mr-2" /> Add Class
           </button>
+        </div>
+      </div>
+
+      {/* Filter Controls Bar */}
+      <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-gray-500 uppercase tracking-wider">
+            <Filter className="w-4 h-4 text-blue-600" /> Filters:
+          </div>
+
+          {/* Grade Level Filter */}
+          <select
+            value={filterLevel}
+            onChange={(e) => setFilterLevel(e.target.value)}
+            className="border border-gray-300 rounded-xl px-3 py-1.5 text-xs font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All Grade Levels</option>
+            {[1, 2, 3, 4, 5, 6].map(lvl => (
+              <option key={lvl} value={lvl}>Level {lvl}</option>
+            ))}
+          </select>
+
+          {/* Form Teacher Status Filter */}
+          <select
+            value={filterFormTeacher}
+            onChange={(e) => setFilterFormTeacher(e.target.value)}
+            className="border border-gray-300 rounded-xl px-3 py-1.5 text-xs font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All Form Teacher Statuses</option>
+            <option value="assigned">Has Form Teacher</option>
+            <option value="unassigned">No Form Teacher</option>
+          </select>
+
+          {(filterLevel || filterFormTeacher || searchTerm) && (
+            <button
+              onClick={() => {
+                setFilterLevel('');
+                setFilterFormTeacher('');
+                setSearchTerm('');
+              }}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-xl transition"
+            >
+              <X className="w-3.5 h-3.5" /> Reset
+            </button>
+          )}
+        </div>
+        <div className="text-xs text-gray-500 font-medium">
+          Showing <span className="font-bold text-gray-900">{filteredClasses.length}</span> of {classes.length} classes
         </div>
       </div>
 

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
 import { Link } from 'react-router-dom';
-import { Plus, Edit2, Trash2, CheckCircle, Upload } from 'lucide-react';
+import { Plus, Edit2, Trash2, CheckCircle, Upload, Filter, X } from 'lucide-react';
 import API_URL from '../../config/api';
 
 const normalizeGender = (value) => {
@@ -33,6 +33,9 @@ export default function StudentsList() {
 
   const [editingId, setEditingId] = useState(null);
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterClass, setFilterClass] = useState('');
+  const [filterGender, setFilterGender] = useState('');
+  const [filterAccountType, setFilterAccountType] = useState('');
   const [sortConfig, setSortConfig] = useState({ key: 'last_name', direction: 'asc' });
 
   useEffect(() => {
@@ -98,7 +101,7 @@ export default function StudentsList() {
       ...filteredStudents.map(s => [
         s.admission_number, s.first_name, s.last_name, s.gender, s.age, s.class_name, s.parent_name, s.parent_phone
       ].map(field => `"${(field || '').toString().replace(/"/g, '""')}"`).join(','))
-    ].join('\\n');
+    ].join('\n');
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
     const link = document.createElement('a');
     link.href = URL.createObjectURL(blob);
@@ -109,7 +112,19 @@ export default function StudentsList() {
   const filteredStudents = [...students]
     .filter(s => {
       const q = searchTerm.toLowerCase();
-      return (s.first_name + ' ' + s.last_name).toLowerCase().includes(q) || s.admission_number.toLowerCase().includes(q);
+      const matchesSearch = (s.first_name + ' ' + s.last_name).toLowerCase().includes(q) || 
+                            s.admission_number.toLowerCase().includes(q) ||
+                            (s.parent_name || '').toLowerCase().includes(q) ||
+                            (s.parent_phone || '').toLowerCase().includes(q);
+      const matchesClass = !filterClass || String(s.class_id) === String(filterClass);
+      const normG = normalizeGender(s.gender);
+      const matchesGender = !filterGender || normG.toLowerCase() === filterGender.toLowerCase();
+      const hasAccount = s.user_id !== null && s.user_id !== undefined;
+      const matchesAccount = !filterAccountType || 
+        (filterAccountType === 'digital' && hasAccount) ||
+        (filterAccountType === 'roster' && !hasAccount);
+
+      return matchesSearch && matchesClass && matchesGender && matchesAccount;
     })
     .sort((a, b) => {
       const aVal = a[sortConfig.key] || '';
@@ -219,6 +234,66 @@ export default function StudentsList() {
         </div>
       </div>
 
+      {/* Filter Controls Bar */}
+      <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-gray-500 uppercase tracking-wider">
+            <Filter className="w-4 h-4 text-blue-600" /> Filters:
+          </div>
+
+          {/* Class Filter */}
+          <select
+            value={filterClass}
+            onChange={(e) => setFilterClass(e.target.value)}
+            className="border border-gray-300 rounded-xl px-3 py-1.5 text-xs font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All Classes</option>
+            {classes.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+
+          {/* Gender Filter */}
+          <select
+            value={filterGender}
+            onChange={(e) => setFilterGender(e.target.value)}
+            className="border border-gray-300 rounded-xl px-3 py-1.5 text-xs font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All Genders</option>
+            <option value="Male">Male</option>
+            <option value="Female">Female</option>
+          </select>
+
+          {/* Account Type Filter */}
+          <select
+            value={filterAccountType}
+            onChange={(e) => setFilterAccountType(e.target.value)}
+            className="border border-gray-300 rounded-xl px-3 py-1.5 text-xs font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All Account Types</option>
+            <option value="digital">📱 Digital Account</option>
+            <option value="roster">📄 Roster Only (No Phone)</option>
+          </select>
+
+          {(filterClass || filterGender || filterAccountType || searchTerm) && (
+            <button
+              onClick={() => {
+                setFilterClass('');
+                setFilterGender('');
+                setFilterAccountType('');
+                setSearchTerm('');
+              }}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-xl transition"
+            >
+              <X className="w-3.5 h-3.5" /> Reset
+            </button>
+          )}
+        </div>
+        <div className="text-xs text-gray-500 font-medium">
+          Showing <span className="font-bold text-gray-900">{filteredStudents.length}</span> of {students.length} students
+        </div>
+      </div>
+
       <div className="bg-white shadow-xs border border-gray-100 rounded-2xl overflow-hidden">
         {loading ? (
           <div className="p-8 text-center text-gray-500 text-sm">Loading students...</div>
@@ -232,6 +307,7 @@ export default function StudentsList() {
                   <th onClick={() => handleSort('admission_number')} className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">Admission No {sortConfig.key === 'admission_number' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
                   <th onClick={() => handleSort('last_name')} className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider cursor-pointer hover:bg-gray-100">Name {sortConfig.key === 'last_name' ? (sortConfig.direction === 'asc' ? '↑' : '↓') : ''}</th>
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Class</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Account Type</th>
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-semibold text-gray-500 uppercase tracking-wider">Parent Phone</th>
                   <th className="px-4 sm:px-6 py-3 text-right text-xs font-semibold text-gray-500 uppercase tracking-wider">Actions</th>
                 </tr>
@@ -242,6 +318,17 @@ export default function StudentsList() {
                     <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm font-semibold text-gray-900">{stu.admission_number}</td>
                     <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-700 font-medium">{stu.first_name} {stu.last_name}</td>
                     <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600">{stu.class_name || 'Unassigned'}</td>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-xs">
+                      {stu.user_id ? (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                          📱 Digital Account
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-700 border border-gray-200">
+                          📄 Roster Only (No Phone)
+                        </span>
+                      )}
+                    </td>
                     <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-xs sm:text-sm text-gray-600">{stu.parent_phone || 'N/A'}</td>
                     <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-right text-xs sm:text-sm font-medium">
                       <button onClick={() => handleOpenModal(stu)} className="p-1.5 text-blue-600 hover:text-blue-900 hover:bg-blue-50 rounded-lg transition-colors mr-2" title="Edit Student">
@@ -351,17 +438,19 @@ export default function StudentsList() {
                     )}
 
                     <div className="border-t pt-4">
-                      <h4 className="text-xs sm:text-sm font-bold text-gray-900 mb-3 flex items-center">
+                      <h4 className="text-xs sm:text-sm font-bold text-gray-900 mb-2 flex items-center">
                         <CheckCircle className="w-4 h-4 mr-2 text-green-500" />
-                        Student Login Credentials
+                        Student Login Credentials (Optional)
                       </h4>
                       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                         <div>
-                          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Student Login Email *</label>
-                          <input type="email" required className="w-full rounded-xl border-gray-300 shadow-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent p-2.5 border text-sm text-gray-900" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} placeholder="student@school.com" />
-                          <p className="text-[11px] text-gray-500 mt-1">An invitation link with a 1-click password setup will be emailed to the student.</p>
+                          <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Student Email (Optional)</label>
+                          <input type="email" className="w-full rounded-xl border-gray-300 shadow-xs focus:ring-2 focus:ring-blue-500 focus:border-transparent p-2.5 border text-sm text-gray-900" value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} placeholder="Leave blank if student has no phone/email" />
                         </div>
                       </div>
+                      <p className="text-[11px] text-gray-500 mt-2 bg-gray-50 p-2.5 rounded-lg border border-gray-200">
+                        📄 <strong>Roster-Only Mode:</strong> If email is left blank, student is added to class rosters for daily attendance, teacher gradebooks, and printable report cards without requiring a phone or login account.
+                      </p>
                     </div>
                   </div>
                 )}

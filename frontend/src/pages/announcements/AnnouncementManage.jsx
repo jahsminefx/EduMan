@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
-import { ArrowLeft, FileText, Image as ImageIcon, Pencil, Plus, Save, Trash2, Upload, X } from 'lucide-react';
+import { ArrowLeft, FileText, Image as ImageIcon, Pencil, Plus, Save, Trash2, Upload, X, Search, Filter } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import API_URL from '../../config/api';
 import { mediaUrl } from '../../utils/media';
@@ -39,6 +39,8 @@ export default function AnnouncementManage() {
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const [error, setError] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
 
   useEffect(() => {
     fetchAnnouncements();
@@ -59,6 +61,13 @@ export default function AnnouncementManage() {
       setLoading(false);
     }
   };
+
+  const filteredAnnouncements = announcements.filter(a => {
+    const q = searchTerm.toLowerCase();
+    const matchesSearch = (a.title || '').toLowerCase().includes(q) || (a.content || '').toLowerCase().includes(q);
+    const matchesStatus = !filterStatus || a.status === filterStatus;
+    return matchesSearch && matchesStatus;
+  });
 
   const handleChange = (field, value) => {
     setForm(current => ({ ...current, [field]: value }));
@@ -312,15 +321,56 @@ export default function AnnouncementManage() {
           </div>
         </form>
 
-        <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-5">
-          <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider mb-4">Workspace</h3>
+        <div className="bg-white border border-gray-100 rounded-xl shadow-sm p-5 space-y-4">
+          <div className="flex items-center justify-between">
+            <h3 className="text-sm font-black text-gray-900 uppercase tracking-wider">Workspace</h3>
+            <span className="text-xs font-bold text-gray-500">{filteredAnnouncements.length} item(s)</span>
+          </div>
+
+          {/* Search & Status Filter */}
+          <div className="space-y-2">
+            <div className="relative">
+              <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5" />
+              <input
+                type="text"
+                placeholder="Search..."
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-1 focus:ring-blue-500"
+              />
+            </div>
+            <div className="flex gap-1">
+              <button
+                type="button"
+                onClick={() => setFilterStatus('')}
+                className={`flex-1 py-1 text-[11px] font-bold rounded ${filterStatus === '' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
+              >
+                All
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterStatus('Published')}
+                className={`flex-1 py-1 text-[11px] font-bold rounded ${filterStatus === 'Published' ? 'bg-green-600 text-white' : 'bg-green-50 text-green-700 hover:bg-green-100'}`}
+              >
+                Published
+              </button>
+              <button
+                type="button"
+                onClick={() => setFilterStatus('Draft')}
+                className={`flex-1 py-1 text-[11px] font-bold rounded ${filterStatus === 'Draft' ? 'bg-yellow-500 text-white' : 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100'}`}
+              >
+                Drafts
+              </button>
+            </div>
+          </div>
+
           {loading ? (
             <div className="text-sm text-gray-500 text-center py-6">Loading...</div>
-          ) : announcements.length === 0 ? (
-            <div className="text-sm text-gray-500 text-center py-6">No announcements yet.</div>
+          ) : filteredAnnouncements.length === 0 ? (
+            <div className="text-sm text-gray-500 text-center py-6">No matching announcements.</div>
           ) : (
             <div className="space-y-3">
-              {announcements.map(announcement => (
+              {filteredAnnouncements.map(announcement => (
                 <div key={announcement.id} className="border border-gray-100 rounded-lg p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">

@@ -71,6 +71,7 @@ export default function MainLayout() {
           { name: 'Subjects', path: '/dashboard/admin/subjects', icon: Library },
           { name: 'Teachers', path: '/dashboard/admin/teachers', icon: Users },
           { name: 'Students', path: '/dashboard/admin/students', icon: GraduationCap },
+          { name: 'Parents', path: '/dashboard/admin/parents', icon: UserCog },
           { name: 'Invite Links', path: '/dashboard/admin/invite-links', icon: Share2 },
           { name: 'Scheme of Work', path: '/dashboard/teacher/schemes', icon: Layers },
           { name: 'Report Cards', path: '/dashboard/reports/card', icon: FolderOpen },

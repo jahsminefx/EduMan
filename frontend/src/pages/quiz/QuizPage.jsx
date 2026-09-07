@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { HelpCircle, Plus, Clock, CheckCircle, Trash2, Send, XCircle, Eye, ArrowLeft, Award } from 'lucide-react';
+import { HelpCircle, Plus, Clock, CheckCircle, Trash2, Send, XCircle, Eye, ArrowLeft, Award, Search, Filter, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import API_URL from '../../config/api';
 
@@ -14,11 +14,29 @@ export default function QuizPage() {
   const [answers, setAnswers] = useState({});
   const [reviewData, setReviewData] = useState(null); // quiz review data
 
+  // Filters state
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterClass, setFilterClass] = useState('');
+  const [filterSubject, setFilterSubject] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+
   // Create form
   const [classes, setClasses] = useState([]);
   const [subjects, setSubjects] = useState([]);
   const [form, setForm] = useState({ class_id: '', subject_id: '', title: '', duration_minutes: 30 });
   const [questions, setQuestions] = useState([{ question_text: '', options: ['', '', '', ''], correct_option_index: 0 }]);
+
+  const filteredQuizzes = quizzes.filter(q => {
+    const term = searchTerm.toLowerCase();
+    const matchesSearch = (q.title || '').toLowerCase().includes(term);
+    const matchesClass = !filterClass || String(q.class_id) === String(filterClass);
+    const matchesSubject = !filterSubject || String(q.subject_id) === String(filterSubject);
+    const matchesStatus = !filterStatus ||
+      (filterStatus === 'attempted' && q.attempted) ||
+      (filterStatus === 'unattempted' && !q.attempted);
+
+    return matchesSearch && matchesClass && matchesSubject && matchesStatus;
+  });
 
   useEffect(() => { fetchData(); }, []);
 
@@ -264,6 +282,74 @@ export default function QuizPage() {
         )}
       </div>
 
+      {/* Filter Controls Bar */}
+      <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <div className="relative flex-1">
+          <Search className="w-3.5 h-3.5 text-gray-400 absolute left-3 top-3" />
+          <input
+            type="text"
+            placeholder="Search quiz title..."
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-gray-500 uppercase tracking-wider">
+            <Filter className="w-4 h-4 text-green-600" /> Filters:
+          </div>
+
+          <select
+            value={filterClass}
+            onChange={(e) => setFilterClass(e.target.value)}
+            className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
+          >
+            <option value="">All Classes</option>
+            {classes.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+
+          <select
+            value={filterSubject}
+            onChange={(e) => setFilterSubject(e.target.value)}
+            className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
+          >
+            <option value="">All Subjects</option>
+            {subjects.map(s => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+
+          {user.role === 'Student' && (
+            <select
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-green-500"
+            >
+              <option value="">All Statuses</option>
+              <option value="attempted">Attempted</option>
+              <option value="unattempted">Pending / Unattempted</option>
+            </select>
+          )}
+
+          {(filterClass || filterSubject || filterStatus || searchTerm) && (
+            <button
+              onClick={() => {
+                setFilterClass('');
+                setFilterSubject('');
+                setFilterStatus('');
+                setSearchTerm('');
+              }}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg transition"
+            >
+              <X className="w-3.5 h-3.5" /> Reset
+            </button>
+          )}
+        </div>
+      </div>
+
       {message && (
         <div className={`p-4 rounded-lg text-sm font-medium ${message.includes('Score') || message.includes('created') ? 'bg-green-50 text-green-800' : 'bg-red-50 text-red-800'}`}>{message}</div>
       )}
@@ -308,11 +394,11 @@ export default function QuizPage() {
 
       {loading ? (
         <div className="p-8 text-center text-gray-500">Loading quizzes...</div>
-      ) : quizzes.length === 0 ? (
-        <div className="p-8 text-center text-gray-500 bg-white rounded-xl border shadow-sm">No quizzes found.</div>
+      ) : filteredQuizzes.length === 0 ? (
+        <div className="p-8 text-center text-gray-500 bg-white rounded-xl border shadow-sm">No quizzes match your filter criteria.</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-          {quizzes.map(q => (
+          {filteredQuizzes.map(q => (
             <div key={q.id} className="bg-white rounded-xl border border-gray-100 shadow-sm p-5 hover:shadow-md transition">
               <div className="flex justify-between items-start">
                 <div>

@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import axios from 'axios';
-import { Download, ExternalLink, Eye, FileText, Image as ImageIcon, Library, Sparkles, Trash2, Upload, Video, X } from 'lucide-react';
+import { Download, ExternalLink, Eye, FileText, Image as ImageIcon, Library, Sparkles, Trash2, Upload, Video, X, Search, Filter } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { API_URL } from '../../config/api';
 import { displayLabel, downloadProtected } from '../ai/aiUtils';
@@ -55,10 +55,29 @@ export default function ContentLibrary() {
   const [loading, setLoading] = useState(true);
   const [message, setMessage] = useState('');
   const [filterType, setFilterType] = useState('');
+  const [filterClass, setFilterClass] = useState('');
+  const [filterSubject, setFilterSubject] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [form, setForm] = useState(emptyForm);
   const [file, setFile] = useState(null);
   const [classes, setClasses] = useState([]);
   const [subjects, setSubjects] = useState([]);
+
+  const filteredContents = contents.filter(c => {
+    const q = searchTerm.toLowerCase();
+    const matchesSearch = (c.title || '').toLowerCase().includes(q) || (c.description || '').toLowerCase().includes(q);
+    const matchesClass = !filterClass || String(c.class_id) === String(filterClass);
+    const matchesSubject = !filterSubject || String(c.subject_id) === String(filterSubject);
+    return matchesSearch && matchesClass && matchesSubject;
+  });
+
+  const filteredAiResources = aiResources.filter(r => {
+    const q = searchTerm.toLowerCase();
+    const matchesSearch = (r.title || '').toLowerCase().includes(q) || (r.description || '').toLowerCase().includes(q);
+    const matchesClass = !filterClass || String(r.class_id) === String(filterClass);
+    const matchesSubject = !filterSubject || String(r.subject_id) === String(filterSubject);
+    return matchesSearch && matchesClass && matchesSubject;
+  });
 
   const selectedType = useMemo(() => getContentType(form.type), [form.type]);
 
@@ -183,24 +202,75 @@ export default function ContentLibrary() {
         )}
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <button
-          onClick={() => setFilterType('')}
-          className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${filterType === '' ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
-        >
-          <Library className="w-4 h-4" />
-          All
-        </button>
-        {contentTypes.map((type) => (
+      <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4">
+        <div className="flex flex-wrap items-center gap-2">
           <button
-            key={type.value}
-            onClick={() => setFilterType(type.value)}
-            className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium transition ${filterType === type.value ? 'bg-blue-50 text-blue-700 border border-blue-200' : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'}`}
+            onClick={() => setFilterType('')}
+            className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${filterType === '' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
           >
-            {React.createElement(type.Icon, { className: 'w-4 h-4' })}
-            {type.label}
+            <Library className="w-3.5 h-3.5" />
+            All Types
           </button>
-        ))}
+          {contentTypes.map((type) => (
+            <button
+              key={type.value}
+              onClick={() => setFilterType(type.value)}
+              className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-lg text-xs font-semibold transition ${filterType === type.value ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200'}`}
+            >
+              {React.createElement(type.Icon, { className: 'w-3.5 h-3.5' })}
+              {type.label}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative flex-1 sm:w-48">
+            <Search className="w-3.5 h-3.5 text-gray-400 absolute left-2.5 top-2.5" />
+            <input
+              type="text"
+              placeholder="Search content..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="w-full pl-8 pr-3 py-1.5 text-xs border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          <select
+            value={filterClass}
+            onChange={(e) => setFilterClass(e.target.value)}
+            className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All Classes</option>
+            {classes.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+
+          <select
+            value={filterSubject}
+            onChange={(e) => setFilterSubject(e.target.value)}
+            className="border border-gray-300 rounded-lg px-2.5 py-1.5 text-xs font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All Subjects</option>
+            {subjects.map(s => (
+              <option key={s.id} value={s.id}>{s.name}</option>
+            ))}
+          </select>
+
+          {(filterType || filterClass || filterSubject || searchTerm) && (
+            <button
+              onClick={() => {
+                setFilterType('');
+                setFilterClass('');
+                setFilterSubject('');
+                setSearchTerm('');
+              }}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-lg transition"
+            >
+              <X className="w-3.5 h-3.5" /> Reset
+            </button>
+          )}
+        </div>
       </div>
 
       {message && (
@@ -220,38 +290,38 @@ export default function ContentLibrary() {
               ))}
             </select>
             <select value={form.class_id} onChange={e => setForm({ ...form, class_id: e.target.value })} className="border rounded-md p-2">
-              <option value="">All Classes</option>
-              {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+              <option value="">Select Class (Optional)</option>
+              {classes.map(cls => (
+                <option key={cls.id} value={cls.id}>{cls.name}</option>
+              ))}
             </select>
             <select value={form.subject_id} onChange={e => setForm({ ...form, subject_id: e.target.value })} className="border rounded-md p-2">
-              <option value="">All Subjects</option>
-              {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              <option value="">Select Subject (Optional)</option>
+              {subjects.map(sub => (
+                <option key={sub.id} value={sub.id}>{sub.name}</option>
+              ))}
             </select>
           </div>
-          <textarea placeholder="Description" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="border rounded-md p-2 w-full" rows={2} />
-          <div className="flex flex-wrap items-center gap-4">
-            <label className="inline-flex items-center gap-2 cursor-pointer text-sm text-blue-600 hover:text-blue-700">
-              <Upload className="w-4 h-4" />
-              Choose File
-              <input type="file" accept={selectedType.accept} className="hidden" onChange={e => setFile(e.target.files?.[0] || null)} />
-            </label>
-            {file && <span className="text-sm text-gray-500 break-all">{file.name}</span>}
+          <textarea placeholder="Description" value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="w-full border rounded-md p-2 h-24" />
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Select File ({selectedType.label})</label>
+            <input type="file" accept={selectedType.accept} onChange={e => setFile(e.target.files[0])} className="border rounded-md p-2 w-full text-sm" required />
           </div>
-          <button type="submit" className="inline-flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition font-medium text-sm">
+          <button type="submit" className="inline-flex items-center px-4 py-2 bg-blue-600 text-white rounded-md font-medium text-sm hover:bg-blue-700">
             <Upload className="w-4 h-4 mr-2" />
             Upload
           </button>
         </form>
       )}
 
-      {(!filterType || filterType === 'document') && aiResources.length > 0 && (
+      {(!filterType || filterType === 'document') && filteredAiResources.length > 0 && (
         <section className="space-y-4">
           <div>
             <h3 className="flex items-center gap-2 text-lg font-bold text-gray-900"><Sparkles className="h-5 w-5 text-violet-600" /> EduMan AI Learning Content</h3>
             <p className="mt-1 text-sm text-gray-500">Teacher-reviewed documents published for your class.</p>
           </div>
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {aiResources.map(resource => (
+            {filteredAiResources.map(resource => (
               <div key={`ai-${resource.id}`} className="rounded-lg border border-violet-100 bg-white p-5 shadow-sm transition hover:shadow-md">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0">
@@ -279,11 +349,11 @@ export default function ContentLibrary() {
 
       {loading ? (
         <div className="p-8 text-center text-gray-500">Loading library...</div>
-      ) : contents.length === 0 && aiResources.length === 0 ? (
-        <div className="p-8 text-center text-gray-500 bg-white rounded-lg border shadow-sm">No content found.</div>
-      ) : contents.length > 0 ? (
+      ) : filteredContents.length === 0 && filteredAiResources.length === 0 ? (
+        <div className="p-8 text-center text-gray-500 bg-white rounded-lg border shadow-sm">No matching content found.</div>
+      ) : filteredContents.length > 0 ? (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {contents.map(content => {
+          {filteredContents.map(content => {
             const meta = getContentType(content.type);
             const fileUrl = mediaUrl(content.file_path);
             const isImage = meta.value === 'image';

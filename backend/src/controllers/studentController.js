@@ -178,13 +178,15 @@ exports.createStudent = async (req, res) => {
         const db = getDB();
         
         const normalizedGender = normalizeGender(gender);
-        if (!admission_number || !first_name || !last_name || !email) {
-            return res.status(400).json({ error: 'Validation Error', message: 'Missing required fields (admission_number, name, email)' });
+        if (!admission_number || !first_name || !last_name) {
+            return res.status(400).json({ error: 'Validation Error', message: 'Missing required fields (admission_number, first_name, last_name).' });
         }
         if (!VALID_GENDERS.has(normalizedGender)) {
             return res.status(400).json({ error: 'Validation Error', message: 'Please select a valid gender.' });
         }
-        if (!isValidEmail(email)) {
+
+        const cleanEmail = email ? String(email).trim().toLowerCase() : '';
+        if (cleanEmail && !isValidEmail(cleanEmail)) {
             return res.status(400).json({ error: 'Validation Error', message: 'Please enter a valid email address.' });
         }
 
@@ -194,28 +196,35 @@ exports.createStudent = async (req, res) => {
             [school_id, admission_number]
         );
         if (existingAdmission) {
-            return res.status(400).json({ error: 'Duplicate', message: 'Admission number already exists.' });
+            return res.status(400).json({ error: 'Duplicate', message: 'Admission number already exists in this school.' });
         }
 
-        const existingEmail = await db.get('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [email]);
-        if (existingEmail) {
-            return res.status(400).json({ error: 'Duplicate', message: 'Student email already exists.' });
+        if (cleanEmail) {
+            const existingEmail = await db.get('SELECT id FROM users WHERE LOWER(email) = LOWER($1)', [cleanEmail]);
+            if (existingEmail) {
+                return res.status(400).json({ error: 'Duplicate', message: 'Student email already exists.' });
+            }
         }
 
         let createdParentUserId = null;
         let rawParentToken = null;
-        const { rawToken: rawStudentToken, tokenHash: studentTokenHash } = generateSetupToken();
+        let user_id = null;
+        let rawStudentToken = null;
 
         const result = await db.transaction(async (client) => {
-            // 1. Create Student User record for login with hashed setup_token
-            const password_hash = await bcrypt.hash(password || crypto.randomBytes(16).toString('hex'), 10);
-            const userResult = await client.run(
-                `INSERT INTO users (name, email, password_hash, role, setup_token, setup_token_expires) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP + INTERVAL '7 days') RETURNING id`,
-                [`${first_name} ${last_name}`, email, password_hash, 'Student', studentTokenHash]
-            );
-            const user_id = userResult.lastID;
+            // 1. Create Student User record for login ONLY if email is provided
+            if (cleanEmail) {
+                const tokenObj = generateSetupToken();
+                rawStudentToken = tokenObj.rawToken;
+                const password_hash = await bcrypt.hash(password || crypto.randomBytes(16).toString('hex'), 10);
+                const userResult = await client.run(
+                    `INSERT INTO users (name, email, password_hash, role, setup_token, setup_token_expires) VALUES ($1, $2, $3, $4, $5, CURRENT_TIMESTAMP + INTERVAL '7 days') RETURNING id`,
+                    [`${first_name} ${last_name}`, cleanEmail, password_hash, 'Student', tokenObj.tokenHash]
+                );
+                user_id = userResult.lastID;
+            }
 
-            // 2. Create Student record linked to User
+            // 2. Create Student record (user_id will be NULL if no email/account)
             const finalParentName = parent_name || (parent_action === 'CREATE_NEW' ? parent_name : '');
             const finalParentPhone = parent_phone || '';
             const studentResult = await client.run(
@@ -288,15 +297,17 @@ exports.createStudent = async (req, res) => {
             });
         }
 
-        // Send welcome email with setup_token invitation link using RAW token
+        // Send welcome email with setup_token invitation link using RAW token ONLY if email is provided
         const schoolObj = await db.get('SELECT name FROM schools WHERE id = $1', [school_id]);
-        sendWelcomeEmail({
-            email,
-            name: `${first_name} ${last_name}`,
-            role: 'Student',
-            schoolName: schoolObj?.name || 'EduMan School',
-            token: rawStudentToken
-        }).catch(() => {});
+        if (cleanEmail && rawStudentToken) {
+            sendWelcomeEmail({
+                email: cleanEmail,
+                name: `${first_name} ${last_name}`,
+                role: 'Student',
+                schoolName: schoolObj?.name || 'EduMan School',
+                token: rawStudentToken
+            }).catch(() => {});
+        }
 
         if (rawParentToken && parent_email) {
             sendWelcomeEmail({
@@ -360,7 +371,7 @@ exports.bulkUploadStudents = async (req, res) => {
     try {
         const db = getDB();
         const school_id = req.user.school_id;
-        const requiredHeaders = ['studentId', 'name', 'email', 'gender', 'class', 'age', 'guardianName', 'guardianPhone'];
+        const requiredHeaders = ['studentId', 'name', 'gender', 'class'];
         const { headers, rows } = parseCsv(req.file.buffer);
         const missingHeaders = requiredHeaders.filter(header => !headers.includes(header));
 
@@ -385,12 +396,12 @@ exports.bulkUploadStudents = async (req, res) => {
             const email = cleanString(row.email).toLowerCase();
             const gender = normalizeGender(row.gender);
             const className = cleanString(row.class);
-            const age = Number(cleanString(row.age));
+            const age = row.age ? Number(cleanString(row.age)) : null;
             const guardianName = cleanString(row.guardianName);
             const guardianPhone = cleanString(row.guardianPhone);
 
-            if (!studentId || !fullName || !email || !gender || !className || !row.age || !guardianName || !guardianPhone) {
-                rowErrors.push(`Row ${rowNumber}: studentId, name, email, gender, class, age, guardianName, and guardianPhone are required.`);
+            if (!studentId || !fullName || !gender || !className) {
+                rowErrors.push(`Row ${rowNumber}: studentId, name, gender, and class are required.`);
                 continue;
             }
 
@@ -398,11 +409,11 @@ exports.bulkUploadStudents = async (req, res) => {
                 rowErrors.push(`Row ${rowNumber}: gender must be Male, Female, or Other.`);
             }
 
-            if (!isValidEmail(email)) {
-                rowErrors.push(`Row ${rowNumber}: email is invalid.`);
+            if (email && !isValidEmail(email)) {
+                rowErrors.push(`Row ${rowNumber}: email "${email}" is invalid.`);
             }
 
-            if (!Number.isInteger(age) || age < 1 || age > 120) {
+            if (age !== null && (!Number.isInteger(age) || age < 1 || age > 120)) {
                 rowErrors.push(`Row ${rowNumber}: age must be a whole number between 1 and 120.`);
             }
 
@@ -418,10 +429,12 @@ exports.bulkUploadStudents = async (req, res) => {
                 seenStudentIds.set(studentKey, rowNumber);
             }
 
-            if (seenEmails.has(email)) {
-                rowErrors.push(`Row ${rowNumber}: duplicate email also appears on row ${seenEmails.get(email)}.`);
-            } else {
-                seenEmails.set(email, rowNumber);
+            if (email) {
+                if (seenEmails.has(email)) {
+                    rowErrors.push(`Row ${rowNumber}: duplicate email also appears on row ${seenEmails.get(email)}.`);
+                } else {
+                    seenEmails.set(email, rowNumber);
+                }
             }
 
             const { first_name, last_name } = splitName(fullName);
@@ -430,12 +443,12 @@ exports.bulkUploadStudents = async (req, res) => {
                 admission_number: studentId,
                 first_name,
                 last_name,
-                email,
+                email: email || '',
                 gender,
                 class_id: classRecord?.id,
                 age,
-                parent_name: guardianName,
-                parent_phone: guardianPhone,
+                parent_name: guardianName || '',
+                parent_phone: guardianPhone || '',
                 password: `${studentId}@123`
             });
         }
@@ -446,9 +459,8 @@ exports.bulkUploadStudents = async (req, res) => {
 
         if (normalizedRows.length > 0) {
             const ids = normalizedRows.map(row => row.admission_number.toLowerCase());
-            const emails = normalizedRows.map(row => row.email.toLowerCase());
+            const emails = normalizedRows.map(row => row.email.toLowerCase()).filter(Boolean);
             const idPlaceholders = ids.map((_, index) => `$${index + 2}`).join(', ');
-            const emailPlaceholders = emails.map((_, index) => `$${index + 1}`).join(', ');
 
             const existingIds = await db.all(
                 `SELECT admission_number FROM students WHERE school_id = $1 AND LOWER(admission_number) IN (${idPlaceholders})`,
@@ -458,12 +470,15 @@ exports.bulkUploadStudents = async (req, res) => {
                 rowErrors.push(`Student ID "${item.admission_number}" already exists in this school.`);
             }
 
-            const existingEmails = await db.all(
-                `SELECT email FROM users WHERE LOWER(email) IN (${emailPlaceholders})`,
-                emails
-            );
-            for (const item of existingEmails) {
-                rowErrors.push(`Email "${item.email}" already exists.`);
+            if (emails.length > 0) {
+                const emailPlaceholders = emails.map((_, index) => `$${index + 1}`).join(', ');
+                const existingEmails = await db.all(
+                    `SELECT email FROM users WHERE LOWER(email) IN (${emailPlaceholders})`,
+                    emails
+                );
+                for (const item of existingEmails) {
+                    rowErrors.push(`Email "${item.email}" already exists.`);
+                }
             }
         }
 
@@ -477,16 +492,21 @@ exports.bulkUploadStudents = async (req, res) => {
 
         await db.transaction(async (client) => {
             for (const row of normalizedRows) {
-                const password_hash = await bcrypt.hash(row.password, 10);
-                const userResult = await client.run(
-                    'INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id',
-                    [`${row.first_name} ${row.last_name}`.trim(), row.email, password_hash, 'Student']
-                );
+                let user_id = null;
+                if (row.email) {
+                    const password_hash = await bcrypt.hash(row.password, 10);
+                    const userResult = await client.run(
+                        'INSERT INTO users (name, email, password_hash, role) VALUES ($1, $2, $3, $4) RETURNING id',
+                        [`${row.first_name} ${row.last_name}`.trim(), row.email, password_hash, 'Student']
+                    );
+                    user_id = userResult.lastID;
+                }
+
                 await client.run(
                     `INSERT INTO students (user_id, school_id, admission_number, first_name, last_name, gender, age, class_id, parent_name, parent_phone)
                      VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
                     [
-                        userResult.lastID,
+                        user_id,
                         school_id,
                         row.admission_number,
                         row.first_name,
@@ -500,6 +520,7 @@ exports.bulkUploadStudents = async (req, res) => {
                 );
             }
         });
+
 
         res.json({
             message: `${normalizedRows.length} student${normalizedRows.length === 1 ? '' : 's'} imported successfully. Default password format is studentId@123.`,
@@ -523,6 +544,159 @@ exports.deleteStudent = async (req, res) => {
         }
         
         res.json({ message: 'Student deleted successfully' });
+    } catch (err) {
+        res.status(500).json({ error: 'Server Error', message: err.message });
+    }
+};
+
+// SchoolAdmin: Get all parents associated with the school
+exports.getParents = async (req, res) => {
+    const school_id = req.user.school_id;
+    if (!school_id) {
+        return res.status(400).json({ error: 'Bad Request', message: 'User has no associated school' });
+    }
+
+    try {
+        const db = getDB();
+        // Fetch all users with role = 'Parent' linked to students in this school OR registered via invite link
+        const parents = await db.all(`
+            SELECT DISTINCT 
+                u.id, 
+                u.name, 
+                u.email, 
+                u.is_active, 
+                u.created_at
+            FROM users u
+            LEFT JOIN parent_student_links psl ON u.id = psl.parent_user_id
+            LEFT JOIN students s ON psl.student_id = s.id
+            WHERE u.role = 'Parent'
+              AND (
+                s.school_id = $1 
+                OR u.id IN (
+                    SELECT psl2.parent_user_id 
+                    FROM parent_student_links psl2 
+                    JOIN students s2 ON psl2.student_id = s2.id 
+                    WHERE s2.school_id = $1
+                )
+              )
+            ORDER BY u.name ASC
+        `, [school_id]);
+
+        // Also fetch all parent-student links for this school to populate children
+        const links = await db.all(`
+            SELECT 
+                psl.id as link_id,
+                psl.parent_user_id,
+                s.id as student_id,
+                s.first_name,
+                s.last_name,
+                s.admission_number,
+                c.name as class_name,
+                c.level as class_level
+            FROM parent_student_links psl
+            JOIN students s ON psl.student_id = s.id
+            LEFT JOIN classes c ON s.class_id = c.id
+            WHERE s.school_id = $1
+        `, [school_id]);
+
+        // Map children to parent records
+        const parentsWithChildren = parents.map(parent => {
+            const children = links
+                .filter(l => l.parent_user_id === parent.id)
+                .map(l => ({
+                    link_id: l.link_id,
+                    student_id: l.student_id,
+                    first_name: l.first_name,
+                    last_name: l.last_name,
+                    full_name: `${l.first_name} ${l.last_name}`,
+                    admission_number: l.admission_number,
+                    class_name: l.class_name,
+                    class_level: l.class_level
+                }));
+
+            return {
+                ...parent,
+                children
+            };
+        });
+
+        res.json({ parents: parentsWithChildren });
+    } catch (err) {
+        res.status(500).json({ error: 'Server Error', message: err.message });
+    }
+};
+
+// SchoolAdmin: Manually link a parent user to a student
+exports.linkParentToStudent = async (req, res) => {
+    const school_id = req.user.school_id;
+    const { parent_user_id, student_id, admission_number } = req.body;
+
+    if (!parent_user_id) {
+        return res.status(400).json({ error: 'Validation Error', message: 'Parent user ID is required.' });
+    }
+
+    try {
+        const db = getDB();
+
+        // 1. Verify parent user exists and has Parent role
+        const parentUser = await db.get("SELECT id, name, role FROM users WHERE id = $1 AND role = 'Parent'", [parent_user_id]);
+        if (!parentUser) {
+            return res.status(404).json({ error: 'Not Found', message: 'Parent user account not found.' });
+        }
+
+        // 2. Find target student by ID or admission_number in this school
+        let targetStudent = null;
+        if (student_id) {
+            targetStudent = await db.get("SELECT id, first_name, last_name, admission_number FROM students WHERE id = $1 AND school_id = $2", [student_id, school_id]);
+        } else if (admission_number) {
+            targetStudent = await db.get("SELECT id, first_name, last_name, admission_number FROM students WHERE LOWER(admission_number) = LOWER($1) AND school_id = $2", [admission_number.trim(), school_id]);
+        }
+
+        if (!targetStudent) {
+            return res.status(404).json({ error: 'Not Found', message: 'Student not found in your school.' });
+        }
+
+        // 3. Check if link already exists
+        const existingLink = await db.get("SELECT id FROM parent_student_links WHERE parent_user_id = $1 AND student_id = $2", [parent_user_id, targetStudent.id]);
+        if (existingLink) {
+            return res.status(400).json({ error: 'Duplicate Link', message: `${parentUser.name} is already linked to ${targetStudent.first_name} ${targetStudent.last_name}.` });
+        }
+
+        // 4. Create link
+        const result = await db.run("INSERT INTO parent_student_links (parent_user_id, student_id) VALUES ($1, $2) RETURNING id", [parent_user_id, targetStudent.id]);
+
+        res.status(201).json({
+            message: `Successfully linked ${parentUser.name} to ${targetStudent.first_name} ${targetStudent.last_name}.`,
+            linkId: result.lastID
+        });
+    } catch (err) {
+        res.status(500).json({ error: 'Server Error', message: err.message });
+    }
+};
+
+// SchoolAdmin: Unlink a parent user from a student
+exports.unlinkParentFromStudent = async (req, res) => {
+    const school_id = req.user.school_id;
+    const { linkId } = req.params;
+
+    try {
+        const db = getDB();
+
+        // Verify link belongs to a student in this school
+        const link = await db.get(`
+            SELECT psl.id 
+            FROM parent_student_links psl
+            JOIN students s ON psl.student_id = s.id
+            WHERE psl.id = $1 AND s.school_id = $2
+        `, [linkId, school_id]);
+
+        if (!link) {
+            return res.status(404).json({ error: 'Not Found', message: 'Parent-student link not found for your school.' });
+        }
+
+        await db.run("DELETE FROM parent_student_links WHERE id = $1", [linkId]);
+
+        res.json({ message: 'Parent-student link removed successfully.' });
     } catch (err) {
         res.status(500).json({ error: 'Server Error', message: err.message });
     }

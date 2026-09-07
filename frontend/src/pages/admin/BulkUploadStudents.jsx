@@ -115,14 +115,14 @@ export default function BulkUploadStudents() {
               />
             </div>
             <p className="text-[11px] sm:text-xs text-gray-500 max-w-xl">
-              Required columns: studentId, name, email, gender, class, age, guardianName, guardianPhone.
+              Required columns: studentId, name, gender, class. Optional columns: email (for students with phones), age, guardianName, guardianPhone.
               Class names must already exist in EduMan.
             </p>
           </div>
         </div>
 
         <div className="bg-blue-50 border border-blue-100 rounded-xl p-3.5 text-xs sm:text-sm text-blue-900">
-          Imported students receive login accounts automatically. The default password format is <span className="font-bold">studentId@123</span>.
+          📄 <strong>Roster-Only Support:</strong> If <span className="font-semibold">email</span> is omitted in the CSV, students are added in Roster-Only mode for attendance, grading, and printed report cards without creating a phone login account. If email is provided, a digital account is created with default password <span className="font-bold">studentId@123</span>.
         </div>
 
         <div className="flex justify-end">

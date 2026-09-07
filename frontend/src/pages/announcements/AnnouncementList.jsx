@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import axios from 'axios';
-import { Megaphone, ArrowRight, Plus, Image as ImageIcon } from 'lucide-react';
+import { Megaphone, ArrowRight, Plus, Image as ImageIcon, Search, X } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import API_URL from '../../config/api';
 import { mediaUrl } from '../../utils/media';
@@ -25,6 +25,7 @@ export default function AnnouncementList() {
   const [announcements, setAnnouncements] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
 
   const canManage = ['SchoolAdmin', 'Teacher'].includes(user.role);
 
@@ -48,6 +49,11 @@ export default function AnnouncementList() {
     }
   };
 
+  const filteredAnnouncements = announcements.filter(a => {
+    const q = searchTerm.toLowerCase();
+    return (a.title || '').toLowerCase().includes(q) || (a.content || '').toLowerCase().includes(q);
+  });
+
   return (
     <div className="space-y-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
@@ -69,6 +75,28 @@ export default function AnnouncementList() {
         )}
       </div>
 
+      {/* Search Bar */}
+      <div className="bg-white p-4 rounded-xl border border-gray-100 shadow-xs flex items-center justify-between gap-3">
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search announcements by title or content..."
+            className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+          />
+        </div>
+        {searchTerm && (
+          <button
+            onClick={() => setSearchTerm('')}
+            className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-3 py-2 rounded-lg transition"
+          >
+            <X className="w-3.5 h-3.5" /> Clear
+          </button>
+        )}
+      </div>
+
       {error && (
         <div className="p-4 bg-red-50 text-red-800 rounded-lg border border-red-100 text-sm font-medium">
           {error}
@@ -79,17 +107,17 @@ export default function AnnouncementList() {
         <div className="p-8 text-center text-gray-500 bg-white rounded-xl border border-gray-100 shadow-sm">
           Loading announcements...
         </div>
-      ) : announcements.length === 0 ? (
+      ) : filteredAnnouncements.length === 0 ? (
         <div className="bg-white border border-dashed border-gray-200 rounded-xl p-10 text-center shadow-sm">
           <div className="mx-auto w-12 h-12 rounded-full bg-blue-50 flex items-center justify-center mb-4">
             <Megaphone className="w-6 h-6 text-blue-600" />
           </div>
-          <h3 className="text-lg font-bold text-gray-900">No Announcements</h3>
-          <p className="text-sm text-gray-500 mt-2">Published announcements will appear here.</p>
+          <h3 className="text-lg font-bold text-gray-900">No Announcements Found</h3>
+          <p className="text-sm text-gray-500 mt-2">No announcements match your search criteria.</p>
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-5">
-          {announcements.map((announcement) => (
+          {filteredAnnouncements.map((announcement) => (
             <article key={announcement.id} className="bg-white border border-gray-100 rounded-xl shadow-sm overflow-hidden flex flex-col">
               <div className="h-40 bg-gray-100">
                 {announcement.featured_image || announcement.attachment_type === 'image' ? (

@@ -3,13 +3,14 @@ import axios from 'axios';
 import API_URL from '../../config/api';
 import {
   Building2, Plus, Search, Edit3, X, Check, Users, GraduationCap,
-  ChevronDown, ChevronUp, AlertCircle, Loader2
+  ChevronDown, ChevronUp, AlertCircle, Loader2, Filter
 } from 'lucide-react';
 
 export default function SchoolsList() {
   const [schools, setSchools] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [editingSchool, setEditingSchool] = useState(null);
   const [expandedId, setExpandedId] = useState(null);
@@ -17,6 +18,13 @@ export default function SchoolsList() {
   const [form, setForm] = useState({ name: '', address: '', phone: '', email: '', is_active: 1 });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+
+  const filteredSchools = schools.filter(s => {
+    const matchesStatus = !filterStatus ||
+      (filterStatus === '1' && Number(s.is_active) === 1) ||
+      (filterStatus === '0' && Number(s.is_active) === 0);
+    return matchesStatus;
+  });
 
   const fetchSchools = async () => {
     setLoading(true);
@@ -104,23 +112,52 @@ export default function SchoolsList() {
         </button>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-md w-full">
-        <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-        <input
-          id="search-schools"
-          type="text"
-          placeholder="Search schools by name or email..."
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
-        />
+      {/* Search & Filter Bar */}
+      <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3">
+        <div className="relative flex-1">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+          <input
+            id="search-schools"
+            type="text"
+            placeholder="Search schools by name or email..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-10 pr-4 py-2 border border-gray-200 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent outline-none transition-all"
+          />
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-gray-500 uppercase tracking-wider">
+            <Filter className="w-4 h-4 text-indigo-600" /> Status:
+          </div>
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="border border-gray-200 rounded-xl px-3 py-2 text-xs font-semibold text-gray-700 bg-white focus:ring-2 focus:ring-indigo-500 outline-none"
+          >
+            <option value="">All Statuses</option>
+            <option value="1">Active</option>
+            <option value="0">Inactive</option>
+          </select>
+
+          {(filterStatus || search) && (
+            <button
+              onClick={() => {
+                setFilterStatus('');
+                setSearch('');
+              }}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-2 rounded-xl transition"
+            >
+              <X className="w-3.5 h-3.5" /> Reset
+            </button>
+          )}
+        </div>
       </div>
 
       {/* Table */}
       {loading ? (
         <div className="flex justify-center py-20"><Loader2 className="w-8 h-8 text-indigo-500 animate-spin" /></div>
-      ) : schools.length === 0 ? (
+      ) : filteredSchools.length === 0 ? (
         <div className="text-center py-20 text-gray-400 bg-white rounded-2xl border border-gray-100 p-8">
           <Building2 className="w-12 h-12 mx-auto mb-4 opacity-30" />
           <p className="text-base sm:text-lg font-bold">No schools found</p>
@@ -141,7 +178,7 @@ export default function SchoolsList() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-50">
-                {schools.map((s) => (
+                {filteredSchools.map((s) => (
                   <React.Fragment key={s.id}>
                     <tr className="hover:bg-gray-50/50 transition-colors cursor-pointer" onClick={() => toggleExpand(s.id)}>
                       <td className="px-4 sm:px-6 py-4">

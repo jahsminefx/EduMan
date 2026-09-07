@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import axios from 'axios';
-import { Plus, Edit2, Trash2, BookMarked, Check, UserPlus, Users } from 'lucide-react';
+import { Plus, Edit2, Trash2, BookMarked, Check, UserPlus, Users, Filter, X } from 'lucide-react';
 import API_URL from '../../config/api';
 
 export default function SubjectsList() {
@@ -24,11 +24,21 @@ export default function SubjectsList() {
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
   const [searchTerm, setSearchTerm] = useState('');
+  const [filterClass, setFilterClass] = useState('');
+  const [filterTeacher, setFilterTeacher] = useState('');
 
-  const filteredSubjects = subjects.filter(s => 
-    s.name.toLowerCase().includes(searchTerm.toLowerCase()) || 
-    (s.code || '').toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredSubjects = subjects.filter(s => {
+    const q = searchTerm.toLowerCase();
+    const matchesSearch = s.name.toLowerCase().includes(q) || (s.code || '').toLowerCase().includes(q);
+    const subClassIds = (s.classes || []).map(c => String(c.id));
+    const matchesClass = !filterClass || subClassIds.includes(String(filterClass));
+    const hasTeachers = s.teachers && s.teachers.length > 0;
+    const matchesTeacher = !filterTeacher ||
+      (filterTeacher === 'assigned' && hasTeachers) ||
+      (filterTeacher === 'unassigned' && !hasTeachers);
+
+    return matchesSearch && matchesClass && matchesTeacher;
+  });
 
   useEffect(() => {
     fetchData();
@@ -187,6 +197,54 @@ export default function SubjectsList() {
           >
             <Plus className="w-4 h-4 mr-1.5" /> Add Subject
           </button>
+        </div>
+      </div>
+
+      {/* Filter Controls Bar */}
+      <div className="bg-white p-4 rounded-2xl border border-gray-100 shadow-xs flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-3 w-full sm:w-auto">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-gray-500 uppercase tracking-wider">
+            <Filter className="w-4 h-4 text-blue-600" /> Filters:
+          </div>
+
+          {/* Class Scope Filter */}
+          <select
+            value={filterClass}
+            onChange={(e) => setFilterClass(e.target.value)}
+            className="border border-gray-300 rounded-xl px-3 py-1.5 text-xs font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All Classes</option>
+            {classes.map(c => (
+              <option key={c.id} value={c.id}>{c.name}</option>
+            ))}
+          </select>
+
+          {/* Teacher Assignment Filter */}
+          <select
+            value={filterTeacher}
+            onChange={(e) => setFilterTeacher(e.target.value)}
+            className="border border-gray-300 rounded-xl px-3 py-1.5 text-xs font-medium text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+          >
+            <option value="">All Teacher Assignments</option>
+            <option value="assigned">Teacher Assigned</option>
+            <option value="unassigned">No Teacher Assigned</option>
+          </select>
+
+          {(filterClass || filterTeacher || searchTerm) && (
+            <button
+              onClick={() => {
+                setFilterClass('');
+                setFilterTeacher('');
+                setSearchTerm('');
+              }}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-1.5 rounded-xl transition"
+            >
+              <X className="w-3.5 h-3.5" /> Reset
+            </button>
+          )}
+        </div>
+        <div className="text-xs text-gray-500 font-medium">
+          Showing <span className="font-bold text-gray-900">{filteredSubjects.length}</span> of {subjects.length} subjects
         </div>
       </div>
 

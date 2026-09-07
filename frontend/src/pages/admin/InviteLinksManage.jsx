@@ -12,7 +12,10 @@ import {
   AlertCircle, 
   XCircle,
   ExternalLink,
-  QrCode
+  QrCode,
+  Search,
+  Filter,
+  X
 } from 'lucide-react';
 import API_URL from '../../config/api';
 
@@ -23,6 +26,10 @@ export default function InviteLinksManage() {
   const [showModal, setShowModal] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
   const [createdModalLink, setCreatedModalLink] = useState(null);
+
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterRole, setFilterRole] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
 
   const [formData, setFormData] = useState({
     role: 'Student',
@@ -119,6 +126,17 @@ export default function InviteLinksManage() {
   const activeLinks = links.filter(l => l.status === 'ACTIVE').length;
   const totalRegistrations = links.reduce((acc, l) => acc + (l.used_count || 0), 0);
 
+  const filteredLinks = links.filter(l => {
+    const q = searchTerm.toLowerCase();
+    const matchesSearch = l.display_code.toLowerCase().includes(q) ||
+                          (l.class_name || '').toLowerCase().includes(q) ||
+                          (l.role || '').toLowerCase().includes(q);
+    const matchesRole = !filterRole || l.role.toLowerCase() === filterRole.toLowerCase();
+    const matchesStatus = !filterStatus || l.status.toUpperCase() === filterStatus.toUpperCase();
+
+    return matchesSearch && matchesRole && matchesStatus;
+  });
+
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
       {/* Header */}
@@ -174,29 +192,78 @@ export default function InviteLinksManage() {
         </div>
       </div>
 
+      {/* Search & Filter Bar */}
+      <div className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+        <div className="relative flex-1">
+          <Search className="w-4 h-4 text-gray-400 absolute left-3 top-3" />
+          <input
+            type="text"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+            placeholder="Search by invite code, role, or class..."
+            className="w-full pl-9 pr-4 py-2 text-sm border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+          />
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex items-center gap-1.5 text-xs font-bold text-gray-500 uppercase tracking-wider">
+            <Filter className="w-4 h-4 text-indigo-600" /> Filters:
+          </div>
+          
+          <select
+            value={filterRole}
+            onChange={(e) => setFilterRole(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-medium"
+          >
+            <option value="">All Roles</option>
+            <option value="Student">Student</option>
+            <option value="Teacher">Teacher</option>
+            <option value="Parent">Parent</option>
+          </select>
+
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="border border-gray-300 rounded-lg px-3 py-2 text-sm text-gray-700 bg-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 font-medium"
+          >
+            <option value="">All Statuses</option>
+            <option value="ACTIVE">Active</option>
+            <option value="EXPIRED">Expired</option>
+            <option value="EXHAUSTED">Exhausted</option>
+            <option value="REVOKED">Revoked</option>
+          </select>
+
+          {(filterRole || filterStatus || searchTerm) && (
+            <button
+              onClick={() => {
+                setFilterRole('');
+                setFilterStatus('');
+                setSearchTerm('');
+              }}
+              className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 hover:text-red-700 bg-red-50 hover:bg-red-100 px-2.5 py-2 rounded-lg transition"
+            >
+              <X className="w-3.5 h-3.5" /> Reset
+            </button>
+          )}
+        </div>
+      </div>
+
       {/* Links List Table */}
       <div className="bg-white rounded-xl border border-gray-200 shadow-sm overflow-hidden">
         <div className="p-5 border-b border-gray-200 flex items-center justify-between">
           <h2 className="text-base font-semibold text-gray-900">Active & Past Invitation Links</h2>
-          <span className="text-xs text-gray-500">{links.length} total generated</span>
+          <span className="text-xs text-gray-500 font-medium">Showing <span className="font-bold text-gray-900">{filteredLinks.length}</span> of {links.length} links</span>
         </div>
 
         {loading ? (
           <div className="p-8 text-center text-gray-500">Loading invitation links...</div>
-        ) : links.length === 0 ? (
+        ) : filteredLinks.length === 0 ? (
           <div className="p-12 text-center">
             <LinkIcon className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-            <h3 className="text-base font-medium text-gray-900 mb-1">No Invitation Links Created Yet</h3>
+            <h3 className="text-base font-medium text-gray-900 mb-1">No Matching Invitation Links</h3>
             <p className="text-sm text-gray-500 max-w-md mx-auto mb-4">
-              Click "Generate New Link" to create a custom sign-up URL for students or teachers.
+              Try adjusting your search query or role/status filters.
             </p>
-            <button
-              onClick={handleOpenModal}
-              className="inline-flex items-center px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-lg hover:bg-indigo-700 transition-colors gap-2"
-            >
-              <Plus className="w-4 h-4" />
-              Generate First Link
-            </button>
           </div>
         ) : (
           <div className="overflow-x-auto">
@@ -213,7 +280,7 @@ export default function InviteLinksManage() {
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200">
-                {links.map((link) => {
+                {filteredLinks.map((link) => {
                   const joinUrl = getJoinUrl(link.display_code);
                   const isCopied = copiedId === link.id;
 
