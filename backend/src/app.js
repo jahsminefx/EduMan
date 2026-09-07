@@ -81,6 +81,7 @@ const notificationRoutes = require('./routes/notificationRoutes');
 const parentRoutes = require('./routes/parentRoutes');
 const financeRoutes = require('./routes/financeRoutes');
 const schemeRoutes = require('./routes/schemeRoutes');
+const inviteLinkRoutes = require('./routes/inviteLinkRoutes');
 
 // Simple health check route
 app.get('/api/health', (req, res) => {
@@ -89,6 +90,7 @@ app.get('/api/health', (req, res) => {
 
 app.use('/api/auth/login', loginLimiter);
 app.use('/api/auth', authRoutes);
+app.use('/api/invite-links', inviteLinkRoutes);
 app.use('/api/stats', statsRoutes);
 app.use('/api/classes', classRoutes);
 app.use('/api/students', studentRoutes);

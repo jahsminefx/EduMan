@@ -292,6 +292,30 @@ function initDB(retryCount = 0) {
             } catch (patchErr) {
                 console.log('Schema patch (quiz_attempt_answers) skipped or already applied.');
             }
+            // ── School invite links table patch ──
+            try {
+                await pool.query(`
+                    CREATE TABLE IF NOT EXISTS school_invite_links (
+                        id SERIAL PRIMARY KEY,
+                        school_id INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+                        code_hash TEXT NOT NULL UNIQUE,
+                        display_code TEXT NOT NULL,
+                        role TEXT NOT NULL CHECK(role IN ('Student', 'Teacher', 'Parent')),
+                        class_id INTEGER REFERENCES classes(id) ON DELETE SET NULL,
+                        max_uses INTEGER DEFAULT 0,
+                        used_count INTEGER DEFAULT 0,
+                        expires_at TIMESTAMP,
+                        is_active INTEGER DEFAULT 1,
+                        created_by INTEGER REFERENCES users(id) ON DELETE CASCADE,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    )
+                `);
+                await pool.query("CREATE INDEX IF NOT EXISTS idx_school_invite_links_code_hash ON school_invite_links(code_hash)");
+                await pool.query("CREATE INDEX IF NOT EXISTS idx_school_invite_links_school ON school_invite_links(school_id)");
+                console.log('Schema patch (school_invite_links) applied.');
+            } catch (patchErr) {
+                console.log('Schema patch (school_invite_links) skipped or already applied.', patchErr.message);
+            }
             // EduMan AI tables and backwards-compatible quiz fields
             try {
                 await pool.query("ALTER TABLE quizzes ADD COLUMN IF NOT EXISTS generation_id INTEGER REFERENCES ai_generations(id) ON DELETE SET NULL");

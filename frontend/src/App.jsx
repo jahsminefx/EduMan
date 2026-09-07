@@ -12,12 +12,14 @@ import HomePage from './pages/public/HomePage';
 import AboutPage from './pages/public/AboutPage';
 import ContactPage from './pages/public/ContactPage';
 import SetupPasswordPage from './pages/public/SetupPasswordPage';
+import JoinSchoolPage from './pages/public/JoinSchoolPage';
 
 // Dashboard Pages
 import Dashboard from './pages/Dashboard';
 import ClassesList from './pages/admin/ClassesList';
 import StudentsList from './pages/admin/StudentsList';
 import BulkUploadStudents from './pages/admin/BulkUploadStudents';
+import InviteLinksManage from './pages/admin/InviteLinksManage';
 import TeachersList from './pages/admin/TeachersList';
 import SubjectsList from './pages/admin/SubjectsList';
 import Settings from './pages/admin/Settings';
@@ -100,6 +102,8 @@ const AppRoutes = () => {
         <Route path="/about" element={<AboutPage />} />
         <Route path="/contact" element={<ContactPage />} />
         <Route path="/setup-password" element={<SetupPasswordPage />} />
+        <Route path="/join" element={<JoinSchoolPage />} />
+        <Route path="/join/:code" element={<JoinSchoolPage />} />
       </Route>
 
       {/* Legacy login redirect */}
@@ -117,6 +121,14 @@ const AppRoutes = () => {
         <Route index element={<Dashboard />} />
         
         {/* Admin Routes */}
+        <Route 
+          path="admin/invite-links" 
+          element={
+            <ProtectedRoute allowedRoles={['SchoolAdmin']}>
+              <InviteLinksManage />
+            </ProtectedRoute>
+          } 
+        />
         <Route 
           path="admin/classes" 
           element={

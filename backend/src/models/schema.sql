@@ -647,3 +647,22 @@ CREATE INDEX IF NOT EXISTS idx_notifications_user_read ON notifications(user_id,
 CREATE INDEX IF NOT EXISTS idx_contact_inquiries_status ON contact_inquiries(status);
 CREATE INDEX IF NOT EXISTS idx_contact_inquiries_assigned ON contact_inquiries(assigned_to);
 
+-- School Invite / Self-Registration Links
+CREATE TABLE IF NOT EXISTS school_invite_links (
+    id SERIAL PRIMARY KEY,
+    school_id INTEGER NOT NULL REFERENCES schools(id) ON DELETE CASCADE,
+    code_hash TEXT NOT NULL UNIQUE,
+    display_code TEXT NOT NULL,
+    role TEXT NOT NULL CHECK(role IN ('Student', 'Teacher', 'Parent')),
+    class_id INTEGER REFERENCES classes(id) ON DELETE SET NULL,
+    max_uses INTEGER DEFAULT 0,
+    used_count INTEGER DEFAULT 0,
+    expires_at TIMESTAMP,
+    is_active INTEGER DEFAULT 1,
+    created_by INTEGER REFERENCES users(id) ON DELETE CASCADE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX IF NOT EXISTS idx_school_invite_links_code_hash ON school_invite_links(code_hash);
+CREATE INDEX IF NOT EXISTS idx_school_invite_links_school ON school_invite_links(school_id);
+

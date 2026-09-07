@@ -21,7 +21,8 @@ import {
   Sparkles,
   History,
   Bot,
-  Layers
+  Layers,
+  Share2
 } from 'lucide-react';
 import BrandLogo from '../components/BrandLogo';
 
@@ -70,6 +71,7 @@ export default function MainLayout() {
           { name: 'Subjects', path: '/dashboard/admin/subjects', icon: Library },
           { name: 'Teachers', path: '/dashboard/admin/teachers', icon: Users },
           { name: 'Students', path: '/dashboard/admin/students', icon: GraduationCap },
+          { name: 'Invite Links', path: '/dashboard/admin/invite-links', icon: Share2 },
           { name: 'Scheme of Work', path: '/dashboard/teacher/schemes', icon: Layers },
           { name: 'Report Cards', path: '/dashboard/reports/card', icon: FolderOpen },
           { name: 'EduMan AI', path: '/dashboard/admin/ai', icon: Bot },
