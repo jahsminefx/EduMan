@@ -57,7 +57,7 @@ async function createNotification({ userId, title, message, type = 'support', li
  * - DEV: Logs to console if SMTP unconfigured; logs clean dev warning on failure.
  * - PROD: Attempts Brevo SMTP; logs error for monitoring if failed, but NEVER throws or rolls back transactions.
  */
-async function sendEmailNotification({ to, subject, text, html }) {
+async function sendEmailNotification({ to, subject, text, html, replyTo }) {
     if (!to) return { success: false, reason: 'No recipient specified' };
 
     const env = process.env.NODE_ENV || 'development';
@@ -99,11 +99,13 @@ async function sendEmailNotification({ to, subject, text, html }) {
             },
         });
 
-        const senderEmail = process.env.CONTACT_FROM_EMAIL || process.env.SMTP_USER || 'noreply@eduman.africa';
+        const senderEmail = process.env.CONTACT_FROM_EMAIL || process.env.SMTP_USER || 'anintajahsmine@gmail.com';
+        const defaultReplyTo = replyTo || process.env.CONTACT_FROM_EMAIL || process.env.SMTP_USER || 'anintajahsmine@gmail.com';
 
         const mailOptions = {
             from: `EduMan Support <${senderEmail}>`,
             to,
+            replyTo: defaultReplyTo,
             subject,
             text,
             html: html || `<p>${text}</p>`
@@ -387,7 +389,7 @@ async function sendWelcomeEmail({ email, name, role, schoolName, password, token
                 </p>
                 <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
                 <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
-                    If you have any questions, contact your school administrator or reach out to us at <a href="mailto:hello@eduman.africa" style="color: #4f46e5;">hello@eduman.africa</a>.
+                    If you have any questions, contact your school administrator or reach out to us at <a href="mailto:anintajahsmine@gmail.com" style="color: #4f46e5;">anintajahsmine@gmail.com</a>.
                 </p>
             </div>
         </div>
@@ -443,7 +445,7 @@ async function sendSchoolApprovalEmail({ email, name, schoolName, password, toke
                 
                 <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
                 <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
-                    Need assistance? Reach out to our team at <a href="mailto:supports@eduman.africa" style="color: #2563eb;">supports@eduman.africa</a> or call 09156457073.
+                    Need assistance? Reach out to our team at <a href="mailto:anintajahsmine@gmail.com" style="color: #2563eb;">anintajahsmine@gmail.com</a> or call 09156457073.
                 </p>
             </div>
         </div>
