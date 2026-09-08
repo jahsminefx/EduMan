@@ -60,4 +60,48 @@ describe('Auth API', () => {
     expect(res.statusCode).toEqual(200);
     expect(res.body.user.email).toEqual('admin@eduman.local');
   });
+
+  it('should process forgot password, verify 6-digit code, and reset password', async () => {
+    const { getDB } = require('../config/database');
+    const db = getDB();
+
+    // 1. Request forgot password code
+    const forgotRes = await request(app)
+      .post('/api/auth/forgot-password')
+      .send({ email: 'admin@eduman.local' });
+    expect(forgotRes.statusCode).toEqual(200);
+    expect(forgotRes.body.message).toContain('6-digit');
+
+    // 2. Fetch reset code from database
+    const user = await db.get("SELECT reset_code FROM users WHERE email = 'admin@eduman.local'");
+    expect(user.reset_code).toBeDefined();
+    expect(user.reset_code.length).toEqual(6);
+
+    // 3. Verify code
+    const verifyRes = await request(app)
+      .post('/api/auth/verify-reset-code')
+      .send({ email: 'admin@eduman.local', code: user.reset_code });
+    expect(verifyRes.statusCode).toEqual(200);
+    expect(verifyRes.body.valid).toBe(true);
+
+    // 4. Reset password
+    const resetRes = await request(app)
+      .post('/api/auth/reset-password')
+      .send({
+        email: 'admin@eduman.local',
+        code: user.reset_code,
+        newPassword: 'BrandNewPassword123!'
+      });
+    expect(resetRes.statusCode).toEqual(200);
+
+    // 5. Login with new password
+    const loginRes = await request(app)
+      .post('/api/auth/login')
+      .send({
+        email: 'admin@eduman.local',
+        password: 'BrandNewPassword123!'
+      });
+    expect(loginRes.statusCode).toEqual(200);
+    expect(loginRes.body).toHaveProperty('token');
+  });
 });
