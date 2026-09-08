@@ -6,6 +6,7 @@ build/
 
 # Environment and Secrets
 .env*
+backend/src/config/vapid_keys.json
 
 # Databases
 *.db
