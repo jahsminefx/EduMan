@@ -109,7 +109,7 @@ app.use('/api/announcements', announcementRoutes);
 app.use('/api/class-info', classInfoRoutes);
 app.use('/api/ai', aiRoutes);
 app.use('/api/uploads', uploadRoutes);
-app.use('/api/contact', contactLimiter, contactRoutes);
+app.use('/api/contact', contactRoutes);
 app.use('/api/support', supportRoutes);
 app.use('/api/knowledge-base', knowledgeBaseRoutes);
 app.use('/api/notifications', notificationRoutes);

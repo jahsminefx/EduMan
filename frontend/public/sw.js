@@ -84,3 +84,53 @@ self.addEventListener('fetch', (event) => {
     })
   );
 });
+
+// Native Web Push Notification Listeners
+self.addEventListener('push', (event) => {
+  let data = { title: 'EduMan Alert', message: 'You have a new notification from EduMan.', link: '/dashboard' };
+
+  if (event.data) {
+    try {
+      data = event.data.json();
+    } catch (e) {
+      data.message = event.data.text();
+    }
+  }
+
+  const options = {
+    body: data.message || data.body || 'You have a new update.',
+    icon: '/images/eduman-logo2.png',
+    badge: '/images/eduman-logo-cropped.png',
+    data: {
+      url: data.link || data.url || '/dashboard'
+    },
+    vibrate: [100, 50, 100],
+    actions: [
+      { action: 'open', title: 'Open EduMan' }
+    ]
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title || 'EduMan Notification', options)
+  );
+});
+
+self.addEventListener('notificationclick', (event) => {
+  event.notification.close();
+
+  const targetUrl = (event.notification.data && event.notification.data.url) || '/dashboard';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then((clientList) => {
+      for (const client of clientList) {
+        if (client.url.includes(targetUrl) && 'focus' in client) {
+          return client.focus();
+        }
+      }
+      if (clients.openWindow) {
+        return clients.openWindow(targetUrl);
+      }
+    })
+  );
+});
+

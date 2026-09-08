@@ -18,7 +18,17 @@ const resendInvitationLimiter = rateLimit({
     message: { error: 'Too Many Requests', message: 'Too many invitation resend requests, please try again later.' }
 });
 
+// Rate limiter for forgot password request and verification
+const forgotPasswordLimiter = rateLimit({
+    windowMs: 15 * 60 * 1000, // 15 minutes window
+    max: process.env.NODE_ENV === 'test' ? 1000 : 15, // 15 requests per 15 mins
+    standardHeaders: true,
+    legacyHeaders: false,
+    message: { error: 'Too Many Requests', message: 'Too many password reset requests, please try again later.' }
+});
+
 module.exports = {
     setupTokenLimiter,
-    resendInvitationLimiter
+    resendInvitationLimiter,
+    forgotPasswordLimiter
 };

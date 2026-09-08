@@ -25,8 +25,10 @@ function getLastSentEmail() {
     return sentEmails.length > 0 ? sentEmails[sentEmails.length - 1] : null;
 }
 
+const { sendPushToUser } = require('./pushNotificationService');
+
 /**
- * Creates an in-app notification record in the database
+ * Creates an in-app notification record in the database and triggers Web Push
  */
 async function createNotification({ userId, title, message, type = 'support', link = null }) {
     if (!userId) return null;
@@ -36,6 +38,12 @@ async function createNotification({ userId, title, message, type = 'support', li
             `INSERT INTO notifications (user_id, title, message, type, link) VALUES ($1, $2, $3, $4, $5) RETURNING id`,
             [userId, title, message, type, link]
         );
+
+        // Trigger native browser/mobile web push notification asynchronously
+        sendPushToUser(userId, { title, message, link }).catch(err => {
+            console.error('Asynchronous push notification error:', err);
+        });
+
         return res.lastID;
     } catch (err) {
         console.error('Failed to create in-app notification:', err);
@@ -393,6 +401,106 @@ async function sendWelcomeEmail({ email, name, role, schoolName, password, token
     }
 }
 
+async function sendSchoolApprovalEmail({ email, name, schoolName, password, token }) {
+    try {
+        const appUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
+        const setupUrl = token ? `${appUrl}/setup-password?token=${token}` : `${appUrl}/#auth`;
+        const subject = `🎉 School Registration Approved! Welcome ${schoolName} to EduMan`;
+
+        const passwordNotice = password ? `
+            <div style="background-color: #f8fafc; border-left: 4px solid #2563eb; border: 1px solid #e2e8f0; padding: 16px; border-radius: 10px; margin: 20px 0;">
+                <p style="margin: 0 0 6px 0; font-size: 11px; color: #64748b; font-weight: bold; text-transform: uppercase; tracking-wide: 1px;">Your Initial Admin Password</p>
+                <code style="font-size: 16px; font-weight: bold; color: #0f172a; background: #e2e8f0; padding: 6px 12px; border-radius: 6px; display: inline-block;">${password}</code>
+                <p style="margin: 10px 0 0 0; font-size: 12px; color: #d97706; font-weight: 600;">
+                    ⚠️ Security Notice: Please log in and change your password in account settings upon first login.
+                </p>
+            </div>
+        ` : '';
+
+        const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
+            <div style="background: linear-gradient(135deg, #2563eb 0%, #4f46e5 100%); color: #ffffff; padding: 30px; text-align: center;">
+                <h1 style="margin: 0; font-size: 24px; font-weight: bold;">School Approved!</h1>
+                <p style="margin: 8px 0 0 0; font-size: 14px; opacity: 0.95;">Welcome <strong>${schoolName}</strong> to EduMan</p>
+            </div>
+            <div style="padding: 28px; color: #374151; line-height: 1.6;">
+                <p style="font-size: 16px; margin-top: 0;">Hello <strong>${name}</strong>,</p>
+                <p>We are delighted to inform you that your school registration application for <strong>${schoolName}</strong> has been officially approved and activated by the EduMan SuperAdmin team!</p>
+                
+                <div style="background-color: #f8fafc; border: 1px solid #e2e8f0; padding: 16px; border-radius: 12px; margin: 20px 0;">
+                    <p style="margin: 0; font-size: 14px;"><strong>Institution Name:</strong> ${schoolName}</p>
+                    <p style="margin: 6px 0 0 0; font-size: 14px;"><strong>Admin Account Email:</strong> ${email}</p>
+                    <p style="margin: 6px 0 0 0; font-size: 14px;"><strong>Assigned Role:</strong> School Administrator</p>
+                </div>
+
+                ${passwordNotice}
+
+                <p style="margin-top: 24px; text-align: center;">
+                    <a href="${setupUrl}" style="background-color: #2563eb; color: #ffffff; padding: 14px 28px; text-decoration: none; border-radius: 10px; font-weight: bold; font-size: 15px; display: inline-block;">
+                        ${token ? 'Set Up Password & Access Portal' : 'Log In to School Portal'} &rarr;
+                    </a>
+                </p>
+                
+                <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+                <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
+                    Need assistance? Reach out to our team at <a href="mailto:supports@eduman.africa" style="color: #2563eb;">supports@eduman.africa</a> or call 09156457073.
+                </p>
+            </div>
+        </div>
+        `;
+
+        const text = `Hello ${name},\n\nCongratulations! Your school registration for ${schoolName} has been approved.\n\nAdmin Email: ${email}\n${password ? `Initial Password: ${password}\n(Please change your password upon logging in)\n` : ''}Access your portal here: ${setupUrl}`;
+
+        return await sendEmailNotification({ to: email, subject, text, html });
+    } catch (err) {
+        console.error('Error sending school approval email:', err);
+        return { success: false, error: err.message };
+    }
+}
+
+async function sendPasswordResetCodeEmail({ email, name, code }) {
+    try {
+        const subject = `🔒 Your EduMan Password Reset Verification Code: ${code}`;
+        const html = `
+        <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; border: 1px solid #e5e7eb; border-radius: 16px; overflow: hidden; background-color: #ffffff;">
+            <div style="background: linear-gradient(135deg, #1e40af 0%, #3b82f6 100%); color: #ffffff; padding: 28px; text-align: center;">
+                <h1 style="margin: 0; font-size: 24px; font-weight: bold;">Password Reset Request</h1>
+                <p style="margin: 6px 0 0 0; font-size: 14px; opacity: 0.95;">EduMan Account Security</p>
+            </div>
+            <div style="padding: 28px; color: #374151; line-height: 1.6;">
+                <p style="font-size: 16px; margin-top: 0;">Hello <strong>${name || 'User'}</strong>,</p>
+                <p>We received a request to reset the password for your EduMan account associated with <strong>${email}</strong>.</p>
+                <p>Use the 6-digit verification code below to verify your account and set a new password:</p>
+
+                <div style="background-color: #eff6ff; border: 2px dashed #3b82f6; padding: 20px; border-radius: 14px; text-align: center; margin: 24px 0;">
+                    <span style="font-size: 12px; font-weight: bold; color: #1e40af; text-transform: uppercase; letter-spacing: 1px; display: block; margin-bottom: 8px;">Verification Code</span>
+                    <span style="font-family: 'Courier New', monospace; font-size: 36px; font-weight: bold; letter-spacing: 8px; color: #1e3a8a;">${code}</span>
+                </div>
+
+                <p style="font-size: 13px; color: #dc2626; font-weight: 600;">
+                    ⚠️ This verification code is valid for 15 minutes.
+                </p>
+                <p style="font-size: 13px; color: #6b7280;">
+                    If you did not request a password reset, please ignore this email or reach out to support if you suspect unauthorized activity.
+                </p>
+
+                <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;" />
+                <p style="font-size: 12px; color: #9ca3af; text-align: center; margin: 0;">
+                    EduMan School Management & Learning Platform &bull; Security Notification
+                </p>
+            </div>
+        </div>
+        `;
+
+        const text = `Hello ${name || 'User'},\n\nYour 6-digit password reset verification code is: ${code}\n\nThis code expires in 15 minutes.\nIf you did not request this code, please ignore this message.`;
+
+        return await sendEmailNotification({ to: email, subject, text, html });
+    } catch (err) {
+        console.error('Error sending password reset email:', err);
+        return { success: false, error: err.message };
+    }
+}
+
 module.exports = {
     getSentEmails,
     clearSentEmails,
@@ -401,9 +509,13 @@ module.exports = {
     sendEmailNotification,
     sendWelcomeEmail,
     sendInvitationEmail,
+    sendSchoolApprovalEmail,
+    sendPasswordResetCodeEmail,
     notifyNewTicket,
     notifyNewReply,
     notifyAssignment,
     notifyStatusChange,
     notifyMentions
 };
+
+

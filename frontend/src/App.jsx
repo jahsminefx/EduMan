@@ -11,8 +11,12 @@ import PublicLayout from './layouts/PublicLayout';
 import HomePage from './pages/public/HomePage';
 import AboutPage from './pages/public/AboutPage';
 import ContactPage from './pages/public/ContactPage';
+import TrackInquiryPage from './pages/public/TrackInquiryPage';
 import SetupPasswordPage from './pages/public/SetupPasswordPage';
+import ForgotPasswordPage from './pages/public/ForgotPasswordPage';
 import JoinSchoolPage from './pages/public/JoinSchoolPage';
+import TermsPage from './pages/public/TermsPage';
+
 
 // Dashboard Pages
 import Dashboard from './pages/Dashboard';
@@ -102,9 +106,13 @@ const AppRoutes = () => {
         <Route path="/" element={<HomePage />} />
         <Route path="/about" element={<AboutPage />} />
         <Route path="/contact" element={<ContactPage />} />
+        <Route path="/contact/track/:inquiryNumber" element={<TrackInquiryPage />} />
         <Route path="/setup-password" element={<SetupPasswordPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
         <Route path="/join" element={<JoinSchoolPage />} />
         <Route path="/join/:code" element={<JoinSchoolPage />} />
+        <Route path="/terms" element={<TermsPage />} />
+        <Route path="/privacy" element={<TermsPage />} />
       </Route>
 
       {/* Legacy login redirect */}

@@ -1,9 +1,11 @@
-import React, { useState, useEffect } from 'react';
-import { Mail, Search, RefreshCw, Send, CheckCircle, ArrowRight, UserCheck, ShieldAlert, Lock } from 'lucide-react';
+import React, { useState, useEffect, useRef } from 'react';
+import { Mail, Search, RefreshCw, Send, CheckCircle, ArrowRight, ArrowLeft, Lock, Building2, Sparkles, X, CheckCircle2 } from 'lucide-react';
 import axios from 'axios';
 import API_URL from '../../config/api';
+import { useAuth } from '../../contexts/AuthContext';
 
 export default function ContactInbox() {
+  const { user } = useAuth();
   const [inquiries, setInquiries] = useState([]);
   const [selectedInquiry, setSelectedInquiry] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -15,6 +17,17 @@ export default function ContactInbox() {
   const [submitting, setSubmitting] = useState(false);
   const [converting, setConverting] = useState(false);
   const [messageAlert, setMessageAlert] = useState('');
+  const [mobileShowDetails, setMobileShowDetails] = useState(false);
+
+  // Approve School Modal State
+  const [showApproveModal, setShowApproveModal] = useState(false);
+  const [approveSchoolName, setApproveSchoolName] = useState('');
+  const [approveAdminName, setApproveAdminName] = useState('');
+  const [approveEmail, setApproveEmail] = useState('');
+  const [approvePassword, setApprovePassword] = useState('SchoolAdmin123!');
+  const [approving, setApproving] = useState(false);
+
+  const detailsRef = useRef(null);
 
   useEffect(() => {
     fetchInquiries();
@@ -40,10 +53,19 @@ export default function ContactInbox() {
   const handleSelectInquiry = async (inq) => {
     setSelectedInquiry(inq);
     setMessageAlert('');
+    setMobileShowDetails(true);
+
+    setTimeout(() => {
+      detailsRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }, 100);
+
     try {
       const res = await axios.get(`${API_URL}/contact/inquiries/${inq.id}`);
+      if (res.data.inquiry) {
+        setSelectedInquiry(res.data.inquiry);
+      }
       setMessages(res.data.messages || []);
-      
+
       // If status is NEW, auto mark as READ
       if (inq.status === 'NEW') {
         await axios.put(`${API_URL}/contact/inquiries/${inq.id}/status`, { status: 'READ' });
@@ -60,14 +82,15 @@ export default function ContactInbox() {
 
     setSubmitting(true);
     try {
-      await axios.post(`${API_URL}/contact/inquiries/${selectedInquiry.id}/messages`, {
+      const res = await axios.post(`${API_URL}/contact/inquiries/${selectedInquiry.id}/messages`, {
         message: replyText.trim(),
         is_internal: isInternal ? 1 : 0
       });
 
       setReplyText('');
       handleSelectInquiry(selectedInquiry);
-      setMessageAlert(isInternal ? 'Internal note added.' : 'Reply sent via email.');
+      const emailed = res.data.emailedVisitor;
+      setMessageAlert(isInternal ? 'Internal note added.' : emailed ? 'First email response sent to visitor with tracking link!' : 'Response posted to live chat thread (no redundant email sent).');
     } catch (err) {
       console.error('Failed to send reply:', err);
     } finally {
@@ -104,6 +127,77 @@ export default function ContactInbox() {
       setConverting(false);
     }
   };
+
+  // Open Approve School Modal pre-filled
+  const handleOpenApproveModal = () => {
+    if (!selectedInquiry) return;
+
+    let defaultSchoolName = selectedInquiry.subject.replace(/School Registration Request:\s*/i, '').trim();
+    if (!defaultSchoolName || defaultSchoolName === selectedInquiry.subject) {
+      const match = selectedInquiry.message?.match(/Institution Name:\s*([^\n]+)/i);
+      if (match) defaultSchoolName = match[1].trim();
+    }
+
+    setApproveSchoolName(defaultSchoolName || 'New School Academy');
+    setApproveAdminName(selectedInquiry.name || 'School Administrator');
+    setApproveEmail(selectedInquiry.email || '');
+    setApprovePassword('SchoolAdmin123!');
+    setShowApproveModal(true);
+  };
+
+  // Execute School & Admin creation
+  const handleExecuteApprove = async (e) => {
+    e.preventDefault();
+    setApproving(true);
+    try {
+      // 1. Create School
+      const schoolRes = await axios.post(`${API_URL}/superadmin/schools`, {
+        name: approveSchoolName,
+        email: approveEmail
+      });
+      const schoolId = schoolRes.data.schoolId;
+
+      // 2. Create School Admin
+      await axios.post(`${API_URL}/superadmin/admins`, {
+        name: approveAdminName,
+        email: approveEmail,
+        password: approvePassword,
+        school_id: schoolId
+      });
+
+      // 3. Mark Contact Inquiry as RESOLVED & add internal note
+      await axios.put(`${API_URL}/contact/inquiries/${selectedInquiry.id}/status`, { status: 'RESOLVED' });
+      await axios.post(`${API_URL}/contact/inquiries/${selectedInquiry.id}/messages`, {
+        message: `APPROVED & REGISTERED: Institution '${approveSchoolName}' officially created by SuperAdmin. School Admin account active for ${approveEmail}.`,
+        is_internal: 1
+      });
+
+      setMessageAlert(`Success! Institution '${approveSchoolName}' registered and School Admin account created for ${approveEmail}!`);
+      setShowApproveModal(false);
+      handleSelectInquiry(selectedInquiry);
+      fetchInquiries();
+    } catch (err) {
+      console.error('Failed to approve school:', err);
+      setMessageAlert(`Approval Error: ${err.response?.data?.message || err.message}`);
+    } finally {
+      setApproving(false);
+    }
+  };
+
+  // Combine initial submission message if messages list is empty
+  const displayMessages = messages.length > 0 ? messages : (selectedInquiry ? [{
+    id: 'initial',
+    sender_name: selectedInquiry.name,
+    sender_email: selectedInquiry.email,
+    message: selectedInquiry.message,
+    created_at: selectedInquiry.created_at,
+    is_internal: 0
+  }] : []);
+
+  const isSchoolRegistrationRequest = selectedInquiry && (
+    selectedInquiry.subject?.toLowerCase().includes('school registration') ||
+    selectedInquiry.message?.includes('NEW SCHOOL REGISTRATION')
+  );
 
   return (
     <div className="p-4 sm:p-6 lg:p-8 max-w-7xl mx-auto space-y-6">
@@ -157,9 +251,11 @@ export default function ContactInbox() {
       </div>
 
       {/* Main Grid: List & Details */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6" ref={detailsRef}>
         {/* Left Column: Inquiry List */}
-        <div className="bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden divide-y divide-gray-100 max-h-[700px] overflow-y-auto">
+        <div className={`bg-white rounded-2xl border border-gray-200 shadow-xs overflow-hidden divide-y divide-gray-100 max-h-[700px] overflow-y-auto ${
+          mobileShowDetails ? 'hidden lg:block' : 'block'
+        }`}>
           {loading ? (
             <div className="p-8 text-center text-gray-400 text-sm">Loading inquiries...</div>
           ) : inquiries.length === 0 ? (
@@ -194,9 +290,22 @@ export default function ContactInbox() {
         </div>
 
         {/* Right Column: Inquiry Details & Threading */}
-        <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-xs p-6 flex flex-col min-h-[600px]">
+        <div className={`lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-xs p-6 flex flex-col min-h-[600px] ${
+          !mobileShowDetails ? 'hidden lg:flex' : 'flex'
+        }`}>
           {selectedInquiry ? (
             <div className="flex-1 flex flex-col justify-between space-y-6">
+              {/* Back Button for mobile */}
+              <div className="lg:hidden pb-3 border-b border-gray-100 flex items-center justify-between">
+                <button
+                  type="button"
+                  onClick={() => setMobileShowDetails(false)}
+                  className="inline-flex items-center gap-1.5 text-xs font-bold text-blue-600 hover:text-blue-800"
+                >
+                  <ArrowLeft className="w-4 h-4" /> Back to Inquiries List
+                </button>
+              </div>
+
               {/* Header Details */}
               <div>
                 <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-gray-100">
@@ -211,7 +320,18 @@ export default function ContactInbox() {
                     </p>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex flex-wrap items-center gap-2">
+                    {/* SuperAdmin School Onboarding Action Button */}
+                    {user?.role === 'SuperAdmin' && isSchoolRegistrationRequest && (
+                      <button
+                        type="button"
+                        onClick={handleOpenApproveModal}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 text-white text-xs font-bold rounded-xl shadow-xs hover:from-emerald-700 hover:to-teal-700 transition"
+                      >
+                        <Building2 className="w-3.5 h-3.5" /> Approve & Register School
+                      </button>
+                    )}
+
                     <select
                       value={selectedInquiry.status}
                       onChange={(e) => handleStatusChange(e.target.value)}
@@ -251,7 +371,7 @@ export default function ContactInbox() {
 
               {/* Conversation Messages */}
               <div className="flex-1 space-y-4 overflow-y-auto max-h-[350px] pr-2 my-4">
-                {messages.map((msg) => (
+                {displayMessages.map((msg) => (
                   <div
                     key={msg.id}
                     className={`p-4 rounded-2xl border ${
@@ -319,6 +439,94 @@ export default function ContactInbox() {
           )}
         </div>
       </div>
+
+      {/* SuperAdmin Approve & Register School Modal */}
+      {showApproveModal && (
+        <div className="fixed inset-0 z-50 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-gray-100 space-y-4 animate-in fade-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between border-b border-gray-100 pb-3">
+              <div className="flex items-center gap-2">
+                <div className="p-2 bg-emerald-100 text-emerald-700 rounded-xl">
+                  <Building2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900 text-sm sm:text-base">Approve & Register Institution</h3>
+                  <p className="text-[11px] text-gray-500">Create school record and assign School Admin account</p>
+                </div>
+              </div>
+              <button
+                onClick={() => setShowApproveModal(false)}
+                className="text-gray-400 hover:text-gray-600 p-1 rounded-lg hover:bg-gray-100"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleExecuteApprove} className="space-y-3 text-xs">
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">School / Institution Name</label>
+                <input
+                  type="text"
+                  required
+                  value={approveSchoolName}
+                  onChange={(e) => setApproveSchoolName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-500 font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">School Admin Name</label>
+                <input
+                  type="text"
+                  required
+                  value={approveAdminName}
+                  onChange={(e) => setApproveAdminName(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-500 font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">School Official Email</label>
+                <input
+                  type="email"
+                  required
+                  value={approveEmail}
+                  onChange={(e) => setApproveEmail(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-500 font-semibold"
+                />
+              </div>
+
+              <div>
+                <label className="block font-bold text-gray-700 mb-1">Initial Password</label>
+                <input
+                  type="text"
+                  required
+                  value={approvePassword}
+                  onChange={(e) => setApprovePassword(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-200 rounded-xl focus:outline-hidden focus:ring-2 focus:ring-emerald-500 font-mono font-bold"
+                />
+              </div>
+
+              <div className="pt-3 flex justify-end gap-2 border-t border-gray-100">
+                <button
+                  type="button"
+                  onClick={() => setShowApproveModal(false)}
+                  className="px-4 py-2 text-xs font-bold text-gray-600 hover:bg-gray-100 rounded-xl"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={approving}
+                  className="px-5 py-2 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs rounded-xl shadow-sm transition flex items-center gap-1.5 disabled:opacity-50"
+                >
+                  {approving ? 'Creating Institution & Admin...' : 'Approve & Activate School Now'}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

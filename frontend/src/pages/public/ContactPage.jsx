@@ -1,6 +1,8 @@
 import React, { useState } from 'react';
 import { HelpCircle, Phone, MapPin, Send, CheckCircle } from 'lucide-react';
 import { Link } from 'react-router-dom';
+import axios from 'axios';
+import API_URL from '../../config/api';
 
 const contactInfo = [
   { icon: HelpCircle, label: 'In-App Support', value: 'EduMan Ticket System', href: '/dashboard/support' },
@@ -11,6 +13,7 @@ const contactInfo = [
 export default function ContactPage() {
   const [form, setForm] = useState({ name: '', email: '', subject: '', message: '' });
   const [status, setStatus] = useState(''); // '' | 'sending' | 'success' | 'error'
+  const [submittedInquiry, setSubmittedInquiry] = useState(null);
   const [errorMsg, setErrorMsg] = useState('');
 
   const handleSubmit = async (e) => {
@@ -25,12 +28,14 @@ export default function ContactPage() {
     setStatus('sending');
 
     try {
-      await axios.post(`${API_URL}/contact`, form);
+      const res = await axios.post(`${API_URL}/contact`, form);
+      setSubmittedInquiry(res.data);
       setStatus('success');
       setForm({ name: '', email: '', subject: '', message: '' });
-    } catch {
+    } catch (err) {
+      console.error('Contact form submission error:', err);
       setStatus('error');
-      setErrorMsg('Failed to send message. Please try again.');
+      setErrorMsg(err.response?.data?.message || 'Failed to send message. Please try again.');
     }
   };
 
@@ -91,16 +96,31 @@ export default function ContactPage() {
                 <h2 className="text-xl sm:text-2xl font-extrabold text-gray-900 mb-6">Send us a Message</h2>
 
                 {status === 'success' ? (
-                  <div className="text-center py-8 sm:py-12">
-                    <div className="w-14 h-14 sm:w-16 sm:h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <div className="text-center py-8 sm:py-12 space-y-4">
+                    <div className="w-14 h-14 sm:w-16 sm:h-16 bg-green-50 rounded-full flex items-center justify-center mx-auto mb-2">
                       <CheckCircle className="w-7 h-7 sm:w-8 sm:h-8 text-green-600" />
                     </div>
-                    <h3 className="text-lg sm:text-xl font-bold text-gray-900 mb-2">Message Sent!</h3>
-                    <p className="text-xs sm:text-sm text-gray-500">Thank you for reaching out. We'll get back to you shortly.</p>
-                    <button onClick={() => setStatus('')}
-                      className="mt-6 px-6 py-2.5 text-xs sm:text-sm font-semibold text-blue-600 hover:bg-blue-50 rounded-xl transition-colors">
-                      Send another message
-                    </button>
+                    <h3 className="text-lg sm:text-xl font-bold text-gray-900">Message Received!</h3>
+                    <p className="text-xs sm:text-sm text-gray-500 max-w-md mx-auto">
+                      Thank you for reaching out. Inquiry <span className="font-bold text-blue-700">{submittedInquiry?.inquiry_number}</span> has been logged. You can chat with our team in real-time right now!
+                    </p>
+
+                    {submittedInquiry?.inquiry_number && submittedInquiry?.access_token && (
+                      <div className="pt-2 flex flex-col sm:flex-row items-center justify-center gap-3">
+                        <Link
+                          to={`/contact/track/${submittedInquiry.inquiry_number}?token=${submittedInquiry.access_token}`}
+                          className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs sm:text-sm rounded-xl shadow-xs transition-all flex items-center gap-2"
+                        >
+                          <Send className="w-4 h-4" /> Live Chat with EduMan Support
+                        </Link>
+                        <button
+                          onClick={() => setStatus('')}
+                          className="px-5 py-3 text-xs sm:text-sm font-semibold text-gray-600 hover:bg-gray-100 rounded-xl transition-colors"
+                        >
+                          Send Another Message
+                        </button>
+                      </div>
+                    )}
                   </div>
                 ) : (
                   <form onSubmit={handleSubmit} className="space-y-4 sm:space-y-5">

@@ -1,7 +1,7 @@
 const { getDB } = require('../config/database');
 const bcrypt = require('bcryptjs');
 const crypto = require('crypto');
-const { sendInvitationEmail } = require('../services/notificationService');
+const { sendInvitationEmail, sendSchoolApprovalEmail } = require('../services/notificationService');
 const { generateSetupToken, recordInvitationAudit } = require('../utils/tokenUtils');
 
 const GLOBAL_STAFF_ROLES = new Set(['ContentManager', 'SupportOfficer']);
@@ -299,11 +299,11 @@ exports.createAdmin = async (req, res) => {
             return userId;
         });
 
-        sendInvitationEmail({
+        sendSchoolApprovalEmail({
             email,
             name,
-            role: 'School Admin',
             schoolName: school.name,
+            password: initialPass,
             token: setupToken
         });
 

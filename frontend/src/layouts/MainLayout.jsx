@@ -28,6 +28,8 @@ import BrandLogo from '../components/BrandLogo';
 
 import NotificationDropdown from '../components/NotificationDropdown';
 import InstallPWA from '../components/InstallPWA';
+import PushNotificationBanner from '../components/PushNotificationBanner';
+import DOMNotificationToast from '../components/DOMNotificationToast';
 
 
 const ANNOUNCEMENT_ROLES = ['SchoolAdmin', 'Teacher', 'Student', 'Parent'];
@@ -337,6 +339,8 @@ export default function MainLayout() {
           </div>
         </main>
         <InstallPWA />
+        <PushNotificationBanner />
+        <DOMNotificationToast />
       </div>
     </div>
   );

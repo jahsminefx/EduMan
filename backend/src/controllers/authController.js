@@ -1,7 +1,8 @@
 const { getDB } = require('../config/database');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto');
 const { generateToken } = require('../utils/auth');
-const { sendWelcomeEmail } = require('../services/notificationService');
+const { sendWelcomeEmail, sendPasswordResetCodeEmail } = require('../services/notificationService');
 const { hashToken, recordInvitationAudit } = require('../utils/tokenUtils');
 
 exports.login = async (req, res) => {
@@ -328,3 +329,110 @@ exports.setupPassword = async (req, res) => {
         res.status(500).json({ error: 'Server Error', message: 'Failed to set up password' });
     }
 };
+
+exports.forgotPassword = async (req, res) => {
+    try {
+        const { email } = req.body;
+        if (!email || !email.trim()) {
+            return res.status(400).json({ error: 'Bad Request', message: 'Email address is required.' });
+        }
+
+        const normalizedEmail = email.trim().toLowerCase();
+        const db = getDB();
+        const user = await db.get(`SELECT id, name, email FROM users WHERE LOWER(email) = $1`, [normalizedEmail]);
+
+        if (!user) {
+            // Generic success message to prevent user enumeration
+            return res.json({ message: 'If an account exists with this email, a 6-digit verification code has been sent.' });
+        }
+
+        // Generate 6-digit verification code
+        const code = crypto.randomInt(100000, 999999).toString();
+
+        // Save code and 15-minute expiration
+        await db.run(
+            `UPDATE users SET reset_code = $1, reset_code_expires = CURRENT_TIMESTAMP + INTERVAL '15 minutes' WHERE id = $2`,
+            [code, user.id]
+        );
+
+        // Send reset code email
+        sendPasswordResetCodeEmail({
+            email: user.email,
+            name: user.name,
+            code
+        }).catch(err => console.error('Failed to send reset code email:', err));
+
+        res.json({ message: 'If an account exists with this email, a 6-digit verification code has been sent.' });
+    } catch (err) {
+        console.error('Forgot password error:', err);
+        res.status(500).json({ error: 'Server Error', message: 'Failed to process password reset request.' });
+    }
+};
+
+exports.verifyResetCode = async (req, res) => {
+    try {
+        const { email, code } = req.body;
+        if (!email || !email.trim() || !code || !code.trim()) {
+            return res.status(400).json({ error: 'Bad Request', message: 'Email and 6-digit verification code are required.' });
+        }
+
+        const normalizedEmail = email.trim().toLowerCase();
+        const cleanCode = code.trim();
+        const db = getDB();
+
+        const user = await db.get(
+            `SELECT id, name, email, reset_code, reset_code_expires FROM users WHERE LOWER(email) = $1`,
+            [normalizedEmail]
+        );
+
+        if (!user || user.reset_code !== cleanCode || !user.reset_code_expires || new Date(user.reset_code_expires) <= new Date()) {
+            return res.status(400).json({ error: 'Bad Request', message: 'Invalid or expired 6-digit verification code.' });
+        }
+
+        res.json({ valid: true, message: 'Verification code confirmed.' });
+    } catch (err) {
+        res.status(500).json({ error: 'Server Error', message: 'Failed to verify reset code.' });
+    }
+};
+
+exports.resetPassword = async (req, res) => {
+    try {
+        const { email, code, newPassword } = req.body;
+        if (!email || !email.trim() || !code || !code.trim() || !newPassword) {
+            return res.status(400).json({ error: 'Bad Request', message: 'Email, verification code, and new password are required.' });
+        }
+
+        if (newPassword.length < 6) {
+            return res.status(400).json({ error: 'Bad Request', message: 'New password must be at least 6 characters long.' });
+        }
+
+        const normalizedEmail = email.trim().toLowerCase();
+        const cleanCode = code.trim();
+        const db = getDB();
+
+        const user = await db.get(
+            `SELECT id, name, email, role, reset_code, reset_code_expires FROM users WHERE LOWER(email) = $1`,
+            [normalizedEmail]
+        );
+
+        if (!user || user.reset_code !== cleanCode || !user.reset_code_expires || new Date(user.reset_code_expires) <= new Date()) {
+            return res.status(400).json({ error: 'Bad Request', message: 'Invalid or expired 6-digit verification code.' });
+        }
+
+        const password_hash = await bcrypt.hash(newPassword, 10);
+
+        await db.transaction(async (client) => {
+            // Update password hash, invalidate active sessions (token_version + 1), and clear reset code
+            await client.run(
+                `UPDATE users SET password_hash = $1, reset_code = NULL, reset_code_expires = NULL, token_version = token_version + 1 WHERE id = $2`,
+                [password_hash, user.id]
+            );
+        });
+
+        res.json({ message: 'Your password has been changed successfully. You may now log in.' });
+    } catch (err) {
+        console.error('Reset password error:', err);
+        res.status(500).json({ error: 'Server Error', message: 'Failed to reset password.' });
+    }
+};
+

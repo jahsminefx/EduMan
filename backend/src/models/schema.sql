@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS users (
     role TEXT NOT NULL CHECK(role IN ('SuperAdmin', 'SchoolAdmin', 'Teacher', 'Student', 'Parent', 'ContentManager', 'Accountant', 'SupportOfficer')),
     setup_token TEXT,
     setup_token_expires TIMESTAMP,
+    reset_code TEXT,
+    reset_code_expires TIMESTAMP,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 

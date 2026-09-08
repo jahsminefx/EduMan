@@ -1,10 +1,12 @@
 import React, { useState } from 'react';
-import { useNavigate, Navigate } from 'react-router-dom';
+import { useNavigate, Navigate, Link } from 'react-router-dom';
+import axios from 'axios';
+import API_URL from '../../config/api';
 import { useAuth } from '../../contexts/AuthContext';
 import {
   BookOpen, Users, Calendar, ClipboardCheck, FileText,
   Library, HelpCircle, BarChart3, Wifi, WifiOff, Shield,
-  Mail, Lock, User, ArrowRight, CheckCircle
+  Mail, Lock, User, ArrowRight, CheckCircle, KeyRound, Building2, Phone, FileCheck
 } from 'lucide-react';
 
 const features = [
@@ -18,19 +20,26 @@ const features = [
 ];
 
 export default function HomePage() {
-  const { user, login, register } = useAuth();
+  const { user, login } = useAuth();
   const navigate = useNavigate();
-  const [activeTab, setActiveTab] = useState('signin');
+  const [activeTab, setActiveTab] = useState('signin'); // 'signin' | 'join' | 'register_school'
 
   // Sign In state
   const [signInEmail, setSignInEmail] = useState('');
   const [signInPassword, setSignInPassword] = useState('');
 
-  // Sign Up state
-  const [signUpName, setSignUpName] = useState('');
-  const [signUpEmail, setSignUpEmail] = useState('');
-  const [signUpPassword, setSignUpPassword] = useState('');
-  const [signUpConfirm, setSignUpConfirm] = useState('');
+  // Join School with Code state
+  const [inviteCode, setInviteCode] = useState('');
+
+  // School Registration Application state
+  const [schoolForm, setSchoolForm] = useState({
+    school_name: '',
+    reg_number: '',
+    contact_name: '',
+    official_email: '',
+    phone: '',
+    estimated_students: '100-500'
+  });
 
   const [error, setError] = useState('');
   const [successMsg, setSuccessMsg] = useState('');
@@ -51,26 +60,52 @@ export default function HomePage() {
     } finally { setLoading(false); }
   };
 
-  const handleSignUp = async (e) => {
+  const handleJoinWithCode = (e) => {
+    e.preventDefault();
+    if (!inviteCode.trim()) {
+      return setError('Please enter a valid school invitation code.');
+    }
+    navigate(`/join/${encodeURIComponent(inviteCode.trim())}`);
+  };
+
+  const handleSchoolRegistrationRequest = async (e) => {
     e.preventDefault();
     setError('');
-    if (signUpPassword !== signUpConfirm) {
-      return setError('Passwords do not match.');
-    }
-    if (signUpPassword.length < 6) {
-      return setError('Password must be at least 6 characters.');
-    }
+    setSuccessMsg('');
     setLoading(true);
+
     try {
-      await register(signUpName, signUpEmail, signUpPassword);
-      setSuccessMsg('Institution account created! Redirecting to dashboard...');
-      setTimeout(() => {
-        navigate('/dashboard');
-      }, 1500);
+      const messageBody = `NEW SCHOOL REGISTRATION APPLICATION:
+- Institution Name: ${schoolForm.school_name}
+- Government License / Reg No: ${schoolForm.reg_number || 'N/A'}
+- Contact Person: ${schoolForm.contact_name}
+- Official Email: ${schoolForm.official_email}
+- Phone Line: ${schoolForm.phone}
+- Estimated Students: ${schoolForm.estimated_students}`;
+
+      await axios.post(`${API_URL}/contact`, {
+        name: schoolForm.contact_name,
+        email: schoolForm.official_email,
+        subject: `School Registration Request: ${schoolForm.school_name}`,
+        message: messageBody
+      });
+
+      setSuccessMsg('Your school registration request has been submitted to SuperAdmin! We will verify your institution details and email your School Admin invitation token.');
+      setSchoolForm({
+        school_name: '',
+        reg_number: '',
+        contact_name: '',
+        official_email: '',
+        phone: '',
+        estimated_students: '100-500'
+      });
     } catch (err) {
-      setError(err.response?.data?.message || err.message);
-    } finally { setLoading(false); }
+      setError(err.response?.data?.message || 'Failed to submit school registration request.');
+    } finally {
+      setLoading(false);
+    }
   };
+
 
   return (
     <div>
@@ -117,101 +152,160 @@ export default function HomePage() {
             <div id="auth" className="w-full max-w-md mx-auto lg:ml-auto">
               <div className="bg-white rounded-2xl shadow-2xl shadow-blue-900/40 overflow-hidden">
                 {/* Tabs */}
-                <div className="flex border-b border-gray-100">
+                <div className="flex border-b border-gray-100 bg-gray-50/50 text-[11px] sm:text-xs">
                   <button onClick={() => { setActiveTab('signin'); setError(''); setSuccessMsg(''); }}
-                    className={`flex-1 py-3.5 text-xs sm:text-sm font-semibold transition-colors ${
-                      activeTab === 'signin' ? 'text-blue-700 border-b-2 border-blue-600 bg-white' : 'text-gray-500 bg-gray-50 hover:text-gray-700'
+                    className={`flex-1 py-3 font-bold transition-colors ${
+                      activeTab === 'signin' ? 'text-blue-700 border-b-2 border-blue-600 bg-white' : 'text-gray-500 hover:text-gray-700'
                     }`}>
                     Sign In
                   </button>
-                  <button onClick={() => { setActiveTab('signup'); setError(''); setSuccessMsg(''); }}
-                    className={`flex-1 py-3.5 text-xs sm:text-sm font-semibold transition-colors ${
-                      activeTab === 'signup' ? 'text-blue-700 border-b-2 border-blue-600 bg-white' : 'text-gray-500 bg-gray-50 hover:text-gray-700'
+                  <button onClick={() => { setActiveTab('join'); setError(''); setSuccessMsg(''); }}
+                    className={`flex-1 py-3 font-bold transition-colors ${
+                      activeTab === 'join' ? 'text-blue-700 border-b-2 border-blue-600 bg-white' : 'text-gray-500 hover:text-gray-700'
                     }`}>
-                    Sign Up
+                    Join with Code
+                  </button>
+                  <button onClick={() => { setActiveTab('register_school'); setError(''); setSuccessMsg(''); }}
+                    className={`flex-1 py-3 font-bold transition-colors ${
+                      activeTab === 'register_school' ? 'text-blue-700 border-b-2 border-blue-600 bg-white' : 'text-gray-500 hover:text-gray-700'
+                    }`}>
+                    Register School
                   </button>
                 </div>
 
                 <div className="p-5 sm:p-6">
                   {error && (
-                    <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500 text-xs sm:text-sm text-red-700 rounded-r-xl">{error}</div>
+                    <div className="mb-4 p-3 bg-red-50 border-l-4 border-red-500 text-xs text-red-700 rounded-r-xl">{error}</div>
                   )}
                   {successMsg && (
-                    <div className="mb-4 p-3 bg-green-50 border-l-4 border-green-500 text-xs sm:text-sm text-green-700 rounded-r-xl flex items-center gap-2">
-                      <CheckCircle className="w-4 h-4 flex-shrink-0" /> {successMsg}
+                    <div className="mb-4 p-3 bg-emerald-50 border-l-4 border-emerald-500 text-xs text-emerald-800 rounded-r-xl flex items-start gap-2">
+                      <CheckCircle className="w-4 h-4 flex-shrink-0 mt-0.5" /> <div>{successMsg}</div>
                     </div>
                   )}
 
-                  {activeTab === 'signin' ? (
+                  {activeTab === 'signin' && (
                     <form onSubmit={handleSignIn} className="space-y-4">
                       <div>
-                        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Email</label>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">Email</label>
                         <div className="relative">
                           <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                           <input type="email" required value={signInEmail} onChange={e => setSignInEmail(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 transition"
                             placeholder="you@school.edu" />
                         </div>
                       </div>
                       <div>
-                        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Password</label>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">Password</label>
                         <div className="relative">
                           <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
                           <input type="password" required value={signInPassword} onChange={e => setSignInPassword(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
+                            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 transition"
                             placeholder="••••••••" />
                         </div>
                       </div>
                       <div className="flex justify-end">
-                        <a href="#" className="text-xs text-blue-600 hover:underline">Forgot password?</a>
+                        <Link to="/forgot-password" className="text-xs text-blue-600 hover:underline font-medium">Forgot password?</Link>
                       </div>
                       <button type="submit" disabled={loading}
-                        className="w-full py-2.5 bg-blue-600 text-white rounded-xl text-xs sm:text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-60 shadow-xs">
+                        className="w-full py-2.5 bg-blue-600 text-white rounded-xl text-xs sm:text-sm font-bold hover:bg-blue-700 transition-colors disabled:opacity-60 shadow-sm">
                         {loading ? 'Signing in...' : 'Sign In'}
                       </button>
                     </form>
-                  ) : (
-                    <form onSubmit={handleSignUp} className="space-y-4">
+                  )}
+
+                  {activeTab === 'join' && (
+                    <form onSubmit={handleJoinWithCode} className="space-y-4">
+                      <div className="p-3 bg-blue-50/60 rounded-xl border border-blue-100 text-xs text-blue-900 leading-relaxed font-medium">
+                        Teachers, Students, and Parents can enter an invitation code generated by their School Administrator.
+                      </div>
                       <div>
-                        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Name of Institution</label>
+                        <label className="block text-xs font-semibold text-gray-700 mb-1">School Invitation Code</label>
                         <div className="relative">
-                          <User className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                          <input type="text" required value={signUpName} onChange={e => setSignUpName(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                            placeholder="Enter your institution name" />
+                          <KeyRound className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+                          <input
+                            type="text"
+                            required
+                            value={inviteCode}
+                            onChange={e => setInviteCode(e.target.value.toUpperCase())}
+                            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-900 font-mono font-bold tracking-wider focus:ring-2 focus:ring-blue-500 transition uppercase"
+                            placeholder="e.g. EDU-STU-98X2A"
+                          />
+                        </div>
+                      </div>
+                      <button type="submit"
+                        className="w-full py-2.5 bg-blue-600 text-white rounded-xl text-xs sm:text-sm font-bold hover:bg-blue-700 transition-colors shadow-sm flex items-center justify-center gap-2">
+                        Verify Code & Join School <ArrowRight className="w-4 h-4" />
+                      </button>
+                    </form>
+                  )}
+
+                  {activeTab === 'register_school' && (
+                    <form onSubmit={handleSchoolRegistrationRequest} className="space-y-3 text-xs">
+                      <div className="p-2.5 bg-amber-50 rounded-xl border border-amber-200 text-[11px] text-amber-900 font-medium leading-normal">
+                        School registrations require SuperAdmin accreditation verification. Fill out your details below to request onboarding.
+                      </div>
+                      <div>
+                        <label className="block font-semibold text-gray-700 mb-0.5">Institution Name</label>
+                        <input
+                          type="text"
+                          required
+                          value={schoolForm.school_name}
+                          onChange={e => setSchoolForm({ ...schoolForm, school_name: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs text-gray-900 focus:ring-2 focus:ring-blue-500"
+                          placeholder="e.g. Grace International Academy"
+                        />
+                      </div>
+                      <div>
+                        <label className="block font-semibold text-gray-700 mb-0.5">Govt License / Reg Number (Optional)</label>
+                        <input
+                          type="text"
+                          value={schoolForm.reg_number}
+                          onChange={e => setSchoolForm({ ...schoolForm, reg_number: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs text-gray-900 focus:ring-2 focus:ring-blue-500"
+                          placeholder="e.g. MOE/REG/2024/098"
+                        />
+                      </div>
+                      <div className="grid grid-cols-2 gap-2">
+                        <div>
+                          <label className="block font-semibold text-gray-700 mb-0.5">Contact Person</label>
+                          <input
+                            type="text"
+                            required
+                            value={schoolForm.contact_name}
+                            onChange={e => setSchoolForm({ ...schoolForm, contact_name: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs text-gray-900 focus:ring-2 focus:ring-blue-500"
+                            placeholder="Principal / Admin Name"
+                          />
+                        </div>
+                        <div>
+                          <label className="block font-semibold text-gray-700 mb-0.5">Phone Line</label>
+                          <input
+                            type="tel"
+                            required
+                            value={schoolForm.phone}
+                            onChange={e => setSchoolForm({ ...schoolForm, phone: e.target.value })}
+                            className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs text-gray-900 focus:ring-2 focus:ring-blue-500"
+                            placeholder="+234..."
+                          />
                         </div>
                       </div>
                       <div>
-                        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Email</label>
-                        <div className="relative">
-                          <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                          <input type="email" required value={signUpEmail} onChange={e => setSignUpEmail(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                            placeholder="you@school.edu" />
-                        </div>
+                        <label className="block font-semibold text-gray-700 mb-0.5">Official School Email</label>
+                        <input
+                          type="email"
+                          required
+                          value={schoolForm.official_email}
+                          onChange={e => setSchoolForm({ ...schoolForm, official_email: e.target.value })}
+                          className="w-full px-3 py-2 border border-gray-300 rounded-xl text-xs text-gray-900 focus:ring-2 focus:ring-blue-500"
+                          placeholder="admin@school.edu.ng"
+                        />
                       </div>
-                      <div>
-                        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Password</label>
-                        <div className="relative">
-                          <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                          <input type="password" required value={signUpPassword} onChange={e => setSignUpPassword(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                            placeholder="Min. 6 characters" />
-                        </div>
-                      </div>
-                      <div>
-                        <label className="block text-xs sm:text-sm font-medium text-gray-700 mb-1">Confirm Password</label>
-                        <div className="relative">
-                          <Lock className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
-                          <input type="password" required value={signUpConfirm} onChange={e => setSignUpConfirm(e.target.value)}
-                            className="w-full pl-10 pr-4 py-2.5 border border-gray-300 rounded-xl text-sm text-gray-900 focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition"
-                            placeholder="Re-enter password" />
-                        </div>
-                      </div>
-                      <p className="text-xs text-gray-500">You will be registered as a <strong>School Admin</strong>.</p>
-                      <button type="submit" disabled={loading}
-                        className="w-full py-2.5 bg-blue-600 text-white rounded-xl text-xs sm:text-sm font-semibold hover:bg-blue-700 transition-colors disabled:opacity-60 shadow-xs">
-                        {loading ? 'Creating account...' : 'Create Account'}
+                      <button
+                        type="submit"
+                        disabled={loading}
+                        className="w-full py-2.5 bg-blue-600 text-white rounded-xl font-bold hover:bg-blue-700 transition-colors disabled:opacity-60 shadow-sm flex items-center justify-center gap-1.5"
+                      >
+                        {loading ? 'Submitting Application...' : 'Submit School Onboarding Application'}
                       </button>
                     </form>
                   )}

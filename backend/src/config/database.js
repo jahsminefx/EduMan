@@ -468,8 +468,19 @@ function initDB(retryCount = 0) {
                     );
                     ALTER TABLE users ADD COLUMN IF NOT EXISTS setup_token TEXT;
                     ALTER TABLE users ADD COLUMN IF NOT EXISTS setup_token_expires TIMESTAMP;
+                    ALTER TABLE contact_inquiries ADD COLUMN IF NOT EXISTS access_token VARCHAR(64);
+
+                    CREATE TABLE IF NOT EXISTS web_push_subscriptions (
+                        id SERIAL PRIMARY KEY,
+                        user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                        endpoint TEXT NOT NULL UNIQUE,
+                        p256dh TEXT NOT NULL,
+                        auth TEXT NOT NULL,
+                        user_agent TEXT,
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                    );
                 `);
-                console.log('Schema patch (Support Center & Password Setup) applied.');
+                console.log('Schema patch (Support Center & Web Push Subscriptions) applied.');
             } catch (patchErr) {
                 console.log('Schema patch (Support Center & Password Setup) skipped or already applied.', patchErr.message);
             }
@@ -582,6 +593,25 @@ function initDB(retryCount = 0) {
                     console.log('Migration 008 skipped or already applied:', migErr.message);
                 } else {
                     console.error('CRITICAL: Migration 008 failed to apply:', migErr);
+                    throw migErr;
+                }
+            }
+
+            // Run migration 009: Password Reset Codes
+            try {
+                const mig9Path = path.join(__dirname, '../migrations/009_password_reset_codes.sql');
+                if (fs.existsSync(mig9Path)) {
+                    const mig9Sql = fs.readFileSync(mig9Path, 'utf8');
+                    await runSqlScript(mig9Sql);
+                    console.log('Migration 009 (Password Reset Codes) applied.');
+                }
+            } catch (migErr) {
+                const msg = (migErr.message || '').toLowerCase();
+                const code = migErr.code || '';
+                if (['42P07', '42701', '42710', '23505'].includes(code) || msg.includes('already exists') || msg.includes('duplicate')) {
+                    console.log('Migration 009 skipped or already applied:', migErr.message);
+                } else {
+                    console.error('CRITICAL: Migration 009 failed to apply:', migErr);
                     throw migErr;
                 }
             }

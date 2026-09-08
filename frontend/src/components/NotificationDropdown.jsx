@@ -1,16 +1,46 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { Bell, Check, Ticket, BookOpen, AlertCircle, Info } from 'lucide-react';
+import { Bell, Check, Ticket, BookOpen, AlertCircle, Info, BellRing, BellOff } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import axios from 'axios';
 import API_URL from '../config/api';
+import { isPushSupported, getNotificationPermission, requestPushPermissionAndSubscribe, unsubscribePushNotification } from '../utils/pushNotificationHelper';
 
 export default function NotificationDropdown() {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [pushStatus, setPushStatus] = useState('default'); // 'granted', 'denied', 'default', 'unsupported'
+  const [pushLoading, setPushLoading] = useState(false);
   const dropdownRef = useRef(null);
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (isPushSupported()) {
+      setPushStatus(getNotificationPermission());
+    } else {
+      setPushStatus('unsupported');
+    }
+  }, []);
+
+  const handleTogglePush = async () => {
+    try {
+      setPushLoading(true);
+      if (pushStatus === 'granted') {
+        await unsubscribePushNotification();
+        setPushStatus('default');
+      } else {
+        await requestPushPermissionAndSubscribe();
+        setPushStatus('granted');
+      }
+    } catch (err) {
+      console.error('Failed to toggle push notifications:', err);
+      setPushStatus(getNotificationPermission());
+    } finally {
+      setPushLoading(false);
+    }
+  };
+
 
   const fetchNotifications = async () => {
     try {
@@ -116,6 +146,42 @@ export default function NotificationDropdown() {
               </button>
             )}
           </div>
+
+          {/* Web Push Notification Quick Toggle Bar */}
+          {pushStatus !== 'unsupported' && (
+            <div className="px-4 py-2 bg-blue-50/60 border-b border-gray-100 flex items-center justify-between text-xs">
+              <div className="flex items-center gap-1.5 text-gray-700">
+                {pushStatus === 'granted' ? (
+                  <BellRing className="w-3.5 h-3.5 text-blue-600 animate-pulse" />
+                ) : (
+                  <BellOff className="w-3.5 h-3.5 text-gray-400" />
+                )}
+                <span className="font-medium text-[11px]">
+                  {pushStatus === 'granted' ? 'Native Push Enabled' : 'Push Alerts Disabled'}
+                </span>
+              </div>
+              <button
+                type="button"
+                onClick={handleTogglePush}
+                disabled={pushLoading || pushStatus === 'denied'}
+                className={`px-2 py-1 rounded-lg font-semibold text-[11px] transition-all flex items-center gap-1 ${
+                  pushStatus === 'granted'
+                    ? 'bg-white text-gray-700 border border-gray-200 hover:bg-gray-50'
+                    : 'bg-blue-600 text-white hover:bg-blue-700'
+                } disabled:opacity-50`}
+              >
+                {pushLoading ? (
+                  'Updating...'
+                ) : pushStatus === 'granted' ? (
+                  'Turn Off'
+                ) : pushStatus === 'denied' ? (
+                  'Blocked in Browser'
+                ) : (
+                  'Enable Push'
+                )}
+              </button>
+            </div>
+          )}
 
           <div className="max-h-80 overflow-y-auto divide-y divide-gray-100">
             {notifications.length === 0 ? (

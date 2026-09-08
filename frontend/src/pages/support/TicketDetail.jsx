@@ -22,7 +22,8 @@ import {
   Tag,
   MessageSquare,
   History,
-  Bot
+  Bot,
+  Ticket
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import axios from 'axios';
@@ -72,7 +73,7 @@ export default function TicketDetail() {
     } catch (err) {
       console.error('Failed to load ticket details:', err);
       setError(err.response?.data?.message || 'Failed to load ticket details.');
-    } fontally: {
+    } finally {
       setLoading(false);
     }
   };
@@ -264,8 +265,12 @@ export default function TicketDetail() {
 
         <div className="flex items-center gap-3 text-xs">
           <div className="hidden md:block text-right">
-            <span className="text-gray-400 block text-[10px] uppercase font-bold">Assigned Agent</span>
-            <span className="font-semibold text-gray-800">{thread.agent_name || 'Unassigned'}</span>
+            <span className="text-gray-400 block text-[10px] uppercase font-bold">
+              {isStaff ? 'Assigned Agent' : 'Support Handler'}
+            </span>
+            <span className="font-semibold text-gray-800">
+              {thread.agent_name || (isStaff ? 'Unassigned' : 'EduMan Support Team')}
+            </span>
           </div>
 
           {user.role === 'SuperAdmin' && (
@@ -458,112 +463,165 @@ export default function TicketDetail() {
           </div>
         </div>
 
-        {/* Right 1 Col: School Info Card, Support Actions, Timeline & AI Preview */}
+        {/* Right 1 Col: Role-based Sidebar Cards */}
         <div className="space-y-6">
-          {/* School Information Card */}
-          <div className="bg-white rounded-3xl border border-gray-200 p-5 shadow-xs space-y-4">
-            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-              <Building2 className="w-4 h-4 text-blue-600" /> Customer / School Information
-            </h3>
+          {/* Customer / School Information Card (STAFF ONLY) */}
+          {isStaff && (
+            <div className="bg-white rounded-3xl border border-gray-200 p-5 shadow-xs space-y-4">
+              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                <Building2 className="w-4 h-4 text-blue-600" /> Customer / School Information
+              </h3>
 
-            <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-xl bg-blue-600 text-white font-bold flex items-center justify-center text-sm shadow-xs flex-shrink-0">
-                {thread.school_name?.[0] || 'S'}
-              </div>
-              <div className="min-w-0 flex-1">
-                <h4 className="text-sm font-bold text-gray-900 truncate">{thread.school_name || 'Independent Account'}</h4>
-                <p className="text-[11px] text-gray-500">{thread.school_type || 'K-12 School'}</p>
-              </div>
-            </div>
-
-            <div className="space-y-2 text-xs text-gray-600">
-              <div className="flex justify-between border-b border-gray-100 pb-1.5">
-                <span className="text-gray-400">Created By:</span>
-                <span className="font-semibold text-gray-900">{thread.creator_name} ({thread.creator_role})</span>
-              </div>
-              <div className="flex justify-between border-b border-gray-100 pb-1.5">
-                <span className="text-gray-400">Email:</span>
-                <span className="font-semibold text-gray-900 truncate max-w-[150px]">{thread.creator_email}</span>
-              </div>
-              {thread.school_phone && (
-                <div className="flex justify-between border-b border-gray-100 pb-1.5">
-                  <span className="text-gray-400">Phone:</span>
-                  <span className="font-semibold text-gray-900">{thread.school_phone}</span>
+              <div className="p-4 rounded-2xl bg-gray-50 border border-gray-100 flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-blue-600 text-white font-bold flex items-center justify-center text-sm shadow-xs flex-shrink-0">
+                  {thread.school_name?.[0] || 'S'}
                 </div>
-              )}
-            </div>
-          </div>
-
-          {/* Support Actions Controls (For Staff or Admin) */}
-          <div className="bg-white rounded-3xl border border-gray-200 p-5 shadow-xs space-y-4">
-            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-              <Shield className="w-4 h-4 text-indigo-600" /> Ticket Management Controls
-            </h3>
-
-            <div className="space-y-3">
-              <div>
-                <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Status</label>
-                <select
-                  value={status}
-                  onChange={(e) => handleUpdateStatus(e.target.value)}
-                  disabled={updating}
-                  className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold bg-white"
-                >
-                  <option value="OPEN">OPEN</option>
-                  <option value="IN_PROGRESS">IN_PROGRESS</option>
-                  <option value="WAITING_FOR_CUSTOMER">WAITING_FOR_CUSTOMER</option>
-                  <option value="RESOLVED">RESOLVED</option>
-                  <option value="CLOSED">CLOSED</option>
-                </select>
+                <div className="min-w-0 flex-1">
+                  <h4 className="text-sm font-bold text-gray-900 truncate">{thread.school_name || 'Independent Account'}</h4>
+                  <p className="text-[11px] text-gray-500">{thread.school_type || 'K-12 School'}</p>
+                </div>
               </div>
 
-              {isStaff && (
-                <>
-                  <div>
-                    <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Priority</label>
-                    <select
-                      value={priority}
-                      onChange={(e) => handleUpdatePriority(e.target.value)}
-                      disabled={updating}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold bg-white"
-                    >
-                      <option value="LOW">LOW</option>
-                      <option value="MEDIUM">MEDIUM</option>
-                      <option value="HIGH">HIGH</option>
-                      <option value="CRITICAL">CRITICAL</option>
-                    </select>
+              <div className="space-y-2 text-xs text-gray-600">
+                <div className="flex justify-between border-b border-gray-100 pb-1.5">
+                  <span className="text-gray-400">Created By:</span>
+                  <span className="font-semibold text-gray-900">{thread.creator_name} ({thread.creator_role})</span>
+                </div>
+                <div className="flex justify-between border-b border-gray-100 pb-1.5">
+                  <span className="text-gray-400">Email:</span>
+                  <span className="font-semibold text-gray-900 truncate max-w-[150px]">{thread.creator_email}</span>
+                </div>
+                {thread.school_phone && (
+                  <div className="flex justify-between border-b border-gray-100 pb-1.5">
+                    <span className="text-gray-400">Phone:</span>
+                    <span className="font-semibold text-gray-900">{thread.school_phone}</span>
                   </div>
-
-                  <div>
-                    <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Assigned Agent</label>
-                    <select
-                      value={assignedTo}
-                      onChange={(e) => handleUpdateAssignment(e.target.value)}
-                      disabled={updating}
-                      className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold bg-white"
-                    >
-                      <option value="">Unassigned</option>
-                      {supportOfficers.map(o => (
-                        <option key={o.id} value={o.id}>{o.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                </>
-              )}
-
-              <button
-                onClick={handleToggleWatcher}
-                className={`w-full py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition-colors ${
-                  isWatched ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-gray-50 text-gray-700 border-gray-200'
-                }`}
-              >
-                <Eye className="w-3.5 h-3.5" /> {isWatched ? 'Watching Ticket' : 'Watch Ticket'}
-              </button>
+                )}
+              </div>
             </div>
-          </div>
+          )}
+
+          {/* Ticket Management Controls Card (STAFF VIEW) */}
+          {isStaff ? (
+            <div className="bg-white rounded-3xl border border-gray-200 p-5 shadow-xs space-y-4">
+              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                <Shield className="w-4 h-4 text-indigo-600" /> Ticket Management Controls
+              </h3>
+
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Status</label>
+                  <select
+                    value={status}
+                    onChange={(e) => handleUpdateStatus(e.target.value)}
+                    disabled={updating}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold bg-white"
+                  >
+                    <option value="OPEN">OPEN</option>
+                    <option value="IN_PROGRESS">IN_PROGRESS</option>
+                    <option value="WAITING_FOR_CUSTOMER">WAITING_FOR_CUSTOMER</option>
+                    <option value="RESOLVED">RESOLVED</option>
+                    <option value="CLOSED">CLOSED</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Priority</label>
+                  <select
+                    value={priority}
+                    onChange={(e) => handleUpdatePriority(e.target.value)}
+                    disabled={updating}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold bg-white"
+                  >
+                    <option value="LOW">LOW</option>
+                    <option value="MEDIUM">MEDIUM</option>
+                    <option value="HIGH">HIGH</option>
+                    <option value="CRITICAL">CRITICAL</option>
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-[11px] font-bold text-gray-500 uppercase mb-1">Assigned Agent</label>
+                  <select
+                    value={assignedTo}
+                    onChange={(e) => handleUpdateAssignment(e.target.value)}
+                    disabled={updating}
+                    className="w-full px-3 py-2 border border-gray-200 rounded-xl text-xs font-semibold bg-white"
+                  >
+                    <option value="">Unassigned</option>
+                    {supportOfficers.map(o => (
+                      <option key={o.id} value={o.id}>{o.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                <button
+                  onClick={handleToggleWatcher}
+                  className={`w-full py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition-colors ${
+                    isWatched ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-gray-50 text-gray-700 border-gray-200'
+                  }`}
+                >
+                  <Eye className="w-3.5 h-3.5" /> {isWatched ? 'Watching Ticket' : 'Watch Ticket'}
+                </button>
+              </div>
+            </div>
+          ) : (
+            /* Ticket Summary & Customer Actions Card (CUSTOMER VIEW) */
+            <div className="bg-white rounded-3xl border border-gray-200 p-5 shadow-xs space-y-4">
+              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                <Ticket className="w-4 h-4 text-blue-600" /> Ticket Actions
+              </h3>
+
+              <div className="p-3.5 rounded-2xl bg-gray-50 border border-gray-100 space-y-2 text-xs">
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Category:</span>
+                  <span className="font-semibold text-gray-900">{thread.category}</span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Current Status:</span>
+                  <span className={`px-2 py-0.5 text-[10px] font-bold rounded-full ${
+                    thread.status === 'OPEN' ? 'bg-blue-600 text-white' :
+                    thread.status === 'WAITING_FOR_CUSTOMER' ? 'bg-amber-500 text-white' :
+                    thread.status === 'RESOLVED' ? 'bg-emerald-600 text-white' : 'bg-gray-600 text-white'
+                  }`}>
+                    {thread.status.replace(/_/g, ' ')}
+                  </span>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                {['OPEN', 'IN_PROGRESS', 'WAITING_FOR_CUSTOMER'].includes(thread.status) ? (
+                  <button
+                    onClick={() => handleUpdateStatus('CLOSED')}
+                    disabled={updating}
+                    className="w-full py-2.5 px-3 bg-rose-50 hover:bg-rose-100 text-rose-700 border border-rose-200 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
+                  >
+                    <CheckCircle2 className="w-4 h-4" /> Close Ticket
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => handleUpdateStatus('IN_PROGRESS')}
+                    disabled={updating}
+                    className="w-full py-2.5 px-3 bg-blue-50 hover:bg-blue-100 text-blue-700 border border-blue-200 rounded-xl text-xs font-bold transition-all flex items-center justify-center gap-2"
+                  >
+                    <RefreshCw className="w-4 h-4" /> Reopen Ticket
+                  </button>
+                )}
+
+                <button
+                  onClick={handleToggleWatcher}
+                  className={`w-full py-2 px-3 rounded-xl text-xs font-bold flex items-center justify-center gap-2 border transition-colors ${
+                    isWatched ? 'bg-blue-50 text-blue-700 border-blue-200' : 'bg-gray-50 text-gray-700 border-gray-200'
+                  }`}
+                >
+                  <Eye className="w-3.5 h-3.5" /> {isWatched ? 'Subscribed to Updates' : 'Subscribe to Updates'}
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Satisfaction Rating Prompt (When Resolved / Closed) */}
-          {['RESOLVED', 'CLOSED'].includes(thread.status) && thread.created_by === user.id && (
+          {['RESOLVED', 'CLOSED'].includes(thread.status) && Number(thread.created_by) === Number(user.id) && (
             <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-3xl border border-amber-200 p-5 shadow-xs space-y-3">
               <h4 className="text-xs font-bold text-amber-900 uppercase tracking-wider flex items-center gap-1.5">
                 <Star className="w-4 h-4 text-amber-500 fill-amber-500" /> Rate Support Satisfaction
@@ -631,24 +689,26 @@ export default function TicketDetail() {
             </div>
           )}
 
-          {/* Activity Timeline Stream */}
-          <div className="bg-white rounded-3xl border border-gray-200 p-5 shadow-xs space-y-3">
-            <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
-              <History className="w-4 h-4 text-gray-600" /> Activity Timeline
-            </h3>
+          {/* Activity Timeline Stream (Staff Only) */}
+          {isStaff && (
+            <div className="bg-white rounded-3xl border border-gray-200 p-5 shadow-xs space-y-3">
+              <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wider flex items-center gap-2">
+                <History className="w-4 h-4 text-gray-600" /> Activity Timeline
+              </h3>
 
-            <div className="space-y-3 max-h-60 overflow-y-auto text-xs">
-              {activityLogs.map((log) => (
-                <div key={log.id} className="border-l-2 border-blue-500 pl-3 py-1 space-y-0.5">
-                  <div className="flex items-center justify-between font-semibold text-gray-900">
-                    <span>{log.action}</span>
-                    <span className="text-[10px] text-gray-400">{new Date(log.created_at).toLocaleDateString()}</span>
+              <div className="space-y-3 max-h-60 overflow-y-auto text-xs">
+                {activityLogs.map((log) => (
+                  <div key={log.id} className="border-l-2 border-blue-500 pl-3 py-1 space-y-0.5">
+                    <div className="flex items-center justify-between font-semibold text-gray-900">
+                      <span>{log.action}</span>
+                      <span className="text-[10px] text-gray-400">{new Date(log.created_at).toLocaleDateString()}</span>
+                    </div>
+                    <p className="text-[11px] text-gray-500">{log.details}</p>
                   </div>
-                  <p className="text-[11px] text-gray-500">{log.details}</p>
-                </div>
-              ))}
+                ))}
+              </div>
             </div>
-          </div>
+          )}
         </div>
       </div>
     </div>

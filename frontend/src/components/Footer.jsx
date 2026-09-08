@@ -24,6 +24,8 @@ export default function Footer() {
               <li><Link to="/" className="hover:text-white transition-colors">Home</Link></li>
               <li><Link to="/about" className="hover:text-white transition-colors">About</Link></li>
               <li><Link to="/contact" className="hover:text-white transition-colors">Contact</Link></li>
+              <li><Link to="/terms" className="hover:text-white transition-colors">Terms & Conditions</Link></li>
+              <li><Link to="/privacy" className="hover:text-white transition-colors">Privacy Policy</Link></li>
             </ul>
           </div>
 
@@ -39,8 +41,13 @@ export default function Footer() {
           </div>
         </div>
 
-        <div className="border-t border-gray-800 mt-10 pt-6 text-center text-sm">
+        <div className="border-t border-gray-800 mt-10 pt-6 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-gray-500">
           <p>&copy; {new Date().getFullYear()} EduMan. All rights reserved.</p>
+          <div className="flex items-center gap-4">
+            <Link to="/terms" className="hover:text-gray-300 transition-colors">Terms of Service</Link>
+            <span>•</span>
+            <Link to="/privacy" className="hover:text-gray-300 transition-colors">Privacy Policy</Link>
+          </div>
         </div>
       </div>
     </footer>

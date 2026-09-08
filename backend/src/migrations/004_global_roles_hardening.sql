@@ -11,6 +11,7 @@ CREATE TABLE IF NOT EXISTS contact_inquiries (
     status TEXT NOT NULL DEFAULT 'NEW',
     assigned_to INTEGER REFERENCES users(id) ON DELETE SET NULL,
     converted_ticket_id INTEGER REFERENCES support_threads(id) ON DELETE SET NULL,
+    access_token VARCHAR(64),
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );

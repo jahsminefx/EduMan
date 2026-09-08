@@ -41,6 +41,20 @@ async function logActivity(threadId, userId, action, details = null) {
     }
 }
 
+/**
+ * Helper to safely query thread by numeric ID or string ticket_number (e.g., SUP-2026-000001)
+ */
+async function findThread(idOrTicketNumber, dbInstance = null) {
+    const db = dbInstance || getDB();
+    const strVal = String(idOrTicketNumber).trim();
+    const isNumeric = /^\d+$/.test(strVal);
+    if (isNumeric) {
+        return await db.get(`SELECT * FROM support_threads WHERE id = $1`, [parseInt(strVal, 10)]);
+    } else {
+        return await db.get(`SELECT * FROM support_threads WHERE ticket_number = $1`, [strVal]);
+    }
+}
+
 function calculateSLATargets(priority, baseDate = new Date()) {
     const now = baseDate.getTime();
     let respMs = 8 * 60 * 60 * 1000;
@@ -226,9 +240,9 @@ exports.getThreads = async (req, res) => {
             whereClauses.push(`t.created_by = $${paramIdx++}`);
             params.push(userId);
         } else if (userRole === 'SchoolAdmin') {
-            // SchoolAdmins view tickets belonging to their school
-            whereClauses.push(`t.school_id = $${paramIdx++}`);
-            params.push(schoolId);
+            // SchoolAdmins view tickets belonging to their school or created by themselves
+            whereClauses.push(`(t.school_id = $${paramIdx++} OR t.created_by = $${paramIdx++})`);
+            params.push(schoolId, userId);
         } else if (userRole === 'SupportOfficer') {
             if (filterTab === 'ASSIGNED') {
                 whereClauses.push(`t.assigned_to = $${paramIdx++}`);
@@ -359,6 +373,8 @@ exports.getThreadById = async (req, res) => {
         }
 
         const db = getDB();
+        const strVal = String(id).trim();
+        const isNumeric = /^\d+$/.test(strVal);
 
         const thread = await db.get(
             `SELECT 
@@ -378,8 +394,8 @@ exports.getThreadById = async (req, res) => {
             LEFT JOIN users u ON u.id = t.created_by
             LEFT JOIN schools s ON s.id = t.school_id
             LEFT JOIN users agent ON agent.id = t.assigned_to
-            WHERE t.id = $1 OR t.ticket_number = $1`,
-            [id]
+            WHERE ${isNumeric ? 't.id = $1' : 't.ticket_number = $1'}`,
+            [isNumeric ? parseInt(strVal, 10) : strVal]
         );
 
         if (!thread) {
@@ -387,11 +403,11 @@ exports.getThreadById = async (req, res) => {
         }
 
         // TENANT ACCESS CHECK
-        if (['Teacher', 'Parent'].includes(userRole) && thread.created_by !== userId) {
+        if (['Teacher', 'Parent'].includes(userRole) && Number(thread.created_by) !== Number(userId)) {
             return res.status(403).json({ error: 'Forbidden', message: 'You can only view your own tickets.' });
         }
-        if (userRole === 'SchoolAdmin' && thread.school_id !== schoolId) {
-            return res.status(403).json({ error: 'Forbidden', message: 'You can only view tickets belonging to your school.' });
+        if (userRole === 'SchoolAdmin' && Number(thread.school_id) !== Number(schoolId) && Number(thread.created_by) !== Number(userId)) {
+            return res.status(403).json({ error: 'Forbidden', message: 'You can only view tickets belonging to your school or created by you.' });
         }
 
         // Fetch Messages (Internal notes filtered for non-staff)
@@ -485,16 +501,16 @@ exports.addMessage = async (req, res) => {
         }
 
         const db = getDB();
-        const thread = await db.get(`SELECT * FROM support_threads WHERE id = $1`, [id]);
+        const thread = await findThread(id, db);
         if (!thread) {
             return res.status(404).json({ error: 'Not Found', message: 'Ticket not found.' });
         }
 
         // Tenant access check
-        if (['Teacher', 'Parent'].includes(userRole) && thread.created_by !== userId) {
+        if (['Teacher', 'Parent'].includes(userRole) && Number(thread.created_by) !== Number(userId)) {
             return res.status(403).json({ error: 'Forbidden', message: 'You cannot reply to this ticket.' });
         }
-        if (userRole === 'SchoolAdmin' && thread.school_id !== req.user.school_id) {
+        if (userRole === 'SchoolAdmin' && Number(thread.school_id) !== Number(req.user.school_id) && Number(thread.created_by) !== Number(userId)) {
             return res.status(403).json({ error: 'Forbidden', message: 'You cannot reply to this ticket.' });
         }
 
@@ -597,7 +613,7 @@ exports.updateThread = async (req, res) => {
         const isStaff = ['SuperAdmin', 'SupportOfficer'].includes(userRole);
 
         const db = getDB();
-        const thread = await db.get(`SELECT * FROM support_threads WHERE id = $1`, [id]);
+        const thread = await findThread(id, db);
         if (!thread) {
             return res.status(404).json({ error: 'Not Found', message: 'Support ticket not found.' });
         }
@@ -607,10 +623,10 @@ exports.updateThread = async (req, res) => {
         // SupportOfficer can change status, assign, priority.
         // SchoolAdmin can close/reopen.
         // Teacher can close/reopen if their own.
-        if (userRole === 'Teacher' && thread.created_by !== userId) {
+        if (userRole === 'Teacher' && Number(thread.created_by) !== Number(userId)) {
             return res.status(403).json({ error: 'Forbidden', message: 'You cannot modify this ticket.' });
         }
-        if (userRole === 'SchoolAdmin' && thread.school_id !== req.user.school_id) {
+        if (userRole === 'SchoolAdmin' && Number(thread.school_id) !== Number(req.user.school_id) && Number(thread.created_by) !== Number(userId)) {
             return res.status(403).json({ error: 'Forbidden', message: 'You cannot modify this ticket.' });
         }
 
@@ -706,7 +722,7 @@ exports.escalateThread = async (req, res) => {
         }
 
         const db = getDB();
-        const thread = await db.get(`SELECT * FROM support_threads WHERE id = $1`, [id]);
+        const thread = await findThread(id, db);
         if (!thread) {
             return res.status(404).json({ error: 'Not Found', message: 'Support ticket not found.' });
         }
@@ -748,12 +764,12 @@ exports.deleteThread = async (req, res) => {
         const { id } = req.params;
         const db = getDB();
 
-        const thread = await db.get(`SELECT ticket_number FROM support_threads WHERE id = $1`, [id]);
+        const thread = await findThread(id, db);
         if (!thread) {
             return res.status(404).json({ error: 'Not Found', message: 'Ticket not found.' });
         }
 
-        await db.run(`DELETE FROM support_threads WHERE id = $1`, [id]);
+        await db.run(`DELETE FROM support_threads WHERE id = $1`, [thread.id]);
         return res.json({ message: `Ticket ${thread.ticket_number} deleted successfully.` });
     } catch (err) {
         console.error('Error deleting ticket:', err);
@@ -813,12 +829,12 @@ exports.submitFeedback = async (req, res) => {
         }
 
         const db = getDB();
-        const thread = await db.get(`SELECT * FROM support_threads WHERE id = $1`, [id]);
+        const thread = await findThread(id, db);
         if (!thread) {
             return res.status(404).json({ error: 'Not Found', message: 'Ticket not found.' });
         }
 
-        if (thread.created_by !== userId) {
+        if (Number(thread.created_by) !== Number(userId)) {
             return res.status(403).json({ error: 'Forbidden', message: 'Only the ticket creator can rate support feedback.' });
         }
 
@@ -845,7 +861,12 @@ exports.toggleWatcher = async (req, res) => {
         const userId = req.user.id;
         const db = getDB();
 
-        const watcher = await db.get(`SELECT id FROM support_watchers WHERE thread_id = $1 AND user_id = $2`, [id, userId]);
+        const thread = await findThread(id, db);
+        if (!thread) {
+            return res.status(404).json({ error: 'Not Found', message: 'Ticket not found.' });
+        }
+
+        const watcher = await db.get(`SELECT id FROM support_watchers WHERE thread_id = $1 AND user_id = $2`, [thread.id, userId]);
 
         if (watcher) {
             await db.run(`DELETE FROM support_watchers WHERE id = $1`, [watcher.id]);

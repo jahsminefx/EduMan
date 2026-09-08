@@ -1,3 +1,4 @@
+const crypto = require('crypto');
 const { getDB } = require('../config/database');
 const { createNotification, sendEmailNotification } = require('../services/notificationService');
 
@@ -30,12 +31,13 @@ exports.submitContactForm = async (req, res) => {
     try {
         const db = getDB();
         const inquiryNumber = await generateInquiryNumber();
+        const accessToken = crypto.randomBytes(24).toString('hex');
 
         const result = await db.transaction(async (client) => {
             const inqRes = await client.run(
-                `INSERT INTO contact_inquiries (inquiry_number, name, email, subject, message, status)
-                 VALUES ($1, $2, $3, $4, $5, 'NEW') RETURNING id`,
-                [inquiryNumber, name, email, subject, message]
+                `INSERT INTO contact_inquiries (inquiry_number, name, email, subject, message, status, access_token)
+                 VALUES ($1, $2, $3, $4, $5, 'NEW', $6) RETURNING id`,
+                [inquiryNumber, name, email, subject, message, accessToken]
             );
             const inquiryId = inqRes.lastID || inqRes.rows?.[0]?.id;
 
@@ -48,15 +50,35 @@ exports.submitContactForm = async (req, res) => {
             return inquiryId;
         });
 
-        // Send 1 single email notification to support inbox email if configured
-        const supportEmail = process.env.CONTACT_EMAIL_TO || process.env.SMTP_USER;
-        if (supportEmail) {
-            sendEmailNotification({
-                to: supportEmail,
-                subject: `[EDUMAN Contact Inquiry ${inquiryNumber}] ${subject}`,
-                text: `New contact form inquiry ${inquiryNumber} received from ${name} <${email}>:\n\nSubject: ${subject}\nMessage:\n${message}`
-            });
-        }
+        // Send automated receipt email notification to the VISITOR with guest chat tracking link
+        const baseUrl = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:5173';
+        const trackFullUrl = `${baseUrl.replace(/\/$/, '')}/contact/track/${inquiryNumber}?token=${accessToken}`;
+
+        sendEmailNotification({
+            to: email,
+            subject: `[EDUMAN] Message Received - Inquiry #${inquiryNumber}`,
+            text: `Hello ${name},\n\nThank you for reaching out to EduMan! We have received your inquiry #${inquiryNumber} regarding "${subject}".\n\nYou can chat live with our support team or check updates anytime using your secure link:\n${trackFullUrl}\n\nBest regards,\nEduMan Support Team`,
+            html: `
+                <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 16px;">
+                    <h2 style="color: #2563eb; margin-top: 0;">Message Received!</h2>
+                    <p style="color: #374151; font-size: 14px; line-height: 1.5;">
+                        Hello <strong>${name}</strong>,<br/><br/>
+                        Thank you for reaching out to EduMan! We have received your message regarding <strong>"${subject}"</strong> (Inquiry <strong>#${inquiryNumber}</strong>).
+                    </p>
+                    <div style="margin: 25px 0; text-align: center;">
+                        <a href="${trackFullUrl}" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; font-weight: bold; border-radius: 8px; text-decoration: none; display: inline-block;">
+                            Chat Live with EduMan Support &rarr;
+                        </a>
+                    </div>
+                    <p style="color: #6b7280; font-size: 12px;">
+                        If the button above does not work, copy and paste this secure link into your browser:<br/>
+                        <a href="${trackFullUrl}" style="color: #2563eb;">${trackFullUrl}</a>
+                    </p>
+                    <hr style="border: 0; border-top: 1px solid #f3f4f6; margin: 20px 0;"/>
+                    <p style="color: #9ca3af; font-size: 11px;">EduMan Educational Management Platform</p>
+                </div>
+            `
+        });
 
         // Notify active Support Officers & SuperAdmins in-app
         const supportStaff = await db.all(
@@ -74,7 +96,9 @@ exports.submitContactForm = async (req, res) => {
 
         res.status(200).json({
             message: 'Thank you! Your message has been received by EduMan Support.',
-            inquiry_number: inquiryNumber
+            inquiry_number: inquiryNumber,
+            access_token: accessToken,
+            track_url: `/contact/track/${inquiryNumber}?token=${accessToken}`
         });
     } catch (error) {
         console.error('Error submitting contact form:', error);
@@ -114,13 +138,14 @@ exports.getInquiryById = async (req, res) => {
     try {
         const { id } = req.params;
         const db = getDB();
+        const numId = parseInt(id, 10);
 
         const inquiry = await db.get(
             `SELECT ci.*, u.name as assigned_to_name 
              FROM contact_inquiries ci 
              LEFT JOIN users u ON ci.assigned_to = u.id 
-             WHERE ci.id = $1`,
-            [id]
+             WHERE ci.id = $1 OR ci.inquiry_number = $2`,
+            [isNaN(numId) ? -1 : numId, String(id).trim()]
         );
 
         if (!inquiry) return res.status(404).json({ error: 'Not Found', message: 'Inquiry not found' });
@@ -131,7 +156,7 @@ exports.getInquiryById = async (req, res) => {
              LEFT JOIN users u ON cim.sender_id = u.id 
              WHERE cim.inquiry_id = $1 
              ORDER BY cim.id ASC`,
-            [id]
+            [inquiry.id]
         );
 
         res.json({ inquiry, messages });
@@ -139,6 +164,7 @@ exports.getInquiryById = async (req, res) => {
         res.status(500).json({ error: 'Server Error', message: error.message });
     }
 };
+
 
 exports.addInquiryMessage = async (req, res) => {
     try {
@@ -148,28 +174,66 @@ exports.addInquiryMessage = async (req, res) => {
         if (!message) return res.status(400).json({ error: 'Bad Request', message: 'Message is required' });
 
         const db = getDB();
-        const inquiry = await db.get('SELECT * FROM contact_inquiries WHERE id = $1', [id]);
+        const numId = parseInt(id, 10);
+        const inquiry = await db.get('SELECT * FROM contact_inquiries WHERE id = $1 OR inquiry_number = $2', [isNaN(numId) ? -1 : numId, String(id).trim()]);
         if (!inquiry) return res.status(404).json({ error: 'Not Found', message: 'Inquiry not found' });
+
+        // Check how many previous non-internal staff replies exist
+        const staffReplyCount = await db.get(
+            `SELECT COUNT(*) as count FROM contact_inquiry_messages WHERE inquiry_id = $1 AND sender_id IS NOT NULL AND is_internal = 0`,
+            [inquiry.id]
+        );
+        const isFirstStaffReply = parseInt(staffReplyCount.count || 0, 10) === 0;
 
         const result = await db.run(
             `INSERT INTO contact_inquiry_messages (inquiry_id, sender_id, sender_name, sender_email, message, is_internal)
              VALUES ($1, $2, $3, $4, $5, $6) RETURNING id`,
-            [id, req.user.id, req.user.name, req.user.email, message, is_internal ? 1 : 0]
+            [inquiry.id, req.user.id, req.user.name, req.user.email, message, is_internal ? 1 : 0]
         );
 
-        if (!is_internal && inquiry.email) {
+        // Update inquiry status to IN_PROGRESS if currently NEW or READ
+        if (inquiry.status === 'NEW' || inquiry.status === 'READ') {
+            await db.run(`UPDATE contact_inquiries SET status = 'IN_PROGRESS', updated_at = CURRENT_TIMESTAMP WHERE id = $1`, [inquiry.id]);
+        }
+
+        // Send email ONLY on the FIRST outbound public reply to provide the visitor with their guest tracking link
+        if (!is_internal && isFirstStaffReply && inquiry.email) {
+            const baseUrl = process.env.FRONTEND_URL || process.env.APP_URL || 'http://localhost:5173';
+            const trackFullUrl = `${baseUrl.replace(/\/$/, '')}/contact/track/${inquiry.inquiry_number}?token=${inquiry.access_token || ''}`;
+
             sendEmailNotification({
                 to: inquiry.email,
-                subject: `Re: [${inquiry.inquiry_number}] ${inquiry.subject}`,
-                text: `${message}\n\n---\nEduMan Support Team`
+                subject: `[EDUMAN] Response to Inquiry #${inquiry.inquiry_number} - ${inquiry.subject}`,
+                text: `Hello ${inquiry.name},\n\nOur support team has responded to your message:\n\n"${message.trim()}"\n\nYou can chat live with our team and view updates anytime using your secure link:\n${trackFullUrl}\n\nBest regards,\nEduMan Support Team`,
+                html: `
+                    <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border: 1px solid #e5e7eb; border-radius: 16px;">
+                        <h2 style="color: #2563eb; margin-top: 0;">New Response from EduMan Support</h2>
+                        <p style="color: #374151; font-size: 14px; line-height: 1.5;">
+                            Hello <strong>${inquiry.name}</strong>,<br/><br/>
+                            Our team has responded to your inquiry regarding <strong>"${inquiry.subject}"</strong>:
+                        </p>
+                        <div style="background-color: #f3f4f6; border-left: 4px solid #2563eb; padding: 15px; border-radius: 8px; margin: 15px 0; font-size: 14px; color: #1f2937;">
+                            ${message.trim().replace(/\n/g, '<br/>')}
+                        </div>
+                        <div style="margin: 25px 0; text-align: center;">
+                            <a href="${trackFullUrl}" style="background-color: #2563eb; color: #ffffff; padding: 12px 24px; font-weight: bold; border-radius: 8px; text-decoration: none; display: inline-block;">
+                                Continue Live Chat on EduMan &rarr;
+                            </a>
+                        </div>
+                        <p style="color: #6b7280; font-size: 12px;">
+                            Click the button above to continue chatting directly with our team on EduMan.
+                        </p>
+                    </div>
+                `
             });
         }
 
-        res.json({ message: 'Message added successfully', id: result.lastID || result.rows?.[0]?.id });
+        res.json({ message: 'Message added successfully', id: result.lastID || result.rows?.[0]?.id, emailedVisitor: !is_internal && isFirstStaffReply });
     } catch (error) {
         res.status(500).json({ error: 'Server Error', message: error.message });
     }
 };
+
 
 exports.updateInquiryStatus = async (req, res) => {
     try {
@@ -266,5 +330,108 @@ exports.convertInquiryToTicket = async (req, res) => {
     } catch (error) {
         console.error('Error converting inquiry to ticket:', error);
         res.status(500).json({ error: 'Server Error', message: error.message });
+    }
+};
+
+// ── GUEST PUBLIC TRACKING & CHAT ENDPOINTS ──
+
+exports.getTrackedInquiry = async (req, res) => {
+    try {
+        const { inquiryNumber } = req.params;
+        const { token } = req.query;
+
+        if (!token) {
+            return res.status(400).json({ error: 'Bad Request', message: 'Access token is required to view inquiry.' });
+        }
+
+        const db = getDB();
+        const inquiry = await db.get(
+            `SELECT inquiry_number, name, email, subject, status, created_at, updated_at, access_token
+             FROM contact_inquiries 
+             WHERE inquiry_number = $1`,
+            [inquiryNumber]
+        );
+
+        if (!inquiry || inquiry.access_token !== token) {
+            return res.status(403).json({ error: 'Forbidden', message: 'Invalid or expired tracking link.' });
+        }
+
+        const messages = await db.all(
+            `SELECT id, sender_id, sender_name, sender_email, message, is_internal, created_at 
+             FROM contact_inquiry_messages 
+             WHERE inquiry_id = (SELECT id FROM contact_inquiries WHERE inquiry_number = $1)
+               AND is_internal = 0
+             ORDER BY id ASC`,
+            [inquiryNumber]
+        );
+
+        const { access_token, ...safeInquiry } = inquiry;
+
+        res.json({ inquiry: safeInquiry, messages });
+    } catch (error) {
+        console.error('Error fetching tracked inquiry:', error);
+        res.status(500).json({ error: 'Server Error', message: 'Failed to retrieve inquiry' });
+    }
+};
+
+exports.addTrackedInquiryMessage = async (req, res) => {
+    try {
+        const { inquiryNumber } = req.params;
+        const { token, message } = req.body;
+
+        if (!token || !message || !message.trim()) {
+            return res.status(400).json({ error: 'Bad Request', message: 'Access token and message body are required.' });
+        }
+
+        const db = getDB();
+        const inquiry = await db.get(
+            `SELECT id, inquiry_number, name, email, subject, access_token 
+             FROM contact_inquiries 
+             WHERE inquiry_number = $1`,
+            [inquiryNumber]
+        );
+
+        if (!inquiry || inquiry.access_token !== token) {
+            return res.status(403).json({ error: 'Forbidden', message: 'Invalid or expired tracking link.' });
+        }
+
+        const msgRes = await db.get(
+            `INSERT INTO contact_inquiry_messages (inquiry_id, sender_name, sender_email, message, is_internal)
+             VALUES ($1, $2, $3, $4, 0) RETURNING id, created_at`,
+            [inquiry.id, inquiry.name, inquiry.email, message.trim()]
+        );
+
+        await db.run(
+            `UPDATE contact_inquiries SET status = 'IN_PROGRESS', updated_at = CURRENT_TIMESTAMP WHERE id = $1`,
+            [inquiry.id]
+        );
+
+        // Notify support officers in-app
+        const supportStaff = await db.all(
+            `SELECT id FROM users WHERE role IN ('SuperAdmin', 'SupportOfficer') AND is_active = 1`
+        );
+        for (const staff of supportStaff) {
+            await createNotification({
+                userId: staff.id,
+                title: `Visitor Reply on ${inquiry.inquiry_number}`,
+                message: `${inquiry.name}: ${message.trim()}`.substring(0, 150),
+                type: 'support',
+                link: `/dashboard/support/contact`
+            });
+        }
+
+        res.json({
+            message: 'Response posted successfully',
+            reply: {
+                id: msgRes.id,
+                sender_name: inquiry.name,
+                sender_email: inquiry.email,
+                message: message.trim(),
+                created_at: msgRes.created_at
+            }
+        });
+    } catch (error) {
+        console.error('Error adding tracked inquiry message:', error);
+        res.status(500).json({ error: 'Server Error', message: 'Failed to post message' });
     }
 };
